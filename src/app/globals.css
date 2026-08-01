@@ -1,26 +1,211 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #f4f6f4;
+  --bg-elevated: #ffffff;
+  --bg-muted: #e8ece9;
+  --fg: #121816;
+  --fg-muted: #5a6b62;
+  --fg-subtle: #8a9a91;
+  --border: #d5ddd8;
+  --border-strong: #b7c4bc;
+  --accent: #0f7a56;
+  --accent-fg: #f3fff9;
+  --accent-soft: #d8f3e7;
+  --gap: #b7791f;
+  --gap-fg: #fff8eb;
+  --gap-soft: #f8ead0;
+  --danger: #c23b3b;
+  --danger-soft: #f8e0e0;
+  --success: #1a8f5c;
+  --ring: #0f7a56;
+  --shadow: 0 18px 50px rgba(18, 24, 22, 0.08);
+  --hero-glow: radial-gradient(ellipse 80% 60% at 70% 20%, rgba(15, 122, 86, 0.14), transparent 60%),
+    radial-gradient(ellipse 50% 40% at 10% 80%, rgba(183, 121, 31, 0.1), transparent 55%),
+    linear-gradient(165deg, #f7f9f7 0%, #eef3f0 45%, #e6efe9 100%);
+  --grid-line: rgba(18, 24, 22, 0.05);
+}
+
+.dark {
+  --bg: #0a0e0c;
+  --bg-elevated: #121916;
+  --bg-muted: #1a221e;
+  --fg: #eef3f0;
+  --fg-muted: #9aaca2;
+  --fg-subtle: #6d7f75;
+  --border: #24302a;
+  --border-strong: #35453c;
+  --accent: #2ee6a6;
+  --accent-fg: #04140e;
+  --accent-soft: rgba(46, 230, 166, 0.12);
+  --gap: #e0b35c;
+  --gap-fg: #1a1306;
+  --gap-soft: rgba(224, 179, 92, 0.14);
+  --danger: #f07171;
+  --danger-soft: rgba(240, 113, 113, 0.14);
+  --success: #2ee6a6;
+  --ring: #2ee6a6;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  --hero-glow: radial-gradient(ellipse 70% 55% at 75% 15%, rgba(46, 230, 166, 0.16), transparent 55%),
+    radial-gradient(ellipse 45% 35% at 15% 85%, rgba(224, 179, 92, 0.12), transparent 50%),
+    linear-gradient(165deg, #0a0e0c 0%, #0d1411 50%, #101814 100%);
+  --grid-line: rgba(238, 243, 240, 0.04);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-muted: var(--bg-muted);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-gap: var(--gap);
+  --color-gap-fg: var(--gap-fg);
+  --color-gap-soft: var(--gap-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-success: var(--success);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-dm-sans);
+  --font-display: var(--font-space-grotesk);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  text-rendering: optimizeLegibility;
 }
+
+::selection {
+  background: color-mix(in oklab, var(--accent) 35%, transparent);
+  color: var(--fg);
+}
+
+.font-display {
+  font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
+}
+
+.bg-hero {
+  background: var(--hero-glow);
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 20%, transparent 75%);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes draw-line {
+  from {
+    stroke-dashoffset: 120;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-rise {
+  animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-rise-delay-1 {
+  animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
+}
+
+.animate-rise-delay-2 {
+  animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.24s both;
+}
+
+.animate-rise-delay-3 {
+  animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.36s both;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2.8s ease-in-out infinite;
+}
+
+.gap-meter-fill {
+  transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Clerk UserProfile — flatten into Settings Account card */
+.mg-clerk-account .cl-navbar,
+.mg-clerk-account .cl-navbarMobileMenuRow,
+.mg-clerk-account .cl-header,
+.mg-clerk-account .cl-profileSection__profile .cl-header {
+  display: none !important;
+}
+
+.mg-clerk-account .cl-rootBox,
+.mg-clerk-account .cl-cardBox,
+.mg-clerk-account .cl-card {
+  width: 100% !important;
+  max-width: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  background: transparent !important;
+}
+
+.mg-clerk-account .cl-scrollBox,
+.mg-clerk-account .cl-pageScrollBox {
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.mg-clerk-account .cl-profileSection {
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--bg-elevated);
+  padding: 0.875rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.mg-clerk-account .cl-profileSectionTitleText {
+  font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.mg-clerk-account a,
+.mg-clerk-account .cl-profileSectionPrimaryButton,
+.mg-clerk-account .cl-button__text {
+  color: var(--accent);
+}
+

@@ -1,0 +1,819 @@
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import {
+  audienceProfiles,
+  businessProfiles,
+  contentAnalyses,
+  moneyGapOpportunities,
+  reports,
+  websiteAnalyses,
+  websiteInsights,
+  websitePages,
+  websites,
+} from "@/db/schema";
+import { buildCrawlCorpus, crawlWebsite } from "@/lib/analysis/firecrawl";
+import type { IntelligenceResult } from "@/lib/analysis/openai";
+import { generateWebsiteIntelligence } from "@/lib/analysis/openai";
+import { persistMoneyGapEngineResult } from "@/lib/analysis/persist-money-gaps";
+import { persistCompetitiveIntelligence } from "@/lib/analysis/competitive/persist";
+import {
+  ANALYSIS_STAGES,
+  MISSING_KEYS_ERROR,
+  PUBLIC_CRAWL_ERROR,
+  type AnalysisStageId,
+} from "@/lib/analysis/stages";
+import { log } from "@/lib/observability/logger";
+import { trackProductMetric } from "@/lib/observability/metrics";
+import { MONEYGAP_ENGINE_VERSION, TRUST_ENGINE_VERSION } from "@/lib/trust";
+
+async function setStage(analysisId: string, stageId: AnalysisStageId | "complete") {
+  const stage =
+    stageId === "complete"
+      ? { id: "complete", label: "Complete", progress: 100 }
+      : ANALYSIS_STAGES.find((s) => s.id === stageId)!;
+
+  await db
+    .update(websiteAnalyses)
+    .set({
+      status: stageId === "complete" ? "completed" : "running",
+      stage: stage.label,
+      progress: stage.progress,
+      ...(stageId === "complete" ? { completedAt: new Date(), error: null } : {}),
+    })
+    .where(eq(websiteAnalyses.id, analysisId));
+}
+
+async function failAnalysis(analysisId: string, websiteId: string, message: string) {
+  const row = await db.query.websiteAnalyses.findFirst({
+    where: eq(websiteAnalyses.id, analysisId),
+    columns: { startedAt: true },
+  });
+  const durationMs = row?.startedAt
+    ? Date.now() - row.startedAt.getTime()
+    : null;
+
+  await db
+    .update(websiteAnalyses)
+    .set({
+      status: "failed",
+      stage: "Failed",
+      error: message,
+      completedAt: new Date(),
+      ...(durationMs != null ? { durationMs } : {}),
+    })
+    .where(eq(websiteAnalyses.id, analysisId));
+
+  await db
+    .update(websites)
+    .set({ status: "error", updatedAt: new Date() })
+    .where(eq(websites.id, websiteId));
+}
+
+function toUserSafeError(err: unknown): string {
+  if (err instanceof Error) {
+    if (
+      err.message === PUBLIC_CRAWL_ERROR ||
+      err.message === MISSING_KEYS_ERROR ||
+      err.message.includes("Intelligence generation failed")
+    ) {
+      return err.message;
+    }
+  }
+  return PUBLIC_CRAWL_ERROR;
+}
+
+function reconstructIntelligence(input: {
+  overview: string | null;
+  business: typeof businessProfiles.$inferSelect | null;
+  audience: typeof audienceProfiles.$inferSelect | null;
+  content: typeof contentAnalyses.$inferSelect | null;
+  insights: (typeof websiteInsights.$inferSelect)[];
+  intelligenceScore: number | null;
+  scoreBreakdown: {
+    businessClarity: number;
+    audienceClarity: number;
+    monetizationVisibility: number;
+    contentAuthority: number;
+    trustSignals: number;
+  } | null;
+}): IntelligenceResult {
+  const monetizationPresent = input.insights
+    .filter((i) => i.category === "monetization" && i.present === true)
+    .map((i) => i.title);
+  const monetizationMissing = input.insights
+    .filter((i) => i.category === "monetization" && i.present === false)
+    .map((i) => i.title);
+
+  const productsByKey = (key: string) =>
+    input.insights.filter((i) => i.category === "product" && i.key === key).map((i) => i.title);
+
+  const trustFlag = (key: string) =>
+    input.insights.find((i) => i.category === "trust" && i.key === key)?.present ?? false;
+
+  return {
+    overview: input.overview ?? "",
+    business: {
+      industry: input.business?.industry ?? "",
+      businessType: input.business?.businessType ?? "",
+      companyType: input.business?.companyType ?? "",
+      businessModel: input.business?.businessModel ?? "",
+      revenueModel: input.business?.revenueModel ?? "",
+      targetCustomer: input.business?.targetCustomer ?? "",
+      targetMarket: input.business?.targetMarket ?? "",
+      productsServices: input.business?.productsServices ?? [],
+    },
+    audience: {
+      primaryAudience: input.audience?.primaryAudience ?? "",
+      secondaryAudience: input.audience?.secondaryAudience ?? "",
+      customerProblems: input.audience?.customerProblems ?? [],
+      customerGoals: input.audience?.customerGoals ?? [],
+      buyingIntent: input.audience?.buyingIntent ?? "",
+    },
+    products: {
+      products: productsByKey("products"),
+      services: productsByKey("services"),
+      freeResources: productsByKey("free_resources"),
+      digitalProducts: productsByKey("digital_products"),
+      subscriptions: productsByKey("subscriptions"),
+      courses: productsByKey("courses"),
+      consulting: productsByKey("consulting"),
+      community: productsByKey("community"),
+    },
+    monetization: {
+      present: monetizationPresent,
+      missing: monetizationMissing,
+    },
+    content: {
+      blogPresence: input.content?.blogPresence ?? false,
+      contentCategories: input.content?.contentCategories ?? [],
+      contentFrequency: input.content?.contentFrequency ?? "",
+      educationalResources: input.content?.educationalResources ?? [],
+      seoOpportunities: input.content?.seoOpportunities ?? [],
+      contentStrengths: input.content?.contentStrengths ?? [],
+      contentStrategy: input.content?.contentStrategy ?? "",
+    },
+    trust: {
+      testimonials: Boolean(trustFlag("testimonials")),
+      reviews: Boolean(trustFlag("reviews")),
+      caseStudies: Boolean(trustFlag("case_studies")),
+      socialProof: Boolean(trustFlag("social_proof")),
+      credentials: Boolean(trustFlag("credentials")),
+      customerLogos: Boolean(trustFlag("customer_logos")),
+      details: input.insights
+        .filter((i) => i.category === "trust" && i.key === "detail")
+        .map((i) => i.title),
+    },
+    score: {
+      overall: input.intelligenceScore ?? 0,
+      businessClarity: input.scoreBreakdown?.businessClarity ?? 0,
+      audienceClarity: input.scoreBreakdown?.audienceClarity ?? 0,
+      monetizationVisibility: input.scoreBreakdown?.monetizationVisibility ?? 0,
+      contentAuthority: input.scoreBreakdown?.contentAuthority ?? 0,
+      trustSignals: input.scoreBreakdown?.trustSignals ?? 0,
+    },
+  };
+}
+
+export async function runMoneyGapEngineOnly(analysisId: string) {
+  const analysis = await db.query.websiteAnalyses.findFirst({
+    where: eq(websiteAnalyses.id, analysisId),
+    with: {
+      website: true,
+      report: {
+        with: {
+          businessProfile: true,
+          audienceProfile: true,
+          contentAnalysis: true,
+          insights: true,
+        },
+      },
+      pages: true,
+    },
+  });
+
+  if (!analysis?.reportId || !analysis.report) {
+    throw new Error("Analysis report not found.");
+  }
+
+  const corpus =
+    analysis.pages.length > 0
+      ? buildCrawlCorpus(
+          analysis.pages.map((p) => ({
+            url: p.url,
+            pageType: p.pageType as
+              | "homepage"
+              | "nav"
+              | "about"
+              | "services"
+              | "products"
+              | "pricing"
+              | "blog"
+              | "contact"
+              | "faq"
+              | "resources"
+              | "other",
+            title: p.title,
+            markdown: p.markdown ?? "",
+            metadata: (p.metadata as Record<string, unknown>) ?? {},
+          })),
+        )
+      : analysis.report.overview ?? "";
+
+  const intelligence = reconstructIntelligence({
+    overview: analysis.report.overview,
+    business: analysis.report.businessProfile,
+    audience: analysis.report.audienceProfile,
+    content: analysis.report.contentAnalysis,
+    insights: analysis.report.insights,
+    intelligenceScore: analysis.report.intelligenceScore,
+    scoreBreakdown: analysis.report.scoreBreakdown ?? null,
+  });
+
+  await setStage(analysisId, "detecting_gaps");
+  await setStage(analysisId, "quantifying");
+  await setStage(analysisId, "action_plans");
+
+  const result = await persistMoneyGapEngineResult({
+    analysisId,
+    reportId: analysis.reportId,
+    url: analysis.url,
+    domain: analysis.website.domain,
+    intelligence,
+    corpus,
+  });
+
+  if (result.ok) {
+    try {
+      const { runMonitorPostProcess } = await import("@/lib/monitor/post-process");
+      await runMonitorPostProcess({
+        websiteId: analysis.websiteId,
+        reportId: analysis.reportId,
+        workspaceId: analysis.workspaceId,
+        analysisId,
+      });
+    } catch (err) {
+      console.error("Monitor post-process soft-fail:", err);
+    }
+  }
+
+  await setStage(analysisId, "complete");
+  return result;
+}
+
+export async function runCompetitiveIntelligenceOnly(analysisId: string) {
+  const analysis = await db.query.websiteAnalyses.findFirst({
+    where: eq(websiteAnalyses.id, analysisId),
+    with: {
+      website: true,
+      report: {
+        with: {
+          businessProfile: true,
+          audienceProfile: true,
+          contentAnalysis: true,
+          insights: true,
+        },
+      },
+      pages: true,
+    },
+  });
+
+  if (!analysis?.reportId || !analysis.report) {
+    throw new Error("Analysis report not found.");
+  }
+
+  const corpus =
+    analysis.pages.length > 0
+      ? buildCrawlCorpus(
+          analysis.pages.map((p) => ({
+            url: p.url,
+            pageType: p.pageType as
+              | "homepage"
+              | "nav"
+              | "about"
+              | "services"
+              | "products"
+              | "pricing"
+              | "blog"
+              | "contact"
+              | "faq"
+              | "resources"
+              | "other",
+            title: p.title,
+            markdown: p.markdown ?? "",
+            metadata: (p.metadata as Record<string, unknown>) ?? {},
+          })),
+        )
+      : analysis.report.overview ?? "";
+
+  const intelligence = reconstructIntelligence({
+    overview: analysis.report.overview,
+    business: analysis.report.businessProfile,
+    audience: analysis.report.audienceProfile,
+    content: analysis.report.contentAnalysis,
+    insights: analysis.report.insights,
+    intelligenceScore: analysis.report.intelligenceScore,
+    scoreBreakdown: analysis.report.scoreBreakdown ?? null,
+  });
+
+  await db
+    .update(reports)
+    .set({
+      competitiveEngineStatus: "pending",
+      competitiveEngineError: null,
+    })
+    .where(eq(reports.id, analysis.reportId));
+
+  await setStage(analysisId, "discovering_competitors");
+
+  const result = await persistCompetitiveIntelligence({
+    analysisId,
+    reportId: analysis.reportId,
+    websiteId: analysis.websiteId,
+    ctx: {
+      url: analysis.url,
+      domain: analysis.website.domain,
+      siteName: analysis.website.name,
+      intelligence,
+      userCorpus: corpus,
+    },
+    hooks: {
+      onDiscoverDone: () => setStage(analysisId, "profiling_competitors"),
+      onProfileStart: () => setStage(analysisId, "profiling_competitors"),
+      onAnalyzeStart: () => setStage(analysisId, "competitive_analysis"),
+    },
+  });
+
+  if (result.ok) {
+    try {
+      const { writeCompetitorSnapshots } = await import(
+        "@/lib/monitor/competitor-snapshot"
+      );
+      await writeCompetitorSnapshots({
+        websiteId: analysis.websiteId,
+        reportId: analysis.reportId,
+      });
+    } catch (err) {
+      console.error("competitorSnapshots soft-fail:", err);
+    }
+  }
+
+  await setStage(analysisId, "complete");
+  return result;
+}
+
+export async function runAnalysisPipeline(analysisId: string) {
+  const startedAtMs = Date.now();
+  const analysis = await db.query.websiteAnalyses.findFirst({
+    where: eq(websiteAnalyses.id, analysisId),
+    with: { website: true },
+  });
+
+  if (!analysis) return;
+
+  if (!process.env.FIRECRAWL_API_KEY || !process.env.OPENAI_API_KEY) {
+    await failAnalysis(analysisId, analysis.websiteId, MISSING_KEYS_ERROR);
+    return;
+  }
+
+  try {
+    log("info", "analysis_started", {
+      analysisId,
+      workspaceId: analysis.workspaceId,
+      websiteId: analysis.websiteId,
+    });
+
+    await db
+      .update(websiteAnalyses)
+      .set({
+        status: "running",
+        startedAt: new Date(),
+        error: null,
+      })
+      .where(eq(websiteAnalyses.id, analysisId));
+
+    await db
+      .update(websites)
+      .set({ status: "analyzing", updatedAt: new Date() })
+      .where(eq(websites.id, analysis.websiteId));
+
+    await setStage(analysisId, "connecting");
+
+    await setStage(analysisId, "reading");
+    const pages = await crawlWebsite(analysis.url);
+
+    await db.delete(websitePages).where(eq(websitePages.analysisId, analysisId));
+    await db.insert(websitePages).values(
+      pages.map((page) => ({
+        analysisId,
+        url: page.url,
+        pageType: page.pageType,
+        title: page.title,
+        markdown: page.markdown,
+        metadata: page.metadata,
+      })),
+    );
+
+    const corpus = buildCrawlCorpus(pages);
+
+    await setStage(analysisId, "understanding");
+    const intelligence = await generateWebsiteIntelligence({
+      url: analysis.url,
+      domain: analysis.website.domain,
+      corpus,
+    });
+
+    await setStage(analysisId, "extracting");
+    await setStage(analysisId, "audience");
+    await setStage(analysisId, "content");
+    await setStage(analysisId, "preparing");
+
+    const siteName =
+      pages.find((p) => p.pageType === "homepage")?.title?.split(/[|\-–—]/)[0]?.trim() ||
+      analysis.website.name;
+
+    const [report] = await db
+      .insert(reports)
+      .values({
+        websiteId: analysis.websiteId,
+        workspaceId: analysis.workspaceId,
+        title: `${siteName} — Growth Intelligence`,
+        type: "intelligence",
+        status: "ready",
+        overview: intelligence.overview,
+        summary: intelligence.overview,
+        intelligenceScore: intelligence.score.overall,
+        scoreBreakdown: {
+          businessClarity: intelligence.score.businessClarity,
+          audienceClarity: intelligence.score.audienceClarity,
+          monetizationVisibility: intelligence.score.monetizationVisibility,
+          contentAuthority: intelligence.score.contentAuthority,
+          trustSignals: intelligence.score.trustSignals,
+        },
+        moneyGapScore: 0,
+        revenueAtRisk: 0,
+        capturePotential: 0,
+        moneyGapEngineStatus: "pending",
+        competitiveEngineStatus: "pending",
+      })
+      .returning();
+
+    await db.insert(businessProfiles).values({
+      analysisId,
+      reportId: report.id,
+      industry: intelligence.business.industry,
+      businessType: intelligence.business.businessType,
+      companyType: intelligence.business.companyType,
+      businessModel: intelligence.business.businessModel,
+      revenueModel: intelligence.business.revenueModel,
+      targetCustomer: intelligence.business.targetCustomer,
+      targetMarket: intelligence.business.targetMarket,
+      productsServices: intelligence.business.productsServices,
+    });
+
+    await db.insert(audienceProfiles).values({
+      analysisId,
+      reportId: report.id,
+      primaryAudience: intelligence.audience.primaryAudience,
+      secondaryAudience: intelligence.audience.secondaryAudience,
+      customerProblems: intelligence.audience.customerProblems,
+      customerGoals: intelligence.audience.customerGoals,
+      buyingIntent: intelligence.audience.buyingIntent,
+    });
+
+    await db.insert(contentAnalyses).values({
+      analysisId,
+      reportId: report.id,
+      blogPresence: intelligence.content.blogPresence,
+      contentCategories: intelligence.content.contentCategories,
+      contentFrequency: intelligence.content.contentFrequency,
+      educationalResources: intelligence.content.educationalResources,
+      seoOpportunities: intelligence.content.seoOpportunities,
+      contentStrengths: intelligence.content.contentStrengths,
+      contentStrategy: intelligence.content.contentStrategy,
+    });
+
+    const insightRows: {
+      analysisId: string;
+      reportId: string;
+      category: string;
+      key: string;
+      title: string;
+      body: string | null;
+      present: boolean | null;
+      sortOrder: number;
+    }[] = [];
+
+    let order = 0;
+    for (const item of intelligence.monetization.present) {
+      insightRows.push({
+        analysisId,
+        reportId: report.id,
+        category: "monetization",
+        key: `present:${item.toLowerCase().replace(/\s+/g, "_")}`,
+        title: item,
+        body: null,
+        present: true,
+        sortOrder: order++,
+      });
+    }
+    for (const item of intelligence.monetization.missing) {
+      insightRows.push({
+        analysisId,
+        reportId: report.id,
+        category: "monetization",
+        key: `missing:${item.toLowerCase().replace(/\s+/g, "_")}`,
+        title: item,
+        body: null,
+        present: false,
+        sortOrder: order++,
+      });
+    }
+
+    const productBuckets: [string, string[]][] = [
+      ["products", intelligence.products.products],
+      ["services", intelligence.products.services],
+      ["free_resources", intelligence.products.freeResources],
+      ["digital_products", intelligence.products.digitalProducts],
+      ["subscriptions", intelligence.products.subscriptions],
+      ["courses", intelligence.products.courses],
+      ["consulting", intelligence.products.consulting],
+      ["community", intelligence.products.community],
+    ];
+
+    for (const [key, items] of productBuckets) {
+      for (const item of items) {
+        insightRows.push({
+          analysisId,
+          reportId: report.id,
+          category: "product",
+          key,
+          title: item,
+          body: key.replace(/_/g, " "),
+          present: true,
+          sortOrder: order++,
+        });
+      }
+    }
+
+    const trustFlags: [string, boolean][] = [
+      ["testimonials", intelligence.trust.testimonials],
+      ["reviews", intelligence.trust.reviews],
+      ["case_studies", intelligence.trust.caseStudies],
+      ["social_proof", intelligence.trust.socialProof],
+      ["credentials", intelligence.trust.credentials],
+      ["customer_logos", intelligence.trust.customerLogos],
+    ];
+
+    for (const [key, present] of trustFlags) {
+      insightRows.push({
+        analysisId,
+        reportId: report.id,
+        category: "trust",
+        key,
+        title: key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        body: null,
+        present,
+        sortOrder: order++,
+      });
+    }
+
+    for (const detail of intelligence.trust.details) {
+      insightRows.push({
+        analysisId,
+        reportId: report.id,
+        category: "trust",
+        key: "detail",
+        title: detail,
+        body: detail,
+        present: true,
+        sortOrder: order++,
+      });
+    }
+
+    if (insightRows.length > 0) {
+      await db.insert(websiteInsights).values(insightRows);
+    }
+
+    await db
+      .update(websiteAnalyses)
+      .set({ reportId: report.id })
+      .where(eq(websiteAnalyses.id, analysisId));
+
+    // Phase 3: Money Gap Engine — intelligence stays usable if engine fails
+    await setStage(analysisId, "detecting_gaps");
+    await setStage(analysisId, "quantifying");
+    await setStage(analysisId, "action_plans");
+
+    await persistMoneyGapEngineResult({
+      analysisId,
+      reportId: report.id,
+      url: analysis.url,
+      domain: analysis.website.domain,
+      intelligence,
+      corpus,
+    });
+
+    // Phase 4: Competitive Intelligence™ — soft-fail (Phase 2/3 remain usable)
+    await setStage(analysisId, "discovering_competitors");
+    await persistCompetitiveIntelligence({
+      analysisId,
+      reportId: report.id,
+      websiteId: analysis.websiteId,
+      ctx: {
+        url: analysis.url,
+        domain: analysis.website.domain,
+        siteName: siteName.slice(0, 120),
+        intelligence,
+        userCorpus: corpus,
+      },
+      hooks: {
+        onDiscoverDone: () => setStage(analysisId, "profiling_competitors"),
+        onProfileStart: () => setStage(analysisId, "profiling_competitors"),
+        onAnalyzeStart: () => setStage(analysisId, "competitive_analysis"),
+      },
+    });
+
+    // Phase 6: Monitor post-process — soft-fail
+    try {
+      const { runMonitorPostProcess } = await import("@/lib/monitor/post-process");
+      await runMonitorPostProcess({
+        websiteId: analysis.websiteId,
+        reportId: report.id,
+        workspaceId: analysis.workspaceId,
+        analysisId,
+      });
+    } catch (err) {
+      log("warn", "monitor_post_process_soft_fail", {
+        analysisId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    // Phase 10: API webhooks — soft-fail
+    try {
+      const { emitWebhookEvent } = await import("@/lib/platform/webhooks");
+      await emitWebhookEvent({
+        workspaceId: analysis.workspaceId,
+        event: "analysis.completed",
+        data: {
+          analysis_id: analysisId,
+          website_id: analysis.websiteId,
+          report_id: report.id,
+          money_gap_score: report.moneyGapScore,
+        },
+      });
+      await emitWebhookEvent({
+        workspaceId: analysis.workspaceId,
+        event: "report.generated",
+        data: {
+          report_id: report.id,
+          website_id: analysis.websiteId,
+          money_gap_score: report.moneyGapScore,
+        },
+      });
+      await emitWebhookEvent({
+        workspaceId: analysis.workspaceId,
+        event: "score.updated",
+        data: {
+          website_id: analysis.websiteId,
+          report_id: report.id,
+          money_gap_score: report.moneyGapScore,
+          category_scores: report.categoryScores,
+        },
+      });
+      await emitWebhookEvent({
+        workspaceId: analysis.workspaceId,
+        event: "opportunity.detected",
+        data: {
+          report_id: report.id,
+          website_id: analysis.websiteId,
+        },
+      });
+    } catch (err) {
+      log("warn", "api_webhook_emit_soft_fail", {
+        analysisId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    const durationMs = Date.now() - startedAtMs;
+
+    await db
+      .update(websiteAnalyses)
+      .set({
+        reportId: report.id,
+        status: "completed",
+        stage: "Complete",
+        progress: 100,
+        completedAt: new Date(),
+        durationMs,
+        engineVersion: MONEYGAP_ENGINE_VERSION,
+        trustVersion: TRUST_ENGINE_VERSION,
+        error: null,
+      })
+      .where(eq(websiteAnalyses.id, analysisId));
+
+    try {
+      const { recordUsage } = await import("@/lib/billing");
+      await recordUsage({
+        workspaceId: analysis.workspaceId,
+        userId: analysis.userId,
+        type: "report_created",
+        meta: { reportId: report.id, analysisId },
+      });
+    } catch (err) {
+      log("warn", "usage_record_soft_fail", {
+        analysisId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    try {
+      const refreshed = await db.query.reports.findFirst({
+        where: eq(reports.id, report.id),
+      });
+      const score = refreshed?.moneyGapScore ?? report.moneyGapScore ?? 0;
+      await trackProductMetric({
+        type: "report_created",
+        workspaceId: analysis.workspaceId,
+        value: 1,
+        meta: { score },
+      });
+      await trackProductMetric({
+        type: "score_snapshot",
+        workspaceId: analysis.workspaceId,
+        value: score,
+      });
+      const opps = await db.query.moneyGapOpportunities.findMany({
+        where: eq(moneyGapOpportunities.reportId, report.id),
+        columns: { category: true },
+      });
+      const categories = [...new Set(opps.map((o) => o.category).filter(Boolean))];
+      for (const category of categories) {
+        await trackProductMetric({
+          type: "gap_category_seen",
+          workspaceId: analysis.workspaceId,
+          meta: { category },
+        });
+      }
+    } catch (err) {
+      log("warn", "product_metrics_soft_fail", {
+        analysisId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    log("info", "analysis_completed", {
+      analysisId,
+      workspaceId: analysis.workspaceId,
+      reportId: report.id,
+      durationMs,
+      engineVersion: MONEYGAP_ENGINE_VERSION,
+      trustVersion: TRUST_ENGINE_VERSION,
+    });
+
+    try {
+      const { recordTimelineEvent } = await import("@/lib/growth-os/timeline");
+      const { evaluateAchievements } = await import("@/lib/growth-os/achievements");
+      const latestReport = await db.query.reports.findFirst({
+        where: eq(reports.id, report.id),
+        columns: { moneyGapScore: true },
+      });
+      const score = latestReport?.moneyGapScore ?? report.moneyGapScore ?? 0;
+      await recordTimelineEvent({
+        workspaceId: analysis.workspaceId,
+        type: "analysis_started",
+        title: `Analysis completed for ${siteName.slice(0, 80)}`,
+        body: "Website intelligence + MoneyGap Engine finished",
+        meta: { analysisId, reportId: report.id },
+      });
+      if (score >= 90) {
+        await recordTimelineEvent({
+          workspaceId: analysis.workspaceId,
+          type: "score_threshold",
+          title: "Score reached 90",
+          meta: { score },
+        });
+      }
+      await evaluateAchievements(analysis.workspaceId);
+    } catch {
+      // soft-fail Growth OS hooks
+    }
+
+    await db
+      .update(websites)
+      .set({
+        name: siteName.slice(0, 120),
+        status: "active",
+        updatedAt: new Date(),
+      })
+      .where(eq(websites.id, analysis.websiteId));
+  } catch (err) {
+    log("error", "analysis_failed", {
+      analysisId,
+      durationMs: Date.now() - startedAtMs,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    await failAnalysis(analysisId, analysis.websiteId, toUserSafeError(err));
+  }
+}

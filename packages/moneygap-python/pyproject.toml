@@ -1,0 +1,5 @@
+[project]
+name = "moneygap"
+version = "0.1.0"
+description = "Thin MoneyGap AI Python SDK stub (REST /api/v1)"
+requires-python = ">=3.10"

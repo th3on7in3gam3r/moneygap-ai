@@ -1,0 +1,32 @@
+{
+  "uid": "MoneyGapAI_app",
+  "type": "app",
+  "config": {
+    "description": "MoneyGap AI connects HubSpot CRM contacts to growth intelligence.",
+    "name": "MoneyGap AI",
+    "distribution": "private",
+    "auth": {
+      "type": "oauth",
+      "redirectUrls": [
+        "http://localhost:3002/api/integrations/oauth/hubspot/callback"
+      ],
+      "requiredScopes": [
+        "oauth",
+        "crm.objects.contacts.read"
+      ],
+      "optionalScopes": [],
+      "conditionallyRequiredScopes": []
+    },
+    "permittedUrls": {
+      "fetch": ["https://api.hubapi.com"],
+      "iframe": [],
+      "img": []
+    },
+    "support": {
+      "supportEmail": "support@moneygap.ai",
+      "documentationUrl": "https://moneygap.ai",
+      "supportUrl": "https://moneygap.ai",
+      "supportPhone": ""
+    }
+  }
+}

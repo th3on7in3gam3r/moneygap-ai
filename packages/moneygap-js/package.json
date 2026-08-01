@@ -1,0 +1,8 @@
+{
+  "name": "@moneygap/sdk",
+  "version": "0.1.0",
+  "description": "Thin MoneyGap AI JavaScript SDK stub (REST /api/v1)",
+  "main": "index.ts",
+  "type": "module",
+  "license": "MIT"
+}

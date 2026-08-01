@@ -1,0 +1,91 @@
+# MoneyGap AI — Render Blueprint
+# Web service + daily MoneyGap Monitor™ cron (hits POST /api/cron/monitor)
+
+services:
+  - type: web
+    name: moneygap-ai
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: FIRECRAWL_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o
+      - key: CRON_SECRET
+        generateValue: true
+
+  - type: cron
+    name: moneygap-monitor
+    runtime: node
+    plan: starter
+    schedule: "0 12 * * *" # daily 12:00 UTC
+    buildCommand: npm install
+    startCommand: node -e "const s=process.env.CRON_SECRET;const u=process.env.APP_URL||process.env.RENDER_EXTERNAL_URL;if(!s||!u){console.error('Missing CRON_SECRET or APP_URL');process.exit(1)}fetch(u.replace(/\\/$/,'')+'/api/cron/monitor',{method:'POST',headers:{Authorization:'Bearer '+s,'Content-Type':'application/json'}}).then(async r=>{const t=await r.text();console.log(r.status,t);if(!r.ok)process.exit(1)}).catch(e=>{console.error(e);process.exit(1)})"
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: CRON_SECRET
+        fromService:
+          name: moneygap-ai
+          type: web
+          envVarKey: CRON_SECRET
+      - key: APP_URL
+        fromService:
+          name: moneygap-ai
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+
+  - type: cron
+    name: moneygap-agency-reports
+    runtime: node
+    plan: starter
+    schedule: "30 12 * * *" # daily 12:30 UTC
+    buildCommand: npm install
+    startCommand: node -e "const s=process.env.CRON_SECRET;const u=process.env.APP_URL||process.env.RENDER_EXTERNAL_URL;if(!s||!u){console.error('Missing CRON_SECRET or APP_URL');process.exit(1)}fetch(u.replace(/\\/$/,'')+'/api/cron/agency-reports',{method:'POST',headers:{Authorization:'Bearer '+s,'Content-Type':'application/json'}}).then(async r=>{const t=await r.text();console.log(r.status,t);if(!r.ok)process.exit(1)}).catch(e=>{console.error(e);process.exit(1)})"
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: CRON_SECRET
+        fromService:
+          name: moneygap-ai
+          type: web
+          envVarKey: CRON_SECRET
+      - key: APP_URL
+        fromService:
+          name: moneygap-ai
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+
+  - type: cron
+    name: moneygap-self-optimization
+    runtime: node
+    plan: starter
+    schedule: "0 13 * * *" # daily 13:00 UTC (after monitor)
+    buildCommand: npm install
+    startCommand: node -e "const s=process.env.CRON_SECRET;const u=process.env.APP_URL||process.env.RENDER_EXTERNAL_URL;if(!s||!u){console.error('Missing CRON_SECRET or APP_URL');process.exit(1)}fetch(u.replace(/\\/$/,'')+'/api/cron/self-optimization',{method:'POST',headers:{Authorization:'Bearer '+s,'Content-Type':'application/json'}}).then(async r=>{const t=await r.text();console.log(r.status,t);if(!r.ok)process.exit(1)}).catch(e=>{console.error(e);process.exit(1)})"
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: CRON_SECRET
+        fromService:
+          name: moneygap-ai
+          type: web
+          envVarKey: CRON_SECRET
+      - key: APP_URL
+        fromService:
+          name: moneygap-ai
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
