@@ -8,6 +8,8 @@ import { runAnalysisPipeline } from "@/lib/analysis/pipeline";
 import { validateAndNormalizeUrl } from "@/lib/analysis/url";
 import { ensureUserAndWorkspace } from "@/lib/analysis/workspace";
 
+export const maxDuration = 300;
+
 const createSchema = z.object({
   url: z.string().min(1),
 });

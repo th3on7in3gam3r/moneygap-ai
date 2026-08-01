@@ -5,6 +5,8 @@ import { db } from "@/db";
 import { websiteAnalyses } from "@/db/schema";
 import { runMoneyGapEngineOnly } from "@/lib/analysis/pipeline";
 
+export const maxDuration = 300;
+
 export async function POST(
   _req: Request,
   context: { params: Promise<{ id: string }> },
@@ -34,7 +36,15 @@ export async function POST(
   });
   if (!gate.ok) return upgradeResponse(gate);
 
-  if (!analysis.reportId || analysis.status !== "completed") {
+  if (!analysis.reportId) {
+    return Response.json(
+      { error: "Finish the website analysis before running the Money Gap Engine." },
+      { status: 400 },
+    );
+  }
+
+  // Allow retry when a prior run left status=running mid Money Gap Engine.
+  if (analysis.status !== "completed" && analysis.status !== "running" && analysis.status !== "failed") {
     return Response.json(
       { error: "Finish the website analysis before running the Money Gap Engine." },
       { status: 400 },

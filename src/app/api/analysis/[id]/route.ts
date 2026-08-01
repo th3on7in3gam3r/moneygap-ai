@@ -1,8 +1,15 @@
 import { auth } from "@clerk/nextjs/server";
+import { after } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { websiteAnalyses } from "@/db/schema";
+import {
+  isStaleRunningAnalysis,
+  resumeStuckAnalysis,
+} from "@/lib/analysis/pipeline";
 import { ANALYSIS_STAGES } from "@/lib/analysis/stages";
+
+export const maxDuration = 300;
 
 export async function GET(
   _req: Request,
@@ -22,6 +29,22 @@ export async function GET(
 
   if (!analysis) {
     return Response.json({ error: "Analysis not found." }, { status: 404 });
+  }
+
+  // Serverless often dies mid Money Gap Engine — resume when polling detects a stale run.
+  if (
+    isStaleRunningAnalysis({
+      status: analysis.status,
+      startedAt: analysis.startedAt,
+      reportId: analysis.reportId,
+    }) &&
+    analysis.reportId
+  ) {
+    after(() => {
+      void resumeStuckAnalysis(id).catch((err) => {
+        console.error("Stuck analysis resume failed:", err);
+      });
+    });
   }
 
   const stageLabels = ANALYSIS_STAGES.map((s) => s.label);

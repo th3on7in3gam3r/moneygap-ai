@@ -260,6 +260,98 @@ export async function runMoneyGapEngineOnly(analysisId: string) {
   return result;
 }
 
+const STALE_RUNNING_MS = 8 * 60 * 1000;
+
+/**
+ * Resume an analysis that died after the intelligence report was saved
+ * (common when Vercel `after()` hits a duration limit mid Money Gap Engine).
+ */
+export async function resumeStuckAnalysis(analysisId: string) {
+  const analysis = await db.query.websiteAnalyses.findFirst({
+    where: eq(websiteAnalyses.id, analysisId),
+    columns: {
+      id: true,
+      status: true,
+      reportId: true,
+      startedAt: true,
+      websiteId: true,
+    },
+  });
+
+  if (!analysis?.reportId) {
+    return { ok: false as const, reason: "no_report" as const };
+  }
+  if (analysis.status === "completed") {
+    return { ok: true as const, reason: "already_complete" as const };
+  }
+
+  log("info", "analysis_resume_stuck", {
+    analysisId,
+    status: analysis.status,
+    reportId: analysis.reportId,
+  });
+
+  // Reset the stale clock so concurrent status polls don't spawn duplicate resumes.
+  await db
+    .update(websiteAnalyses)
+    .set({
+      status: "running",
+      stage: "Building Growth Roadmap & scoring…",
+      progress: 88,
+      startedAt: new Date(),
+      error: null,
+    })
+    .where(eq(websiteAnalyses.id, analysisId));
+
+  try {
+    const moneyGap = await runMoneyGapEngineOnly(analysisId);
+    if (!moneyGap.ok) {
+      log("warn", "analysis_resume_money_gap_soft_fail", {
+        analysisId,
+        error: moneyGap.error,
+      });
+    }
+
+    try {
+      await runCompetitiveIntelligenceOnly(analysisId);
+    } catch (err) {
+      log("warn", "analysis_resume_competitive_soft_fail", {
+        analysisId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      await setStage(analysisId, "complete");
+    }
+
+    await db
+      .update(websites)
+      .set({ status: "active", updatedAt: new Date() })
+      .where(eq(websites.id, analysis.websiteId));
+
+    return { ok: true as const, reason: "resumed" as const };
+  } catch (err) {
+    log("error", "analysis_resume_failed", {
+      analysisId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    await failAnalysis(
+      analysisId,
+      analysis.websiteId,
+      "Analysis timed out while building the Growth Roadmap. Retry the scan — your business intelligence draft may already be saved.",
+    );
+    return { ok: false as const, reason: "failed" as const };
+  }
+}
+
+/** True when a running analysis looks abandoned (serverless kill / hung OpenAI). */
+export function isStaleRunningAnalysis(input: {
+  status: string;
+  startedAt: Date | null;
+  reportId: string | null;
+}): boolean {
+  if (input.status !== "running" || !input.startedAt) return false;
+  return Date.now() - input.startedAt.getTime() >= STALE_RUNNING_MS;
+}
+
 export async function runCompetitiveIntelligenceOnly(analysisId: string) {
   const analysis = await db.query.websiteAnalyses.findFirst({
     where: eq(websiteAnalyses.id, analysisId),
