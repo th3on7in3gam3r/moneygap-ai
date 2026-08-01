@@ -46,7 +46,7 @@ export function recommendFixPaths(
     /schema|auth|clerk|middleware|api route|database|migration|drizzle|prisma/.test(
       blob,
     ) ||
-    moduleId === "ai";
+    (moduleId === "ai" && playbook !== "site_chatbot");
 
   const isAutomation =
     moduleId === "automation" ||
@@ -60,6 +60,7 @@ export function recommendFixPaths(
       "backlinks",
       "lead_magnet",
       "seo_content",
+      "site_chatbot",
     ].includes(playbook) ||
     moduleId === "marketing" ||
     moduleId === "content" ||
@@ -67,7 +68,11 @@ export function recommendFixPaths(
     moduleId === "trust" ||
     /email|newsletter|testimonial|review|landing page|copy/.test(blob);
 
-  if (isDevHeavy) {
+  // Chatbot packs are draft-shaped — prefer Action Center before blanket AI → Developer Mode
+  if (playbook === "site_chatbot") {
+    recommendedId = "action_assets";
+    reason = "Playbook-friendly gap—Build with Action Center for editable drafts.";
+  } else if (isDevHeavy) {
     recommendedId = "developer_ai";
     reason =
       "Looks implementation-heavy—Code + AI (plans & blueprints) is a strong fit.";

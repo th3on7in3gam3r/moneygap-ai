@@ -64,6 +64,16 @@ const CHECKLISTS: Record<PlaybookId, string[]> = {
     "Publish reviewed drafts outside MoneyGap (human approval)",
     "Measure organic traffic, leads, and conversions (AI Estimate baseline)",
   ],
+  site_chatbot: [
+    "List top FAQs and objections for the offer",
+    "Draft automated FAQ replies for human review",
+    "Design lead-qualify questions and routing rules",
+    "Choose a chatbot tool (Intercom, Drift, or similar) — config draft only",
+    "Write sample conversation scripts with CTAs to trial / demo / sales",
+    "Review transcripts and handoff rules before go-live",
+    "Enable reviewed bot outside MoneyGap (human approval)",
+    "Measure chat starts, qualified leads, and conversions (AI Estimate baseline)",
+  ],
   generic: [
     "Clarify the desired business outcome",
     "Define the smallest shippable version",

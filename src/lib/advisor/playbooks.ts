@@ -6,6 +6,7 @@ export type PlaybookId =
   | "lead_magnet"
   | "digital_product"
   | "seo_content"
+  | "site_chatbot"
   | "generic";
 
 export type ActionButtonId =
@@ -79,6 +80,15 @@ const PLAYBOOK_BUTTONS: Record<PlaybookId, ActionButtonId[]> = {
     "checklist",
     "ask_advisor",
   ],
+  site_chatbot: [
+    "build",
+    "learn_why",
+    "save",
+    "complete",
+    "create_project",
+    "checklist",
+    "ask_advisor",
+  ],
   generic: [
     "build",
     "learn_why",
@@ -112,6 +122,16 @@ export function resolvePlaybook(input: {
   const hay = `${input.moduleId ?? ""} ${input.category ?? ""} ${input.title} ${input.whatsMissing ?? ""}`.toLowerCase();
 
   if (/newsletter|email list|welcome sequence|drip/.test(hay)) return "newsletter";
+  // Chatbot / live chat before bare FAQ so "AI chatbot for FAQ" ≠ FAQ Page Pack
+  if (
+    /chatbot|live chat|conversational|lead qualif|ai assistant|intercom|drift/.test(
+      hay,
+    ) ||
+    (input.moduleId === "ai" &&
+      /chat|faq|qualify|assistant|conversational/.test(hay))
+  ) {
+    return "site_chatbot";
+  }
   if (/\bfaq\b|frequently asked/.test(hay)) return "faq";
   if (/testimonial|review|social proof|case stud/.test(hay)) return "testimonials";
   if (/backlink|guest post|outreach|authority|digital pr|mention/.test(hay))
@@ -158,6 +178,7 @@ export function playbookTitle(playbook: PlaybookId): string {
     lead_magnet: "Lead Magnet Builder Pack",
     digital_product: "Digital Product Builder Pack",
     seo_content: "Buyer-Intent Content Pack",
+    site_chatbot: "Site Chatbot Pack",
     generic: "Implementation Pack",
   };
   return map[playbook];

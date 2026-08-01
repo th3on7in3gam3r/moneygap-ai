@@ -68,6 +68,14 @@ sales page draft, launch plan, and marketing strategy. Frame estimates as direct
 6) Implementation checklist (research → drafts → human review → publish outside MoneyGap),
 7) Impact note labeled "AI Estimate" with no guarantees on traffic, leads, or revenue.
 Never claim content is live or auto-published. All copy is for human review before publish.`,
+  site_chatbot: `Generate a Site Chatbot Pack for missing AI assistant / FAQ + lead qualification chat. Include sections for:
+1) FAQ / objection answer bank tailored to the business (draft replies only),
+2) Lead-qualify question flow with routing rules (trial / demo / sales handoff / self-serve),
+3) Sample conversation transcripts (visitor → bot → CTA) — labeled as drafts for human review,
+4) Tool shortlist notes (Intercom, Drift, or similar) as configuration guidance — not SDK embeds or live widgets,
+5) Implementation checklist (research → draft flows → human review → enable outside MoneyGap),
+6) Impact note labeled "AI Estimate" with no guarantees on leads, conversions, or revenue.
+Never claim a chatbot is live or auto-connected to CRM/email. All copy and flows are for human review before enablement.`,
   generic: `Generate a practical Implementation Pack for this Money Gap: strategy overview, copy drafts,
 step-by-step plan, and checklist. Connect every step to Visibility → Traffic → Leads → Customers → Revenue.`,
 };

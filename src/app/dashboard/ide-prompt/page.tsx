@@ -3,9 +3,15 @@
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { ArrowLeft, Check, Copy, Code2 } from "lucide-react";
+import type { OpportunityFix } from "@/db/schema";
+import {
+  EstimateBadge,
+  FixPlan,
+} from "@/components/money-gap/opportunity-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { formatCurrency } from "@/lib/utils";
 
 type PromptItem = {
   tool: string;
@@ -22,9 +28,13 @@ type Opportunity = {
   moduleId: string;
   summary: string | null;
   whatsMissing: string;
+  whyItMatters: string;
+  businessImpact: string;
+  estimatedAnnualRevenue: number | null;
   difficulty: string;
   estimatedTime: string | null;
   opportunityIndex: number;
+  fixes: OpportunityFix[] | null;
 };
 
 type Payload = {
@@ -177,7 +187,7 @@ export default function IdePromptPage() {
       {data && (
         <>
           <Card>
-            <CardHeader>
+            <CardHeader className="space-y-5">
               <div className="flex items-start gap-3">
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
                   <Code2 className="size-5" />
@@ -196,17 +206,92 @@ export default function IdePromptPage() {
                   <p className="mt-1 text-sm leading-relaxed text-fg-muted">
                     {data.opportunity.summary ?? data.opportunity.whatsMissing}
                   </p>
-                  <p className="mt-2 text-xs text-fg-subtle">
-                    Difficulty: {data.opportunity.difficulty}
-                    {data.opportunity.estimatedTime
-                      ? ` · Est. time: ${data.opportunity.estimatedTime}`
-                      : ""}
-                    {data.stackSummary
-                      ? ` · Stack: ${data.stackSummary}`
-                      : " · Project Memory optional"}
+                </div>
+              </div>
+
+              <div className="grid gap-3 border-y border-border py-3 sm:grid-cols-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-fg-subtle">
+                    Difficulty
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-fg">
+                    {data.opportunity.difficulty}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-fg-subtle">
+                    Est. time
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-fg">
+                    {data.opportunity.estimatedTime ?? "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-fg-subtle">
+                    Stack
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-fg">
+                    {data.stackSummary ?? "Project Memory optional"}
                   </p>
                 </div>
               </div>
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-fg-subtle">
+                    What’s missing
+                  </p>
+                  <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">
+                    {data.opportunity.whatsMissing}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-fg-subtle">
+                    Why it matters
+                  </p>
+                  <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">
+                    {data.opportunity.whyItMatters}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-fg-subtle">
+                    Business impact
+                  </p>
+                  <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">
+                    {data.opportunity.businessImpact}
+                  </p>
+                </div>
+              </div>
+
+              {data.opportunity.estimatedAnnualRevenue != null &&
+              data.opportunity.estimatedAnnualRevenue > 0 ? (
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-bg-muted/50 px-3.5 py-3">
+                  <EstimateBadge />
+                  <span className="text-sm text-fg-muted">
+                    Estimated annual impact:
+                  </span>
+                  <span className="font-display text-base font-semibold text-fg">
+                    {formatCurrency(data.opportunity.estimatedAnnualRevenue)}
+                  </span>
+                  <span className="text-xs text-fg-subtle">— not a guarantee</span>
+                </div>
+              ) : null}
+
+              {data.opportunity.fixes && data.opportunity.fixes.length > 0 ? (
+                <details className="group rounded-xl border border-border">
+                  <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-fg marker:content-none [&::-webkit-details-marker]:hidden">
+                    <span className="flex items-center justify-between gap-2">
+                      Fix Plan
+                      <span className="text-fg-subtle transition group-open:rotate-45">
+                        +
+                      </span>
+                    </span>
+                  </summary>
+                  <div className="border-t border-border px-4 py-4">
+                    <FixPlan fixes={data.opportunity.fixes} />
+                  </div>
+                </details>
+              ) : null}
             </CardHeader>
           </Card>
 
