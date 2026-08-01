@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { GOAL_TYPES } from "@/lib/growth-os/goal-types";
 import { formatCurrency } from "@/lib/utils";
 
 type TodayPayload = Awaited<
@@ -9,7 +10,49 @@ type TodayPayload = Awaited<
 >;
 
 export function TodayFocusPanel({ data }: { data: TodayPayload }) {
-  const { greeting, focus } = data;
+  const { greeting, focus, goals, portfolio, journey } = data;
+  const latestScore =
+    journey.scoreHistory.length > 0
+      ? journey.scoreHistory[journey.scoreHistory.length - 1]!.score
+      : null;
+  const goalLabels = Object.fromEntries(
+    GOAL_TYPES.map((g) => [g.id, g.label]),
+  );
+
+  const focusStats = [
+    {
+      label: "High priority",
+      value: String(focus.highPriorityCount),
+      hint:
+        focus.highPriorityCount === 1 ? "Opportunity" : "Opportunities",
+    },
+    {
+      label: "Projects waiting",
+      value: String(focus.projectsWaiting),
+      hint: focus.projectsWaiting === 1 ? "In progress" : "Active / paused",
+    },
+    {
+      label: "MoneyGap Score™",
+      value:
+        latestScore != null
+          ? String(latestScore)
+          : focus.scoreDelta != null
+            ? `${focus.scoreDelta > 0 ? "+" : ""}${focus.scoreDelta}`
+            : "—",
+      hint:
+        focus.scoreDelta != null && focus.scoreDelta !== 0
+          ? `${focus.scoreDelta > 0 ? "+" : ""}${focus.scoreDelta} recently`
+          : "Latest rollup",
+    },
+    {
+      label: "Annual opportunity",
+      value: formatCurrency(portfolio.estimatedAnnual, {
+        compact: portfolio.estimatedAnnual >= 10000,
+      }),
+      hint: "Across all websites",
+    },
+  ];
+
   return (
     <Card>
       <CardHeader>
@@ -21,8 +64,8 @@ export function TodayFocusPanel({ data }: { data: TodayPayload }) {
             {greeting}
           </h2>
         </div>
-        <Button href="/dashboard/goals" size="sm" variant="secondary">
-          Goals
+        <Button href="/dashboard/copilot" size="sm" variant="secondary">
+          Plan my day
         </Button>
       </CardHeader>
       <CardBody className="space-y-5">
@@ -30,56 +73,120 @@ export function TodayFocusPanel({ data }: { data: TodayPayload }) {
           <h3 className="text-xs font-semibold uppercase tracking-[0.1em] text-accent">
             Today&apos;s Focus
           </h3>
-          <ul className="mt-3 space-y-2 text-sm text-fg">
-            <li>
-              <span className="tabular-nums font-semibold">
-                {focus.highPriorityCount}
-              </span>{" "}
-              High Priority{" "}
-              {focus.highPriorityCount === 1 ? "Opportunity" : "Opportunities"}
-            </li>
-            <li>
-              <span className="tabular-nums font-semibold">
-                {focus.projectsWaiting}
-              </span>{" "}
-              Project{focus.projectsWaiting === 1 ? "" : "s"} Waiting
-            </li>
-            {focus.scoreDelta != null && focus.scoreDelta !== 0 && (
-              <li>
-                MoneyGap Score™ {focus.scoreDelta > 0 ? "increased" : "changed"}{" "}
-                recently ({focus.scoreDelta > 0 ? "+" : ""}
-                {focus.scoreDelta}).
-              </li>
-            )}
-            {focus.competitorLine && <li>{focus.competitorLine}</li>}
-          </ul>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {focusStats.map((stat) => (
+              <div
+                key={stat.label}
+                className="rounded-xl border border-border bg-bg px-3 py-3"
+              >
+                <p className="text-[11px] uppercase tracking-[0.08em] text-fg-subtle">
+                  {stat.label}
+                </p>
+                <p className="mt-1 font-display text-2xl font-semibold tabular-nums text-fg">
+                  {stat.value}
+                </p>
+                <p className="mt-0.5 text-xs text-fg-muted">{stat.hint}</p>
+              </div>
+            ))}
+          </div>
+          {focus.competitorLine ? (
+            <p className="mt-3 text-sm text-fg-muted">{focus.competitorLine}</p>
+          ) : null}
         </div>
 
-        {focus.recommendation && (
-          <div className="rounded-xl border border-border bg-bg px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-subtle">
-              AI Recommendation
-            </p>
-            {(focus.recommendation.websiteDomain ||
-              focus.recommendation.websiteName) && (
-              <p className="mt-1 text-xs font-medium text-accent">
-                {focus.recommendation.websiteName
-                  ? `${focus.recommendation.websiteName} · `
-                  : ""}
-                {focus.recommendation.websiteDomain}
-              </p>
-            )}
-            <p className="mt-1 text-sm font-medium text-fg">
-              {focus.recommendation.title}
-            </p>
-            <p className="mt-1 text-xs text-fg-muted">{focus.recommendation.reason}</p>
-            <div className="mt-3">
-              <Button href={focus.recommendation.href} size="sm">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+          {focus.recommendation ? (
+            <div className="flex flex-col justify-between gap-4 rounded-xl border border-border bg-bg px-4 py-4 sm:flex-row sm:items-center">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-subtle">
+                  AI Recommendation
+                </p>
+                {(focus.recommendation.websiteDomain ||
+                  focus.recommendation.websiteName) && (
+                  <p className="mt-1 truncate text-xs font-medium text-accent">
+                    {focus.recommendation.websiteName
+                      ? `${focus.recommendation.websiteName} · `
+                      : ""}
+                    {focus.recommendation.websiteDomain}
+                  </p>
+                )}
+                <p className="mt-1 text-base font-medium text-fg">
+                  {focus.recommendation.title}
+                </p>
+                <p className="mt-1 text-xs text-fg-muted">
+                  {focus.recommendation.reason}
+                </p>
+              </div>
+              <Button
+                href={focus.recommendation.href}
+                size="sm"
+                className="shrink-0 self-start sm:self-center"
+              >
                 Work On This
               </Button>
             </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-border px-4 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-subtle">
+                AI Recommendation
+              </p>
+              <p className="mt-2 text-sm text-fg-muted">
+                Run a website analysis to unlock your next best action.
+              </p>
+              <Button href="/dashboard/analyze" size="sm" className="mt-3">
+                Analyze website
+              </Button>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-border px-4 py-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-subtle">
+                Active Goals
+              </p>
+              <Link
+                href="/dashboard/goals"
+                className="text-xs font-medium text-accent hover:underline"
+              >
+                Manage
+              </Link>
+            </div>
+            {goals.length === 0 ? (
+              <div className="mt-3">
+                <p className="text-sm text-fg-muted">
+                  Set goals so recommendations align with what matters most.
+                </p>
+                <Button
+                  href="/dashboard/goals"
+                  size="sm"
+                  variant="secondary"
+                  className="mt-3"
+                >
+                  Add a goal
+                </Button>
+              </div>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {goals.slice(0, 4).map((g) => (
+                  <li
+                    key={g.id}
+                    className="flex items-start justify-between gap-2 text-sm"
+                  >
+                    <span className="min-w-0 font-medium text-fg">{g.title}</span>
+                    <span className="shrink-0 text-[11px] uppercase tracking-[0.06em] text-fg-subtle">
+                      {goalLabels[g.type] ?? g.type}
+                    </span>
+                  </li>
+                ))}
+                {goals.length > 4 ? (
+                  <li className="text-xs text-fg-muted">
+                    +{goals.length - 4} more
+                  </li>
+                ) : null}
+              </ul>
+            )}
           </div>
-        )}
+        </div>
       </CardBody>
     </Card>
   );
