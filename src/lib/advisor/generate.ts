@@ -59,6 +59,15 @@ Focus on business outcomes (traffic → leads → revenue), not vanity metrics.`
 worksheet, mini course, and email course — pick the best 2–3 for this business and draft outlines + opt-in copy.`,
   digital_product: `Generate a Digital Product Builder Pack: 10 product ideas, positioning, pricing guidance (AI Estimate),
 sales page draft, launch plan, and marketing strategy. Frame estimates as directional.`,
+  seo_content: `Generate a Buyer-Intent Content Pack for thin topical / SEO content gaps. Include sections for:
+1) Buyer-intent keyword shortlist (8–12 keywords) with funnel stage (awareness / consideration / decision),
+2) 90-day content calendar (weekly topics only — draft editorial plan, not published),
+3) One full markdown article draft for the top buyer-intent keyword,
+4) Internal-linking plan to home, pricing, and related conversion pages,
+5) FAQ / comparison page outline for high-intent queries,
+6) Implementation checklist (research → drafts → human review → publish outside MoneyGap),
+7) Impact note labeled "AI Estimate" with no guarantees on traffic, leads, or revenue.
+Never claim content is live or auto-published. All copy is for human review before publish.`,
   generic: `Generate a practical Implementation Pack for this Money Gap: strategy overview, copy drafts,
 step-by-step plan, and checklist. Connect every step to Visibility → Traffic → Leads → Customers → Revenue.`,
 };
