@@ -54,6 +54,16 @@ const CHECKLISTS: Record<PlaybookId, string[]> = {
     "Market and sell",
     "Collect feedback and iterate",
   ],
+  seo_content: [
+    "Identify top buyer-intent keywords for the offer",
+    "Prioritize 3–5 long-tail topics for first drafts",
+    "Draft first targeted blog posts for human review",
+    "Build a 90-day buyer-intent content calendar",
+    "Add internal links from new drafts to pricing / home",
+    "Outline FAQ or comparison pages for decision-stage queries",
+    "Publish reviewed drafts outside MoneyGap (human approval)",
+    "Measure organic traffic, leads, and conversions (AI Estimate baseline)",
+  ],
   generic: [
     "Clarify the desired business outcome",
     "Define the smallest shippable version",

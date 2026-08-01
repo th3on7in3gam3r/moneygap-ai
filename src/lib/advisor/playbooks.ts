@@ -5,6 +5,7 @@ export type PlaybookId =
   | "backlinks"
   | "lead_magnet"
   | "digital_product"
+  | "seo_content"
   | "generic";
 
 export type ActionButtonId =
@@ -69,6 +70,15 @@ const PLAYBOOK_BUTTONS: Record<PlaybookId, ActionButtonId[]> = {
     "checklist",
     "ask_advisor",
   ],
+  seo_content: [
+    "build",
+    "learn_why",
+    "save",
+    "complete",
+    "create_project",
+    "checklist",
+    "ask_advisor",
+  ],
   generic: [
     "build",
     "learn_why",
@@ -122,6 +132,15 @@ export function resolvePlaybook(input: {
   if (input.moduleId === "content" && /faq/.test(hay)) return "faq";
   if (input.moduleId === "marketing" && /lead|magnet|download/.test(hay))
     return "lead_magnet";
+  if (
+    /buyer.?intent|thin topical|pillar|content calendar|long.?tail|comparison page|\bgeo\b|ai citation/.test(
+      hay,
+    ) ||
+    input.moduleId === "seo" ||
+    input.moduleId === "content"
+  ) {
+    return "seo_content";
+  }
 
   return "generic";
 }
@@ -138,6 +157,7 @@ export function playbookTitle(playbook: PlaybookId): string {
     backlinks: "Backlink Campaign Pack",
     lead_magnet: "Lead Magnet Builder Pack",
     digital_product: "Digital Product Builder Pack",
+    seo_content: "Buyer-Intent Content Pack",
     generic: "Implementation Pack",
   };
   return map[playbook];

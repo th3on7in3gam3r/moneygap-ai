@@ -53,11 +53,17 @@ export function recommendFixPaths(
     /automat|workflow|zapier|crm sync|nurture sequence/.test(blob);
 
   const isMarketingAssets =
-    ["newsletter", "faq", "testimonials", "backlinks", "lead_magnet"].includes(
-      playbook,
-    ) ||
+    [
+      "newsletter",
+      "faq",
+      "testimonials",
+      "backlinks",
+      "lead_magnet",
+      "seo_content",
+    ].includes(playbook) ||
     moduleId === "marketing" ||
     moduleId === "content" ||
+    moduleId === "seo" ||
     moduleId === "trust" ||
     /email|newsletter|testimonial|review|landing page|copy/.test(blob);
 
