@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/#product", label: "Product" },
+  { href: "/academy", label: "Growth Academy" },
   { href: "/pricing", label: "Pricing" },
   { href: "/about", label: "About" },
 ];
@@ -71,6 +72,9 @@ export function MarketingFooter() {
           </p>
         </div>
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-fg-muted">
+          <Link href="/academy" className="hover:text-fg">
+            Growth Academy
+          </Link>
           <Link href="/pricing" className="hover:text-fg">
             Pricing
           </Link>

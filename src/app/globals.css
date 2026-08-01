@@ -160,6 +160,119 @@ body {
   animation: pulse-soft 2.8s ease-in-out infinite;
 }
 
+/* Growth Academy™ editorial prose */
+.academy-prose {
+  max-width: 42rem;
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  color: var(--fg);
+}
+
+.academy-prose > * + * {
+  margin-top: 1.15rem;
+}
+
+.academy-prose h2 {
+  margin-top: 2.75rem;
+  font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
+  font-size: 1.65rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--fg);
+  scroll-margin-top: 6rem;
+}
+
+.academy-prose h3 {
+  margin-top: 2rem;
+  font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--fg);
+  scroll-margin-top: 6rem;
+}
+
+.academy-prose p {
+  color: color-mix(in oklab, var(--fg) 92%, var(--fg-muted));
+}
+
+.academy-prose strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.academy-prose a {
+  color: var(--accent);
+  text-underline-offset: 3px;
+}
+
+.academy-prose a:hover {
+  text-decoration: underline;
+}
+
+.academy-prose ul,
+.academy-prose ol {
+  padding-left: 1.35rem;
+  color: color-mix(in oklab, var(--fg) 92%, var(--fg-muted));
+}
+
+.academy-prose li + li {
+  margin-top: 0.45rem;
+}
+
+.academy-prose ul {
+  list-style: disc;
+}
+
+.academy-prose ol {
+  list-style: decimal;
+}
+
+.academy-prose blockquote {
+  margin: 1.75rem 0;
+  border-left: 3px solid var(--accent);
+  padding: 0.35rem 0 0.35rem 1.15rem;
+  font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
+  font-size: 1.2rem;
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: -0.015em;
+  color: var(--fg);
+}
+
+.academy-prose blockquote p {
+  margin: 0;
+  color: var(--fg);
+}
+
+.academy-prose pre {
+  margin: 1.5rem 0;
+  overflow-x: auto;
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  background: var(--bg-muted);
+  padding: 1rem 1.15rem;
+  font-size: 0.875rem;
+}
+
+.academy-prose code {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.9em;
+}
+
+.academy-prose :not(pre) > code {
+  border-radius: 0.35rem;
+  background: var(--bg-muted);
+  padding: 0.1rem 0.35rem;
+}
+
+.academy-prose hr {
+  margin: 2.5rem 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
 .gap-meter-fill {
   transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
 }

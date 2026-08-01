@@ -4288,3 +4288,211 @@ export const workspaceOnboardingRelations = relations(
 );
 
 export type WorkspaceOnboarding = typeof workspaceOnboarding.$inferSelect;
+
+/* ─── Growth Academy™ (public content hub — distinct from Marketplace courses) ─── */
+
+export type GaArticleStatus = "draft" | "scheduled" | "published" | "archived";
+export type GaSectionType =
+  | "articles"
+  | "guides"
+  | "tutorials"
+  | "case_studies"
+  | "insights"
+  | "seo"
+  | "conversion"
+  | "technical_seo"
+  | "ai"
+  | "marketing"
+  | "product_updates"
+  | "release_notes"
+  | "success_stories"
+  | "research"
+  | "prompt_library";
+
+export type GaFaqItem = { question: string; answer: string };
+export type GaAiAssist = {
+  internalLinks?: { href: string; label: string; reason: string }[];
+  externalCitations?: { url: string; label: string }[];
+  socialPosts?: { channel: string; copy: string }[];
+  newsletterCopy?: string;
+  imagePrompts?: string[];
+  ctas?: string[];
+  schemaNotes?: string;
+};
+export type GaAuthorSocials = {
+  twitter?: string;
+  linkedin?: string;
+  website?: string;
+};
+
+export const gaAuthors = pgTable(
+  "ga_authors",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    slug: text("slug").notNull().unique(),
+    name: text("name").notNull(),
+    bio: text("bio"),
+    avatarUrl: text("avatar_url"),
+    socials: jsonb("socials").$type<GaAuthorSocials>().notNull().default({}),
+    expertise: jsonb("expertise").$type<string[]>().notNull().default([]),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+);
+
+export const gaCategories = pgTable(
+  "ga_categories",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    slug: text("slug").notNull().unique(),
+    name: text("name").notNull(),
+    description: text("description"),
+    sectionType: text("section_type").$type<GaSectionType>().notNull().default("articles"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+);
+
+export const gaTags = pgTable("ga_tags", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const gaArticles = pgTable(
+  "ga_articles",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    slug: text("slug").notNull().unique(),
+    title: text("title").notNull(),
+    excerpt: text("excerpt"),
+    bodyMarkdown: text("body_markdown").notNull().default(""),
+    status: text("status").$type<GaArticleStatus>().notNull().default("draft"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+    featuredImageUrl: text("featured_image_url"),
+    authorId: uuid("author_id").references(() => gaAuthors.id, {
+      onDelete: "set null",
+    }),
+    seoTitle: text("seo_title"),
+    seoDescription: text("seo_description"),
+    canonicalUrl: text("canonical_url"),
+    ogImage: text("og_image"),
+    faqJson: jsonb("faq_json").$type<GaFaqItem[]>().notNull().default([]),
+    aiAssist: jsonb("ai_assist").$type<GaAiAssist>().notNull().default({}),
+    readingTimeMinutes: integer("reading_time_minutes").notNull().default(1),
+    featured: boolean("featured").notNull().default(false),
+    viewCount: integer("view_count").notNull().default(0),
+    version: integer("version").notNull().default(1),
+    createdByUserId: text("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("ga_articles_status_idx").on(t.status),
+    index("ga_articles_published_idx").on(t.publishedAt),
+    index("ga_articles_author_idx").on(t.authorId),
+  ],
+);
+
+export const gaArticleCategories = pgTable(
+  "ga_article_categories",
+  {
+    articleId: uuid("article_id")
+      .notNull()
+      .references(() => gaArticles.id, { onDelete: "cascade" }),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => gaCategories.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    uniqueIndex("ga_article_categories_uidx").on(t.articleId, t.categoryId),
+    index("ga_article_categories_category_idx").on(t.categoryId),
+  ],
+);
+
+export const gaArticleTags = pgTable(
+  "ga_article_tags",
+  {
+    articleId: uuid("article_id")
+      .notNull()
+      .references(() => gaArticles.id, { onDelete: "cascade" }),
+    tagId: uuid("tag_id")
+      .notNull()
+      .references(() => gaTags.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    uniqueIndex("ga_article_tags_uidx").on(t.articleId, t.tagId),
+    index("ga_article_tags_tag_idx").on(t.tagId),
+  ],
+);
+
+export const gaArticleVersions = pgTable(
+  "ga_article_versions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    articleId: uuid("article_id")
+      .notNull()
+      .references(() => gaArticles.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    title: text("title").notNull(),
+    bodyMarkdown: text("body_markdown").notNull(),
+    seoTitle: text("seo_title"),
+    seoDescription: text("seo_description"),
+    snapshot: jsonb("snapshot").notNull().default({}),
+    createdByUserId: text("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("ga_article_versions_article_idx").on(t.articleId),
+    uniqueIndex("ga_article_versions_uidx").on(t.articleId, t.version),
+  ],
+);
+
+export const gaArticleEvents = pgTable(
+  "ga_article_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    articleId: uuid("article_id")
+      .notNull()
+      .references(() => gaArticles.id, { onDelete: "cascade" }),
+    eventType: text("event_type").notNull(),
+    // view | share | cta | newsletter
+    meta: jsonb("meta").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("ga_article_events_article_idx").on(t.articleId),
+    index("ga_article_events_type_idx").on(t.eventType),
+  ],
+);
+
+export const gaContentIdeas = pgTable(
+  "ga_content_ideas",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    title: text("title").notNull(),
+    summary: text("summary").notNull(),
+    theme: text("theme").notNull(),
+    source: text("source").notNull().default("content_gap"),
+    status: text("status").notNull().default("open"),
+    // open | drafted | dismissed
+    articleId: uuid("article_id").references(() => gaArticles.id, {
+      onDelete: "set null",
+    }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("ga_content_ideas_status_idx").on(t.status)],
+);
+
+export type GaAuthor = typeof gaAuthors.$inferSelect;
+export type GaCategory = typeof gaCategories.$inferSelect;
+export type GaTag = typeof gaTags.$inferSelect;
+export type GaArticle = typeof gaArticles.$inferSelect;
+export type GaContentIdea = typeof gaContentIdeas.$inferSelect;
