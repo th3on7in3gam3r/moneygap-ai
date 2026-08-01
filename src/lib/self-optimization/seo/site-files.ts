@@ -7,7 +7,8 @@ async function fetchText(
     const res = await fetch(url, {
       redirect: "follow",
       headers: { "User-Agent": "MoneyGapSelfOptimization/1.0" },
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(6_000),
+      cache: "no-store",
     });
     const body = await res.text();
     return { ok: res.ok, status: res.status, body };
@@ -18,8 +19,10 @@ async function fetchText(
 
 export async function fetchSiteFiles(origin: string): Promise<SiteFilesResult> {
   const base = origin.replace(/\/$/, "");
-  const robots = await fetchText(`${base}/robots.txt`);
-  const sitemap = await fetchText(`${base}/sitemap.xml`);
+  const [robots, sitemap] = await Promise.all([
+    fetchText(`${base}/robots.txt`),
+    fetchText(`${base}/sitemap.xml`),
+  ]);
   const sitemapAlt =
     !sitemap.ok ? await fetchText(`${base}/sitemap_index.xml`) : null;
 

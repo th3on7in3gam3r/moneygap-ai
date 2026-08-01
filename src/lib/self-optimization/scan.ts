@@ -26,6 +26,42 @@ import { scoreSeo } from "./seo/score";
 import { scoreTrust } from "./trust/heuristics";
 import type { SelfOptFindingInput } from "./types";
 
+/** Scans left in "running" after a crash / killed dev server block the UI forever. */
+const STALE_RUNNING_MS = 90_000;
+
+export async function markStaleRunningFailed(workspaceId: string) {
+  const rows = await db
+    .select({
+      id: selfOptimizationScans.id,
+      startedAt: selfOptimizationScans.startedAt,
+      createdAt: selfOptimizationScans.createdAt,
+    })
+    .from(selfOptimizationScans)
+    .where(
+      and(
+        eq(selfOptimizationScans.workspaceId, workspaceId),
+        eq(selfOptimizationScans.status, "running"),
+      ),
+    );
+
+  const cutoff = Date.now() - STALE_RUNNING_MS;
+  const staleIds = rows
+    .filter((r) => (r.startedAt ?? r.createdAt).getTime() < cutoff)
+    .map((r) => r.id);
+
+  for (const id of staleIds) {
+    await db
+      .update(selfOptimizationScans)
+      .set({
+        status: "failed",
+        finishedAt: new Date(),
+        error:
+          "Scan timed out or was interrupted. Try Run self scan again.",
+      })
+      .where(eq(selfOptimizationScans.id, id));
+  }
+}
+
 async function ensureSelfWebsite(workspaceId: string, targetUrl: string) {
   const validated = validateSelfOptimizationUrl(targetUrl);
   if (!validated.ok) throw new Error(validated.error);
@@ -97,6 +133,8 @@ export async function runSelfOptimizationScan(opts: {
     return { ok: false, error: "disabled", message: target.message ?? "Disabled" };
   }
 
+  await markStaleRunningFailed(opts.workspaceId);
+
   const [scan] = await db
     .insert(selfOptimizationScans)
     .values({
@@ -121,9 +159,11 @@ export async function runSelfOptimizationScan(opts: {
       })
       .where(eq(selfOptimizationScans.id, scan.id));
 
-    const probePaths = pathsToProbe().slice(0, 16);
-    const pages = await fetchPages(target.url, probePaths);
-    const siteFiles = await fetchSiteFiles(target.url);
+    const probePaths = pathsToProbe().slice(0, 12);
+    const [pages, siteFiles] = await Promise.all([
+      fetchPages(target.url, probePaths),
+      fetchSiteFiles(target.url),
+    ]);
 
     const seo = scoreSeo(pages, siteFiles);
     const content = scoreContentCoverage(pages);
@@ -338,7 +378,7 @@ export async function runDailySelfScan(opts?: { dryRun?: boolean }) {
     const target = validateSelfOptimizationUrl(
       process.env.SELF_OPTIMIZATION_URL ||
         process.env.APP_URL ||
-        "https://moneygap.ai",
+        "https://moneygap-ai.com",
     );
     if (target.ok) {
       const sites = await db

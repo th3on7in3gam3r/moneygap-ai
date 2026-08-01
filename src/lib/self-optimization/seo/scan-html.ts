@@ -109,6 +109,10 @@ function imageAltStats(html: string): { total: number; missingAlt: number } {
   return { total, missingAlt };
 }
 
+const PAGE_FETCH_TIMEOUT_MS = 8_000;
+/** Keep modest — local self-scans hit the same Next server that is running the job. */
+const PAGE_FETCH_CONCURRENCY = 4;
+
 export async function fetchPageSeo(
   url: string,
 ): Promise<PageSeoSnapshot> {
@@ -124,11 +128,15 @@ export async function fetchPageSeo(
         "User-Agent": "MoneyGapSelfOptimization/1.0",
         Accept: "text/html,application/xhtml+xml",
       },
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(PAGE_FETCH_TIMEOUT_MS),
+      // Avoid hanging on slow/chunked SSR bodies during local self-scans.
+      cache: "no-store",
     });
     ttfbMs = Date.now() - started;
     status = res.status;
-    html = await res.text();
+    // Cap HTML parse work — SEO heuristics only need the head + early body.
+    const raw = await res.text();
+    html = raw.length > 400_000 ? raw.slice(0, 400_000) : raw;
   } catch {
     return {
       url,
@@ -206,9 +214,21 @@ export async function fetchPages(
     return `${origin.replace(/\/$/, "")}${p.startsWith("/") ? p : `/${p}`}`;
   });
   const unique = [...new Set(urls)];
-  const results: PageSeoSnapshot[] = [];
-  for (const url of unique) {
-    results.push(await fetchPageSeo(url));
+  const results: PageSeoSnapshot[] = new Array(unique.length);
+  let next = 0;
+
+  async function worker() {
+    while (next < unique.length) {
+      const i = next;
+      next += 1;
+      results[i] = await fetchPageSeo(unique[i]!);
+    }
   }
+
+  const workers = Array.from(
+    { length: Math.min(PAGE_FETCH_CONCURRENCY, unique.length) },
+    () => worker(),
+  );
+  await Promise.all(workers);
   return results;
 }

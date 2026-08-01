@@ -150,11 +150,20 @@ export default function SelfOptimizationPage() {
     return () => clearTimeout(t);
   }, []);
 
-  // Poll while a scan is running
+  // Poll while a scan is running (server also auto-fails stale "running" rows ~90s)
   useEffect(() => {
     if (data?.latestScan?.status !== "running") return;
     const id = setInterval(() => load(), 2500);
-    return () => clearInterval(id);
+    const giveUp = setTimeout(() => {
+      setError(
+        "Scan is taking longer than expected. Refresh and try again — a stuck run will auto-clear shortly.",
+      );
+      load();
+    }, 100_000);
+    return () => {
+      clearInterval(id);
+      clearTimeout(giveUp);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- poll on running status
   }, [data?.latestScan?.status, data?.latestScan?.id]);
 

@@ -98,7 +98,7 @@ export function resolveDefaultSelfUrl(): string {
     process.env.APP_URL,
     process.env.RENDER_EXTERNAL_URL,
     process.env.NEXT_PUBLIC_APP_URL,
-    "https://moneygap.ai",
+    "https://moneygap-ai.com",
   ];
   for (const c of candidates) {
     if (!c?.trim()) continue;
@@ -106,9 +106,9 @@ export function resolveDefaultSelfUrl(): string {
     if (v.ok) return v.value.origin;
   }
   // Last resort: public analyzer still used for marketing domain when set
-  const publicFallback = validateAndNormalizeUrl("https://moneygap.ai");
+  const publicFallback = validateAndNormalizeUrl("https://moneygap-ai.com");
   if (publicFallback.ok) return publicFallback.value.origin;
-  return "https://moneygap.ai";
+  return "https://moneygap-ai.com";
 }
 
 async function getSettings(workspaceId: string) {

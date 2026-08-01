@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   },
   description:
     "MoneyGap AI reveals where your website leaks revenue — and shows exactly how to close the gap.",
-  metadataBase: new URL("https://moneygap.ai"),
+  metadataBase: new URL("https://moneygap-ai.com"),
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

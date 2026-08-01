@@ -86,7 +86,7 @@ export async function discoverWebsiteSignals(
       redirect: "follow",
       signal: controller.signal,
       headers: {
-        "User-Agent": "MoneyGapAI-Onboarding/1.0 (+https://moneygap.ai)",
+        "User-Agent": "MoneyGapAI-Onboarding/1.0 (+https://moneygap-ai.com)",
         Accept: "text/html,application/xhtml+xml",
       },
     });

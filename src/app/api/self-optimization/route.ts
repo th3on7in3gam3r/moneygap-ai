@@ -11,6 +11,7 @@ import { ensureUserAndWorkspace } from "@/lib/analysis/workspace";
 import {
   getScanSummaries,
   isSelfOptimizationEnabled,
+  markStaleRunningFailed,
   resolveSelfScanTarget,
   runSelfOptimizationScan,
   upsertSelfOptSettings,
@@ -24,6 +25,7 @@ export async function GET() {
 
   try {
     const { workspace } = await ensureUserAndWorkspace();
+    await markStaleRunningFailed(workspace.id);
     const enabled = isSelfOptimizationEnabled();
     const target = await resolveSelfScanTarget(workspace.id);
     const summaries = await getScanSummaries(workspace.id);
