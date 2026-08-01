@@ -21,15 +21,56 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteUrl = "https://www.moneygap-ai.com";
+const siteTitle = "MoneyGap AI — Find the revenue you're leaving behind";
+const siteDescription =
+  "MoneyGap AI reveals where your website leaks revenue — and shows exactly how to close the gap.";
+
 export const metadata: Metadata = {
   title: {
-    default: "MoneyGap AI — Find the revenue you're leaving behind",
+    default: siteTitle,
     template: "%s · MoneyGap AI",
   },
-  description:
-    "MoneyGap AI reveals where your website leaks revenue — and shows exactly how to close the gap.",
-  metadataBase: new URL("https://moneygap-ai.com"),
+  description: siteDescription,
+  metadataBase: new URL(siteUrl),
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: siteTitle,
+    description: siteDescription,
+    url: "/",
+    type: "website",
+    siteName: "MoneyGap AI",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteTitle,
+    description: siteDescription,
+  },
 };
+
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "MoneyGap AI",
+    url: siteUrl,
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "MoneyGap AI",
+    applicationCategory: "BusinessApplication",
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "USD",
+    },
+    description: siteDescription,
+    url: `${siteUrl}/`,
+  },
+];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -37,6 +78,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body
         className={`${spaceGrotesk.variable} ${dmSans.variable} ${geistMono.variable} min-h-full bg-bg font-sans text-fg antialiased`}
       >
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         <ClerkProvider>
           <ThemeProvider>{children}</ThemeProvider>
         </ClerkProvider>
