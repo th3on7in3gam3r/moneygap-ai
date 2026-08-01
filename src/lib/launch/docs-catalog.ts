@@ -93,6 +93,27 @@ export const DOC_CATALOG: DocCatalogEntry[] = [
     category: "grow",
     path: "docs/team-workspace.md",
   },
+  {
+    slug: "growth-academy",
+    title: "Growth Academy™",
+    summary: "Public content hub, SEO, and editorial CMS.",
+    category: "grow",
+    path: "docs/growth-academy.md",
+  },
+  {
+    slug: "blog-cms",
+    title: "Blog CMS",
+    summary: "Draft, preview, publish, versions, idea queue.",
+    category: "grow",
+    path: "docs/blog-cms.md",
+  },
+  {
+    slug: "ai-publishing",
+    title: "AI Publishing Engine™",
+    summary: "Draft-only AI article generation for editors.",
+    category: "grow",
+    path: "docs/ai-publishing.md",
+  },
 ];
 
 export function listDocCatalog(category?: string | null) {

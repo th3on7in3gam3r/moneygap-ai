@@ -169,6 +169,16 @@ async function seed() {
     })
     .onConflictDoNothing();
 
+  try {
+    const { seedGrowthAcademyContent } = await import(
+      "../lib/growth-academy/seed"
+    );
+    await seedGrowthAcademyContent();
+    console.log("Growth Academy™ sample content seeded.");
+  } catch (err) {
+    console.warn("Growth Academy seed skipped:", err);
+  }
+
   console.log("Seed complete.");
 }
 

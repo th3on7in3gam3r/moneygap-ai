@@ -2,6 +2,7 @@
 
 import {
   BarChart3,
+  BookOpen,
   FileText,
   Gauge,
   Globe2,
@@ -47,6 +48,7 @@ function buildNav(isAgency: boolean, isClient: boolean) {
     { href: "/dashboard/money-gaps", label: "Money Gaps", icon: Gauge },
     { href: "/dashboard/reports", label: "Reports", icon: FileText },
     { href: "/dashboard/websites", label: "Websites", icon: Globe2 },
+    { href: "/dashboard/academy", label: "Growth Academy", icon: BookOpen },
   ];
   if (isAgency) {
     items.push({ href: "/dashboard/clients", label: "Clients", icon: Users });
