@@ -29,6 +29,7 @@ Never auto-publish. Users review and approve everything.
 | `backlinks` | authority, backlinks, guest post | Strategy, guest ideas, outreach + follow-ups, anchors, checklist |
 | `lead_magnet` | lead magnet, download | eBook/checklist/template/guide/prompt pack ideas + copy |
 | `digital_product` | digital product, course, templates | 10 ideas, positioning, pricing, sales page, launch plan |
+| `seo_content` | thin topical / buyer-intent coverage, GEO, long-tail, `moduleId` seo or content | Buyer-Intent Content Pack: keyword shortlist, 90-day calendar, article draft, internal links, FAQ/comparison outline, checklist (drafts only; AI Estimate impact) |
 | `generic` | fallback | Structured implementation pack for the gap |
 
 ## Action Projects™
