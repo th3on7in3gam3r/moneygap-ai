@@ -1,3 +1,4 @@
+import Firecrawl from "@mendable/firecrawl-js";
 import type { PageSeoSnapshot } from "../types";
 
 function metaContent(html: string, nameOrProp: string): string | null {
@@ -109,58 +110,38 @@ function imageAltStats(html: string): { total: number; missingAlt: number } {
   return { total, missingAlt };
 }
 
-const PAGE_FETCH_TIMEOUT_MS = 8_000;
-/** Keep modest — local self-scans hit the same Next server that is running the job. */
-const PAGE_FETCH_CONCURRENCY = 4;
+function emptySnapshot(url: string): PageSeoSnapshot {
+  return {
+    url,
+    status: null,
+    title: null,
+    metaDescription: null,
+    canonical: null,
+    og: {},
+    twitter: {},
+    h1: [],
+    h2: [],
+    imagesMissingAlt: 0,
+    imageCount: 0,
+    internalLinks: 0,
+    externalLinks: 0,
+    jsonLdTypes: [],
+    hasMain: false,
+    hasNav: false,
+    hasFooter: false,
+    htmlLength: 0,
+    ttfbMs: null,
+  };
+}
 
-export async function fetchPageSeo(
+export function parseHtmlToSnapshot(
   url: string,
-): Promise<PageSeoSnapshot> {
-  const started = Date.now();
-  let status: number | null = null;
-  let html = "";
-  let ttfbMs: number | null = null;
-
-  try {
-    const res = await fetch(url, {
-      redirect: "follow",
-      headers: {
-        "User-Agent": "MoneyGapSelfOptimization/1.0",
-        Accept: "text/html,application/xhtml+xml",
-      },
-      signal: AbortSignal.timeout(PAGE_FETCH_TIMEOUT_MS),
-      // Avoid hanging on slow/chunked SSR bodies during local self-scans.
-      cache: "no-store",
-    });
-    ttfbMs = Date.now() - started;
-    status = res.status;
-    // Cap HTML parse work — SEO heuristics only need the head + early body.
-    const raw = await res.text();
-    html = raw.length > 400_000 ? raw.slice(0, 400_000) : raw;
-  } catch {
-    return {
-      url,
-      status: null,
-      title: null,
-      metaDescription: null,
-      canonical: null,
-      og: {},
-      twitter: {},
-      h1: [],
-      h2: [],
-      imagesMissingAlt: 0,
-      imageCount: 0,
-      internalLinks: 0,
-      externalLinks: 0,
-      jsonLdTypes: [],
-      hasMain: false,
-      hasNav: false,
-      hasFooter: false,
-      htmlLength: 0,
-      ttfbMs: null,
-    };
-  }
-
+  htmlInput: string,
+  status: number | null,
+  ttfbMs: number | null,
+): PageSeoSnapshot {
+  const html =
+    htmlInput.length > 400_000 ? htmlInput.slice(0, 400_000) : htmlInput;
   const origin = (() => {
     try {
       return new URL(url).origin;
@@ -169,9 +150,11 @@ export async function fetchPageSeo(
     }
   })();
 
-  const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]
-    ?.replace(/<[^>]+>/g, "")
-    .trim() ?? null;
+  const title =
+    html
+      .match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]
+      ?.replace(/<[^>]+>/g, "")
+      .trim() ?? null;
   const imgs = imageAltStats(html);
   const links = countLinks(html, origin);
 
@@ -205,6 +188,87 @@ export async function fetchPageSeo(
   };
 }
 
+const PAGE_FETCH_TIMEOUT_MS = 10_000;
+/** Keep modest — local self-scans hit the same Next server that is running the job. */
+const PAGE_FETCH_CONCURRENCY = 4;
+
+function isLocalTarget(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.replace(/\.+$/, "").toLowerCase();
+    return (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "0.0.0.0" ||
+      host === "::1"
+    );
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchPageSeo(url: string): Promise<PageSeoSnapshot> {
+  const started = Date.now();
+
+  try {
+    const res = await fetch(url, {
+      redirect: "follow",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (compatible; MoneyGapSelfOptimization/1.1; +https://moneygap-ai.com)",
+        Accept: "text/html,application/xhtml+xml",
+      },
+      signal: AbortSignal.timeout(PAGE_FETCH_TIMEOUT_MS),
+      cache: "no-store",
+    });
+    const ttfbMs = Date.now() - started;
+    const raw = await res.text();
+    return parseHtmlToSnapshot(url, raw, res.status, ttfbMs);
+  } catch {
+    return emptySnapshot(url);
+  }
+}
+
+async function fetchPageSeoViaFirecrawl(url: string): Promise<PageSeoSnapshot | null> {
+  const apiKey = process.env.FIRECRAWL_API_KEY?.trim();
+  if (!apiKey) return null;
+
+  try {
+    const client = new Firecrawl({ apiKey });
+    const result = await client.scrape(url, {
+      formats: ["rawHtml", "html"],
+      onlyMainContent: false,
+    });
+    const html =
+      (typeof result.rawHtml === "string" && result.rawHtml) ||
+      (typeof result.html === "string" && result.html) ||
+      "";
+    if (!html.trim()) return null;
+    return parseHtmlToSnapshot(url, html, 200, null);
+  } catch {
+    return null;
+  }
+}
+
+async function mapPool<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next;
+      next += 1;
+      results[i] = await fn(items[i]!, i);
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, () => worker()),
+  );
+  return results;
+}
+
 export async function fetchPages(
   origin: string,
   paths: string[],
@@ -214,21 +278,31 @@ export async function fetchPages(
     return `${origin.replace(/\/$/, "")}${p.startsWith("/") ? p : `/${p}`}`;
   });
   const unique = [...new Set(urls)];
-  const results: PageSeoSnapshot[] = new Array(unique.length);
-  let next = 0;
 
-  async function worker() {
-    while (next < unique.length) {
-      const i = next;
-      next += 1;
-      results[i] = await fetchPageSeo(unique[i]!);
-    }
+  // On Vercel/serverless, HTTP-fetching the same deployment often times out.
+  // Prefer Firecrawl (external) for any non-local self-scan target.
+  const useFirecrawlFirst =
+    Boolean(process.env.FIRECRAWL_API_KEY?.trim()) && !isLocalTarget(origin);
+
+  if (useFirecrawlFirst) {
+    return mapPool(unique, 3, async (url) => {
+      const viaFc = await fetchPageSeoViaFirecrawl(url);
+      if (viaFc) return viaFc;
+      return fetchPageSeo(url);
+    });
   }
 
-  const workers = Array.from(
-    { length: Math.min(PAGE_FETCH_CONCURRENCY, unique.length) },
-    () => worker(),
+  let results = await mapPool(unique, PAGE_FETCH_CONCURRENCY, (url) =>
+    fetchPageSeo(url),
   );
-  await Promise.all(workers);
+
+  const okCount = results.filter((p) => p.status === 200).length;
+  if (okCount === 0 && process.env.FIRECRAWL_API_KEY?.trim()) {
+    results = await mapPool(unique, 3, async (url) => {
+      const viaFc = await fetchPageSeoViaFirecrawl(url);
+      return viaFc ?? emptySnapshot(url);
+    });
+  }
+
   return results;
 }

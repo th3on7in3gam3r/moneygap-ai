@@ -17,6 +17,8 @@ import {
   upsertSelfOptSettings,
 } from "@/lib/self-optimization";
 
+export const maxDuration = 60;
+
 export async function GET() {
   const { isAuthenticated } = await auth();
   if (!isAuthenticated) {

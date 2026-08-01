@@ -98,17 +98,24 @@ export function resolveDefaultSelfUrl(): string {
     process.env.APP_URL,
     process.env.RENDER_EXTERNAL_URL,
     process.env.NEXT_PUBLIC_APP_URL,
+    "https://www.moneygap-ai.com",
     "https://moneygap-ai.com",
   ];
   for (const c of candidates) {
     if (!c?.trim()) continue;
     const v = validateSelfOptimizationUrl(c.trim());
-    if (v.ok) return v.value.origin;
+    if (v.ok) {
+      // Apex redirects to www — scan the live host to avoid redirect-only failures.
+      if (v.value.hostname === "moneygap-ai.com") {
+        return "https://www.moneygap-ai.com";
+      }
+      return v.value.origin;
+    }
   }
   // Last resort: public analyzer still used for marketing domain when set
-  const publicFallback = validateAndNormalizeUrl("https://moneygap-ai.com");
+  const publicFallback = validateAndNormalizeUrl("https://www.moneygap-ai.com");
   if (publicFallback.ok) return publicFallback.value.origin;
-  return "https://moneygap-ai.com";
+  return "https://www.moneygap-ai.com";
 }
 
 async function getSettings(workspaceId: string) {
@@ -146,12 +153,15 @@ export async function resolveSelfScanTarget(workspaceId: string): Promise<{
     };
   }
 
+  const normalizeOrigin = (origin: string, hostname: string) =>
+    hostname === "moneygap-ai.com" ? "https://www.moneygap-ai.com" : origin;
+
   if (settings?.targetUrl?.trim()) {
     const v = validateSelfOptimizationUrl(settings.targetUrl.trim());
     if (v.ok) {
       return {
         enabled: true,
-        url: v.value.origin,
+        url: normalizeOrigin(v.value.origin, v.value.hostname),
         source: "workspace",
         message: null,
       };
@@ -164,7 +174,7 @@ export async function resolveSelfScanTarget(workspaceId: string): Promise<{
     if (v.ok) {
       return {
         enabled: true,
-        url: v.value.origin,
+        url: normalizeOrigin(v.value.origin, v.value.hostname),
         source: "env",
         message: null,
       };
@@ -177,7 +187,7 @@ export async function resolveSelfScanTarget(workspaceId: string): Promise<{
     if (v.ok) {
       return {
         enabled: true,
-        url: v.value.origin,
+        url: normalizeOrigin(v.value.origin, v.value.hostname),
         source: "env",
         message: null,
       };

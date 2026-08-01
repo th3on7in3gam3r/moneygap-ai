@@ -324,7 +324,7 @@ export async function runSelfOptimizationScan(opts: {
 
     const unreachableError =
       reachable === 0
-        ? `Target URL unreachable (${target.url}). In local development, set APP_URL or SELF_OPTIMIZATION_URL to your running app (e.g. http://localhost:3002).`
+        ? `Could not fetch ${target.url} (0/${pages.length} URLs OK). On Vercel, serverless often cannot HTTP-call its own URL — ensure FIRECRAWL_API_KEY is set, or point SELF_OPTIMIZATION_URL at https://www.moneygap-ai.com. Locally use http://localhost:3002.`
         : null;
 
     await db
@@ -378,7 +378,7 @@ export async function runDailySelfScan(opts?: { dryRun?: boolean }) {
     const target = validateSelfOptimizationUrl(
       process.env.SELF_OPTIMIZATION_URL ||
         process.env.APP_URL ||
-        "https://moneygap-ai.com",
+        "https://www.moneygap-ai.com",
     );
     if (target.ok) {
       const sites = await db
