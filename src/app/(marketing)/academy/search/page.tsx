@@ -1,9 +1,14 @@
+import type { Metadata } from "next";
 import { ArticleCard } from "@/components/growth-academy/article-card";
 import { isGrowthAcademyEnabled, listPublishedArticles } from "@/lib/growth-academy";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Search · Growth Academy™",
-};
+  description: "Search Growth Academy™ articles, guides, and insights from MoneyGap AI.",
+  path: "/academy/search",
+  noIndex: true,
+});
 
 export default async function AcademySearchPage({
   searchParams,

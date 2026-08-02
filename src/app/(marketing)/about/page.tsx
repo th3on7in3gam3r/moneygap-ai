@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { StartFreeButton } from "@/components/auth-buttons";
 import { Button } from "@/components/ui/button";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "About MoneyGap AI",
   description:
     "MoneyGap AI is an AI-powered Growth Operating System™ that finds Money Gaps™ — hidden revenue leaks and growth opportunities — then helps you prioritize, fix, and measure them.",
-};
+  path: "/about",
+});
 
 const OWNER_QUESTIONS = [
   "Where am I losing opportunities?",

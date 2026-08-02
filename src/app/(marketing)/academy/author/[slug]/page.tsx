@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ArticleCard } from "@/components/growth-academy/article-card";
 import {
@@ -5,6 +6,24 @@ import {
   isGrowthAcademyEnabled,
   listPublishedArticles,
 } from "@/lib/growth-academy";
+import { buildPageMetadata } from "@/lib/seo";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const author = await getAuthorBySlug(slug);
+  if (!author) return {};
+  return buildPageMetadata({
+    title: `${author.name} · Growth Academy™`,
+    description:
+      author.bio ||
+      `Articles by ${author.name} on MoneyGap Growth Academy™.`,
+    path: `/academy/author/${slug}`,
+  });
+}
 
 export default async function AcademyAuthorPage({
   params,

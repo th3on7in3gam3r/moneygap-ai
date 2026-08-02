@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const links = [
-  { href: "/#product", label: "Product" },
+  { href: "/features", label: "Features" },
   { href: "/academy", label: "Growth Academy" },
   { href: "/pricing", label: "Pricing" },
   { href: "/about", label: "About" },
@@ -72,6 +72,9 @@ export function MarketingFooter() {
           </p>
         </div>
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-fg-muted">
+          <Link href="/features" className="hover:text-fg">
+            Features
+          </Link>
           <Link href="/academy" className="hover:text-fg">
             Growth Academy
           </Link>
@@ -81,11 +84,17 @@ export function MarketingFooter() {
           <Link href="/about" className="hover:text-fg">
             About
           </Link>
-          <Link href="/sign-in" className="hover:text-fg">
-            Sign in
+          <Link href="/contact" className="hover:text-fg">
+            Contact
           </Link>
-          <Link href="/dashboard" className="hover:text-fg">
-            Dashboard
+          <Link href="/docs" className="hover:text-fg">
+            Docs
+          </Link>
+          <Link href="/privacy" className="hover:text-fg">
+            Privacy
+          </Link>
+          <Link href="/terms" className="hover:text-fg">
+            Terms
           </Link>
         </div>
       </div>

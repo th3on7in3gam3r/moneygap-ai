@@ -84,6 +84,7 @@ export default async function AcademyArticlePage({
     article,
     author,
     categoryName: categories[0]?.name,
+    categorySlug: categories[0]?.slug,
   });
   const relatedFiltered = related.filter((r) => r.id !== article.id).slice(0, 4);
   const authorInitial = (author?.name ?? "M").trim().charAt(0).toUpperCase();

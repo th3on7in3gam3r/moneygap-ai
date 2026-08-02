@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ArticleCard } from "@/components/growth-academy/article-card";
 import {
@@ -5,6 +6,22 @@ import {
   isGrowthAcademyEnabled,
   listPublishedArticles,
 } from "@/lib/growth-academy";
+import { buildPageMetadata } from "@/lib/seo";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ tag: string }>;
+}): Promise<Metadata> {
+  const { tag: slug } = await params;
+  const tag = await getTagBySlug(slug);
+  if (!tag) return {};
+  return buildPageMetadata({
+    title: `#${tag.name} · Growth Academy™`,
+    description: `Articles tagged ${tag.name} on MoneyGap Growth Academy™.`,
+    path: `/academy/tag/${slug}`,
+  });
+}
 
 export default async function AcademyTagPage({
   params,

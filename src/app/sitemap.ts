@@ -1,24 +1,76 @@
 import type { MetadataRoute } from "next";
-import { SITE_ORIGIN, listPublishedArticles } from "@/lib/growth-academy";
+import {
+  listAuthors,
+  listCategories,
+  listPublishedArticles,
+} from "@/lib/growth-academy";
+import { db } from "@/db";
+import { gaTags } from "@/db/schema";
+import { absoluteUrl } from "@/lib/seo";
+
+const STATIC_PATHS: { path: string; changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"]; priority: number }[] = [
+  { path: "/", changeFrequency: "weekly", priority: 1 },
+  { path: "/features", changeFrequency: "monthly", priority: 0.85 },
+  { path: "/pricing", changeFrequency: "monthly", priority: 0.9 },
+  { path: "/about", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/contact", changeFrequency: "monthly", priority: 0.5 },
+  { path: "/privacy", changeFrequency: "yearly", priority: 0.3 },
+  { path: "/terms", changeFrequency: "yearly", priority: 0.3 },
+  { path: "/academy", changeFrequency: "daily", priority: 0.9 },
+  { path: "/docs", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/marketplace", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/integrations", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/api", changeFrequency: "monthly", priority: 0.55 },
+  { path: "/academy/rss.xml", changeFrequency: "daily", priority: 0.4 },
+];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const staticRoutes: MetadataRoute.Sitemap = [
-    { url: `${SITE_ORIGIN}/`, changeFrequency: "weekly", priority: 1 },
-    { url: `${SITE_ORIGIN}/pricing`, changeFrequency: "monthly", priority: 0.8 },
-    { url: `${SITE_ORIGIN}/about`, changeFrequency: "monthly", priority: 0.6 },
-    { url: `${SITE_ORIGIN}/academy`, changeFrequency: "daily", priority: 0.9 },
-    { url: `${SITE_ORIGIN}/blog`, changeFrequency: "daily", priority: 0.7 },
-  ];
+  const staticRoutes: MetadataRoute.Sitemap = STATIC_PATHS.map((r) => ({
+    url: absoluteUrl(r.path),
+    changeFrequency: r.changeFrequency,
+    priority: r.priority,
+  }));
 
   try {
-    const articles = await listPublishedArticles({ limit: 200 });
+    const [articles, categories, authors, tags] = await Promise.all([
+      listPublishedArticles({ limit: 500 }),
+      listCategories(),
+      listAuthors(),
+      db.select().from(gaTags).limit(200),
+    ]);
+
     const articleRoutes = articles.map((a) => ({
-      url: `${SITE_ORIGIN}/academy/${a.slug}`,
-      lastModified: a.updatedAt,
+      url: absoluteUrl(`/academy/${a.slug}`),
+      lastModified: a.updatedAt ?? a.publishedAt ?? undefined,
       changeFrequency: "weekly" as const,
       priority: 0.7,
     }));
-    return [...staticRoutes, ...articleRoutes];
+
+    const categoryRoutes = categories.map((c) => ({
+      url: absoluteUrl(`/academy/c/${c.slug}`),
+      changeFrequency: "weekly" as const,
+      priority: 0.65,
+    }));
+
+    const authorRoutes = authors.map((a) => ({
+      url: absoluteUrl(`/academy/author/${a.slug}`),
+      changeFrequency: "monthly" as const,
+      priority: 0.5,
+    }));
+
+    const tagRoutes = tags.map((t) => ({
+      url: absoluteUrl(`/academy/tag/${t.slug}`),
+      changeFrequency: "weekly" as const,
+      priority: 0.45,
+    }));
+
+    return [
+      ...staticRoutes,
+      ...categoryRoutes,
+      ...authorRoutes,
+      ...tagRoutes,
+      ...articleRoutes,
+    ];
   } catch {
     return staticRoutes;
   }

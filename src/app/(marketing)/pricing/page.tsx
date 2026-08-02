@@ -3,11 +3,13 @@ import { Check } from "lucide-react";
 import { StartFreeButton } from "@/components/auth-buttons";
 import { Button } from "@/components/ui/button";
 import { PLAN_CATALOG } from "@/lib/billing/catalog";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Pricing",
   description: "Simple plans for teams closing revenue gaps.",
-};
+  path: "/pricing",
+});
 
 const HIGHLIGHT = "growth";
 

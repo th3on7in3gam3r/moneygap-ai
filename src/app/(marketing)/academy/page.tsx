@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import {
   ArrowRight,
   BookOpen,
@@ -14,12 +15,14 @@ import {
   isGrowthAcademyEnabled,
   listPublishedArticles,
 } from "@/lib/growth-academy";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Growth Academy™",
   description:
     "SEO, conversion, AI, and growth education from MoneyGap AI — thought leadership with editorial control.",
-};
+  path: "/academy",
+});
 
 const PATHWAYS = [
   {

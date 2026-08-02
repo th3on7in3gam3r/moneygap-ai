@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import type { GaArticle, GaAuthor, GaFaqItem } from "@/db/schema";
-import { SITE_ORIGIN } from "./constants";
+import { absoluteUrl, getSiteOrigin } from "@/lib/seo/site";
+import { breadcrumbJsonLd, faqPageJsonLd } from "@/lib/seo/jsonld";
 
 export function articleCanonical(article: GaArticle): string {
   if (article.canonicalUrl?.trim()) return article.canonicalUrl.trim();
-  return `${SITE_ORIGIN}/academy/${article.slug}`;
+  return absoluteUrl(`/academy/${article.slug}`);
 }
 
 export function articleMetadata(
@@ -18,10 +19,12 @@ export function articleMetadata(
     "Growth Academy™ by MoneyGap AI";
   const url = articleCanonical(article);
   const image = article.ogImage || article.featuredImageUrl || undefined;
+  const origin = getSiteOrigin();
 
   return {
     title,
     description,
+    metadataBase: new URL(origin),
     alternates: { canonical: url },
     openGraph: {
       title,
@@ -45,9 +48,24 @@ export function articleJsonLd(input: {
   article: GaArticle;
   author?: GaAuthor | null;
   categoryName?: string | null;
+  categorySlug?: string | null;
 }) {
-  const { article, author, categoryName } = input;
+  const { article, author, categoryName, categorySlug } = input;
   const url = articleCanonical(article);
+  const origin = getSiteOrigin();
+  const crumbs = [
+    { name: "Growth Academy", path: "/academy" },
+    ...(categoryName
+      ? [
+          {
+            name: categoryName,
+            path: categorySlug ? `/academy/c/${categorySlug}` : undefined,
+          },
+        ]
+      : []),
+    { name: article.title, path: `/academy/${article.slug}` },
+  ];
+
   const nodes: Record<string, unknown>[] = [
     {
       "@context": "https://schema.org",
@@ -60,68 +78,40 @@ export function articleJsonLd(input: {
         ? {
             "@type": "Person",
             name: author.name,
-            url: `${SITE_ORIGIN}/academy/author/${author.slug}`,
+            url: absoluteUrl(`/academy/author/${author.slug}`),
           }
-        : { "@type": "Organization", name: "MoneyGap AI" },
+        : { "@type": "Organization", name: "MoneyGap AI", url: origin },
       publisher: {
         "@type": "Organization",
         name: "MoneyGap AI",
-        url: SITE_ORIGIN,
+        url: origin,
       },
       mainEntityOfPage: url,
       image: article.ogImage || article.featuredImageUrl || undefined,
     },
-    {
-      "@context": "https://schema.org",
-      "@type": "BreadcrumbList",
-      itemListElement: [
-        {
-          "@type": "ListItem",
-          position: 1,
-          name: "Growth Academy",
-          item: `${SITE_ORIGIN}/academy`,
-        },
-        ...(categoryName
-          ? [
-              {
-                "@type": "ListItem",
-                position: 2,
-                name: categoryName,
-              },
-            ]
-          : []),
-        {
-          "@type": "ListItem",
-          position: categoryName ? 3 : 2,
-          name: article.title,
-          item: url,
-        },
-      ],
-    },
+    breadcrumbJsonLd(crumbs),
   ];
 
   const faq = (article.faqJson ?? []) as GaFaqItem[];
   if (faq.length > 0) {
-    nodes.push({
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      mainEntity: faq.map((f) => ({
-        "@type": "Question",
-        name: f.question,
-        acceptedAnswer: { "@type": "Answer", text: f.answer },
-      })),
-    });
+    nodes.push(faqPageJsonLd(faq));
   }
 
   return nodes;
 }
 
 export function buildRssXml(
-  items: { title: string; slug: string; excerpt: string | null; publishedAt: Date | null }[],
+  items: {
+    title: string;
+    slug: string;
+    excerpt: string | null;
+    publishedAt: Date | null;
+  }[],
 ): string {
+  const origin = getSiteOrigin();
   const channelItems = items
     .map((item) => {
-      const link = `${SITE_ORIGIN}/academy/${item.slug}`;
+      const link = absoluteUrl(`/academy/${item.slug}`);
       return `<item>
   <title><![CDATA[${item.title}]]></title>
   <link>${link}</link>
@@ -136,7 +126,7 @@ export function buildRssXml(
 <rss version="2.0">
 <channel>
   <title>MoneyGap Growth Academy™</title>
-  <link>${SITE_ORIGIN}/academy</link>
+  <link>${origin}/academy</link>
   <description>SEO, conversion, and AI growth education from MoneyGap AI.</description>
   ${channelItems}
 </channel>

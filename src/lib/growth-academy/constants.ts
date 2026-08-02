@@ -1,9 +1,8 @@
 import type { GaSectionType } from "@/db/schema";
+import { getSiteOrigin } from "@/lib/seo/site";
 
-export const SITE_ORIGIN =
-  process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-  process.env.APP_URL?.replace(/\/$/, "") ||
-  "https://www.moneygap-ai.com";
+/** @deprecated Prefer getSiteOrigin() from @/lib/seo — kept for existing imports. */
+export const SITE_ORIGIN = getSiteOrigin();
 
 export const GA_SECTIONS: {
   sectionType: GaSectionType;

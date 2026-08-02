@@ -2,6 +2,15 @@ import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { DM_Sans, Geist_Mono, Space_Grotesk } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
+import {
+  SITE_DEFAULT_DESCRIPTION,
+  SITE_DEFAULT_TITLE,
+  getSiteOrigin,
+  jsonLdScript,
+  organizationJsonLd,
+  softwareApplicationJsonLd,
+  websiteJsonLd,
+} from "@/lib/seo";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -21,55 +30,36 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const siteUrl = "https://www.moneygap-ai.com";
-const siteTitle = "MoneyGap AI — Find the revenue you're leaving behind";
-const siteDescription =
-  "MoneyGap AI reveals where your website leaks revenue — and shows exactly how to close the gap.";
+const siteUrl = getSiteOrigin();
 
 export const metadata: Metadata = {
   title: {
-    default: siteTitle,
+    default: SITE_DEFAULT_TITLE,
     template: "%s · MoneyGap AI",
   },
-  description: siteDescription,
+  description: SITE_DEFAULT_DESCRIPTION,
   metadataBase: new URL(siteUrl),
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: siteTitle,
-    description: siteDescription,
+    title: SITE_DEFAULT_TITLE,
+    description: SITE_DEFAULT_DESCRIPTION,
     url: "/",
     type: "website",
     siteName: "MoneyGap AI",
   },
   twitter: {
     card: "summary_large_image",
-    title: siteTitle,
-    description: siteDescription,
+    title: SITE_DEFAULT_TITLE,
+    description: SITE_DEFAULT_DESCRIPTION,
   },
 };
 
 const jsonLd = [
-  {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    name: "MoneyGap AI",
-    url: siteUrl,
-  },
-  {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    name: "MoneyGap AI",
-    applicationCategory: "BusinessApplication",
-    offers: {
-      "@type": "Offer",
-      price: "0",
-      priceCurrency: "USD",
-    },
-    description: siteDescription,
-    url: `${siteUrl}/`,
-  },
+  organizationJsonLd(),
+  websiteJsonLd(),
+  softwareApplicationJsonLd(),
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -80,7 +70,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       >
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: jsonLdScript(jsonLd) }}
         />
         <ClerkProvider>
           <ThemeProvider>{children}</ThemeProvider>

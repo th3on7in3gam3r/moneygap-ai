@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { CheckCircle2, LineChart, ScanSearch, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { StartFreeButton } from "@/components/auth-buttons";
@@ -9,7 +10,21 @@ import {
 } from "@/components/money-gap";
 import { Button } from "@/components/ui/button";
 import { SAMPLE_GAPS } from "@/lib/sample-data";
+import {
+  SITE_DEFAULT_DESCRIPTION,
+  SITE_DEFAULT_TITLE,
+  buildPageMetadata,
+} from "@/lib/seo";
 import { formatCurrency } from "@/lib/utils";
+
+export const metadata: Metadata = {
+  ...buildPageMetadata({
+    title: SITE_DEFAULT_TITLE,
+    description: SITE_DEFAULT_DESCRIPTION,
+    path: "/",
+  }),
+  title: { absolute: SITE_DEFAULT_TITLE },
+};
 
 export default function HomePage() {
   return (
