@@ -60,9 +60,26 @@ if (fallback.recommendedId !== "checklist") {
   );
 }
 
+const schemaMarkup = recommendFixPaths({
+  id: "opp-schema",
+  title: "Missing Schema Markup for Key Offers",
+  category: "seo",
+  moduleId: "seo",
+  whatsMissing:
+    "No implementation of schema markup for product offerings or service details",
+  difficulty: "medium",
+});
+
+if (schemaMarkup.recommendedId !== "action_assets") {
+  throw new Error(
+    `expected action_assets for schema markup, got ${schemaMarkup.recommendedId}`,
+  );
+}
+
 console.log("fix-paths smoke OK", {
   marketing: marketing.recommendedId,
   developer: developer.recommendedId,
   automation: automation.recommendedId,
   fallback: fallback.recommendedId,
+  schemaMarkup: schemaMarkup.recommendedId,
 });

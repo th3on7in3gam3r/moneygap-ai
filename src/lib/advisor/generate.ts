@@ -76,6 +76,14 @@ Never claim content is live or auto-published. All copy is for human review befo
 5) Implementation checklist (research → draft flows → human review → enable outside MoneyGap),
 6) Impact note labeled "AI Estimate" with no guarantees on leads, conversions, or revenue.
 Never claim a chatbot is live or auto-connected to CRM/email. All copy and flows are for human review before enablement.`,
+  schema_markup: `Generate a Schema Markup Pack for missing structured data / JSON-LD on key offers. Include sections for:
+1) Recommended @types for this business (Organization, Product, Service, Offer, FAQPage where relevant),
+2) Paste-ready JSON-LD snippets for main products/services — labeled as drafts for human review,
+3) Page placement notes (where to add <script type="application/ld+json"> on offer pages),
+4) Validation checklist (Google Rich Results Test / Schema.org validator — human review before go-live),
+5) Implementation checklist (audit offer pages → draft JSON-LD → review → paste outside MoneyGap → re-scan),
+6) Impact note labeled "AI Estimate" with no guarantees on CTR, traffic, leads, or revenue.
+Never claim schema is live or auto-published. All markup is for human review before paste/deploy.`,
   generic: `Generate a practical Implementation Pack for this Money Gap: strategy overview, copy drafts,
 step-by-step plan, and checklist. Connect every step to Visibility → Traffic → Leads → Customers → Revenue.`,
 };

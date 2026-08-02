@@ -7,6 +7,7 @@ export type PlaybookId =
   | "digital_product"
   | "seo_content"
   | "site_chatbot"
+  | "schema_markup"
   | "generic";
 
 export type ActionButtonId =
@@ -89,6 +90,15 @@ const PLAYBOOK_BUTTONS: Record<PlaybookId, ActionButtonId[]> = {
     "checklist",
     "ask_advisor",
   ],
+  schema_markup: [
+    "build",
+    "learn_why",
+    "save",
+    "complete",
+    "create_project",
+    "checklist",
+    "ask_advisor",
+  ],
   generic: [
     "build",
     "learn_why",
@@ -152,6 +162,15 @@ export function resolvePlaybook(input: {
   if (input.moduleId === "content" && /faq/.test(hay)) return "faq";
   if (input.moduleId === "marketing" && /lead|magnet|download/.test(hay))
     return "lead_magnet";
+  // Structured data / JSON-LD before SEO catch-all (Buyer-Intent Content Pack)
+  if (
+    /schema markup|structured data|json-?ld|rich results|offer schema|product schema|service schema/.test(
+      hay,
+    ) &&
+    !/schema migration|db schema|database schema|drizzle|prisma/.test(hay)
+  ) {
+    return "schema_markup";
+  }
   if (
     /buyer.?intent|thin topical|pillar|content calendar|long.?tail|comparison page|\bgeo\b|ai citation/.test(
       hay,
@@ -179,6 +198,7 @@ export function playbookTitle(playbook: PlaybookId): string {
     digital_product: "Digital Product Builder Pack",
     seo_content: "Buyer-Intent Content Pack",
     site_chatbot: "Site Chatbot Pack",
+    schema_markup: "Schema Markup Pack",
     generic: "Implementation Pack",
   };
   return map[playbook];

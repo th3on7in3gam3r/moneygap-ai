@@ -74,6 +74,16 @@ const CHECKLISTS: Record<PlaybookId, string[]> = {
     "Enable reviewed bot outside MoneyGap (human approval)",
     "Measure chat starts, qualified leads, and conversions (AI Estimate baseline)",
   ],
+  schema_markup: [
+    "Audit key offer / product / service pages for missing structured data",
+    "Choose @types (Organization, Product, Service, Offer, FAQPage)",
+    "Draft JSON-LD for main offers for human review",
+    "Note placement: script type application/ld+json on each page",
+    "Validate with Rich Results Test before go-live",
+    "Paste reviewed markup outside MoneyGap (human approval)",
+    "Re-scan the site after deploy",
+    "Measure rich-result eligibility / CTR movement (AI Estimate baseline)",
+  ],
   generic: [
     "Clarify the desired business outcome",
     "Define the smallest shippable version",

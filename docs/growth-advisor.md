@@ -31,6 +31,7 @@ Never auto-publish. Users review and approve everything.
 | `digital_product` | digital product, course, templates | 10 ideas, positioning, pricing, sales page, launch plan |
 | `seo_content` | thin topical / buyer-intent coverage, GEO, long-tail, `moduleId` seo or content | Buyer-Intent Content Pack: keyword shortlist, 90-day calendar, article draft, internal links, FAQ/comparison outline, checklist (drafts only; AI Estimate impact) |
 | `site_chatbot` | chatbot, live chat, AI assistant, lead qualify, Intercom/Drift; `moduleId` ai + chat/FAQ language | Site Chatbot Pack: FAQ answer bank, qualify flow, sample transcripts, tool config drafts, checklist (drafts only; AI Estimate impact) |
+| `schema_markup` | schema markup, structured data, JSON-LD, rich results, offer/product/service schema | Schema Markup Pack: recommended @types, paste-ready JSON-LD drafts, placement notes, validation checklist (drafts only; AI Estimate impact) |
 | `generic` | fallback | Structured implementation pack for the gap |
 
 ## Action Projects™

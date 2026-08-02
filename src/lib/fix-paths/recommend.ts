@@ -43,7 +43,7 @@ export function recommendFixPaths(
   const isDevHeavy =
     difficulty === "hard" ||
     difficulty === "high" ||
-    /schema|auth|clerk|middleware|api route|database|migration|drizzle|prisma/.test(
+    /schema migration|db schema|database schema|auth|clerk|middleware|api route|database|migration|drizzle|prisma/.test(
       blob,
     ) ||
     (moduleId === "ai" && playbook !== "site_chatbot");
@@ -61,6 +61,7 @@ export function recommendFixPaths(
       "lead_magnet",
       "seo_content",
       "site_chatbot",
+      "schema_markup",
     ].includes(playbook) ||
     moduleId === "marketing" ||
     moduleId === "content" ||
@@ -68,8 +69,8 @@ export function recommendFixPaths(
     moduleId === "trust" ||
     /email|newsletter|testimonial|review|landing page|copy/.test(blob);
 
-  // Chatbot packs are draft-shaped — prefer Action Center before blanket AI → Developer Mode
-  if (playbook === "site_chatbot") {
+  // Draft-shaped packs — prefer Action Center before Developer Mode
+  if (playbook === "site_chatbot" || playbook === "schema_markup") {
     recommendedId = "action_assets";
     reason = "Playbook-friendly gap—Build with Action Center for editable drafts.";
   } else if (isDevHeavy) {
