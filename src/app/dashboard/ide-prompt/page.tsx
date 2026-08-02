@@ -187,12 +187,12 @@ export default function IdePromptPage() {
       {data && (
         <>
           <Card>
-            <CardHeader className="space-y-5">
+            <CardBody className="space-y-5">
               <div className="flex items-start gap-3">
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
                   <Code2 className="size-5" />
                 </span>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge tone="neutral">{data.opportunity.category}</Badge>
                     <Badge tone="neutral">{data.opportunity.moduleId}</Badge>
@@ -203,79 +203,57 @@ export default function IdePromptPage() {
                   <h2 className="mt-2 font-display text-xl font-semibold tracking-tight text-fg">
                     {data.opportunity.title}
                   </h2>
-                  <p className="mt-1 text-sm leading-relaxed text-fg-muted">
+                  <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">
                     {data.opportunity.summary ?? data.opportunity.whatsMissing}
                   </p>
+                  <p className="mt-3 text-xs text-fg-subtle">
+                    Difficulty: {data.opportunity.difficulty}
+                    {data.opportunity.estimatedTime
+                      ? ` · Est. time: ${data.opportunity.estimatedTime}`
+                      : ""}
+                    {data.stackSummary
+                      ? ` · Stack: ${data.stackSummary}`
+                      : " · Project Memory optional"}
+                  </p>
+                  {data.opportunity.estimatedAnnualRevenue != null &&
+                  data.opportunity.estimatedAnnualRevenue > 0 ? (
+                    <p className="mt-3 inline-flex flex-wrap items-center gap-2 font-display text-lg font-semibold tabular-nums text-gap">
+                      {formatCurrency(data.opportunity.estimatedAnnualRevenue)}
+                      <EstimateBadge />
+                      <span className="text-xs font-normal text-fg-subtle">
+                        annual · not a guarantee
+                      </span>
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
-              <div className="grid gap-3 border-y border-border py-3 sm:grid-cols-3">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-fg-subtle">
-                    Difficulty
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-fg">
-                    {data.opportunity.difficulty}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-fg-subtle">
-                    Est. time
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-fg">
-                    {data.opportunity.estimatedTime ?? "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-fg-subtle">
-                    Stack
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-fg">
-                    {data.stackSummary ?? "Project Memory optional"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-fg-subtle">
+              <div className="space-y-4 border-t border-border pt-5">
+                <section>
+                  <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-fg-subtle">
                     What’s missing
-                  </p>
-                  <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">
+                  </h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-fg">
                     {data.opportunity.whatsMissing}
                   </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-fg-subtle">
+                </section>
+                <section>
+                  <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-fg-subtle">
                     Why it matters
-                  </p>
+                  </h3>
                   <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">
                     {data.opportunity.whyItMatters}
                   </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-fg-subtle">
+                </section>
+                <section>
+                  <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-fg-subtle">
                     Business impact
-                  </p>
+                  </h3>
                   <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">
                     {data.opportunity.businessImpact}
                   </p>
-                </div>
+                </section>
               </div>
-
-              {data.opportunity.estimatedAnnualRevenue != null &&
-              data.opportunity.estimatedAnnualRevenue > 0 ? (
-                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-bg-muted/50 px-3.5 py-3">
-                  <EstimateBadge />
-                  <span className="text-sm text-fg-muted">
-                    Estimated annual impact:
-                  </span>
-                  <span className="font-display text-base font-semibold text-fg">
-                    {formatCurrency(data.opportunity.estimatedAnnualRevenue)}
-                  </span>
-                  <span className="text-xs text-fg-subtle">— not a guarantee</span>
-                </div>
-              ) : null}
 
               {data.opportunity.fixes && data.opportunity.fixes.length > 0 ? (
                 <details className="group rounded-xl border border-border">
@@ -292,7 +270,7 @@ export default function IdePromptPage() {
                   </div>
                 </details>
               ) : null}
-            </CardHeader>
+            </CardBody>
           </Card>
 
           <div className="grid items-start gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
