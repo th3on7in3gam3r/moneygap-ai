@@ -6,6 +6,7 @@ import { websiteAnalyses } from "@/db/schema";
 import {
   isStaleRunningAnalysis,
   resumeStuckAnalysis,
+  failStalePreReportAnalysis,
 } from "@/lib/analysis/pipeline";
 import { ANALYSIS_STAGES } from "@/lib/analysis/stages";
 
@@ -22,7 +23,7 @@ export async function GET(
 
   const { id } = await context.params;
 
-  const analysis = await db.query.websiteAnalyses.findFirst({
+  let analysis = await db.query.websiteAnalyses.findFirst({
     where: and(eq(websiteAnalyses.id, id), eq(websiteAnalyses.userId, userId)),
     with: { website: true },
   });
@@ -31,20 +32,29 @@ export async function GET(
     return Response.json({ error: "Analysis not found." }, { status: 404 });
   }
 
+  const stale = isStaleRunningAnalysis({
+    status: analysis.status,
+    startedAt: analysis.startedAt,
+    reportId: analysis.reportId,
+  });
+
   // Serverless often dies mid Money Gap Engine — resume when polling detects a stale run.
-  if (
-    isStaleRunningAnalysis({
-      status: analysis.status,
-      startedAt: analysis.startedAt,
-      reportId: analysis.reportId,
-    }) &&
-    analysis.reportId
-  ) {
+  if (stale && analysis.reportId) {
     after(() => {
       void resumeStuckAnalysis(id).catch((err) => {
         console.error("Stuck analysis resume failed:", err);
       });
     });
+  } else if (stale && !analysis.reportId) {
+    // Hung during crawl / early pipeline with no report to resume — fail so UI can retry.
+    await failStalePreReportAnalysis(id);
+    analysis = await db.query.websiteAnalyses.findFirst({
+      where: and(eq(websiteAnalyses.id, id), eq(websiteAnalyses.userId, userId)),
+      with: { website: true },
+    });
+    if (!analysis) {
+      return Response.json({ error: "Analysis not found." }, { status: 404 });
+    }
   }
 
   const stageLabels = ANALYSIS_STAGES.map((s) => s.label);

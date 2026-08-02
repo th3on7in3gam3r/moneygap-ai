@@ -1,7 +1,7 @@
 import Firecrawl from "@mendable/firecrawl-js";
 import type { PageType } from "@/lib/analysis/stages";
 import { MISSING_KEYS_ERROR, PUBLIC_CRAWL_ERROR } from "@/lib/analysis/stages";
-import { withRetry } from "@/lib/observability/logger";
+import { log, withRetry } from "@/lib/observability/logger";
 
 export type ScrapedPage = {
   url: string;
@@ -24,6 +24,12 @@ const PAGE_TYPE_PATTERNS: { type: PageType; patterns: RegExp[] }[] = [
     patterns: [/\/resources?(?:\/|$)/i, /\/guides?(?:\/|$)/i, /\/docs?(?:\/|$)/i, /\/learn(?:\/|$)/i, /\/library(?:\/|$)/i],
   },
 ];
+
+const MAP_TIMEOUT_MS = 40_000;
+const SCRAPE_TIMEOUT_MS = 22_000;
+const CRAWL_BUDGET_MS = 140_000;
+const SCRAPE_CONCURRENCY = 3;
+const PAGE_LIMIT = 10;
 
 function classifyPageType(url: string, homepageUrl: string): PageType {
   try {
@@ -51,7 +57,28 @@ function getFirecrawl() {
   return new Firecrawl({ apiKey });
 }
 
-function pickPriorityUrls(homepage: string, mapped: string[], limit = 12): string[] {
+async function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`${label} timed out after ${ms}ms`)),
+          ms,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function pickPriorityUrls(homepage: string, mapped: string[], limit = PAGE_LIMIT): string[] {
   const home = homepage.replace(/\/$/, "");
   const scored = mapped
     .map((url) => {
@@ -97,56 +124,105 @@ function pickPriorityUrls(homepage: string, mapped: string[], limit = 12): strin
   return Array.from(new Set(selected)).slice(0, limit);
 }
 
+async function scrapeOne(
+  client: Firecrawl,
+  target: string,
+  homepage: string,
+): Promise<ScrapedPage | null> {
+  try {
+    const result = await withRetry(
+      () =>
+        withTimeout(
+          client.scrape(target, {
+            formats: ["markdown"],
+            onlyMainContent: true,
+          }),
+          SCRAPE_TIMEOUT_MS,
+          `firecrawl_scrape:${target}`,
+        ),
+      { attempts: 2, baseMs: 250, label: "firecrawl_scrape" },
+    );
+
+    const markdown = result.markdown ?? "";
+    if (!markdown || markdown.trim().length < 40) return null;
+
+    const metadata = (result.metadata ?? {}) as Record<string, unknown>;
+    const title =
+      (typeof metadata.title === "string" && metadata.title) ||
+      (typeof metadata.ogTitle === "string" && metadata.ogTitle) ||
+      null;
+
+    return {
+      url: target,
+      pageType: classifyPageType(target, homepage),
+      title,
+      markdown: markdown.slice(0, 24000),
+      metadata,
+    };
+  } catch (err) {
+    log("warn", "firecrawl_scrape_skip", {
+      url: target,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
+async function mapPool<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<R>,
+  shouldStop?: () => boolean,
+): Promise<R[]> {
+  const out: R[] = [];
+  let i = 0;
+  async function run() {
+    while (i < items.length) {
+      if (shouldStop?.()) return;
+      const idx = i++;
+      out[idx] = await worker(items[idx]);
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, () => run()),
+  );
+  return out;
+}
+
 export async function crawlWebsite(url: string): Promise<ScrapedPage[]> {
   const client = getFirecrawl();
+  const started = Date.now();
+  const budgetExceeded = () => Date.now() - started >= CRAWL_BUDGET_MS;
 
   let mappedUrls: string[] = [url];
   try {
-    const mapResult = await client.map(url, { limit: 80 });
+    const mapResult = await withTimeout(
+      client.map(url, { limit: 60 }),
+      MAP_TIMEOUT_MS,
+      "firecrawl_map",
+    );
     const urls = (mapResult.links ?? [])
       .map((link) => link.url)
       .filter((u): u is string => Boolean(u));
     if (urls.length > 0) {
       mappedUrls = urls;
     }
-  } catch {
-    // Map is best-effort; continue with homepage scrape
+  } catch (err) {
+    log("warn", "firecrawl_map_soft_fail", {
+      url,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 
-  const targets = pickPriorityUrls(url, mappedUrls, 12);
-  const pages: ScrapedPage[] = [];
+  const targets = pickPriorityUrls(url, mappedUrls, PAGE_LIMIT);
+  const scraped = await mapPool(
+    targets,
+    SCRAPE_CONCURRENCY,
+    (target) => scrapeOne(client, target, url),
+    budgetExceeded,
+  );
 
-  for (const target of targets) {
-    try {
-      const result = await withRetry(
-        () =>
-          client.scrape(target, {
-            formats: ["markdown"],
-            onlyMainContent: true,
-          }),
-        { attempts: 2, baseMs: 300, label: "firecrawl_scrape" },
-      );
-
-      const markdown = result.markdown ?? "";
-      if (!markdown || markdown.trim().length < 40) continue;
-
-      const metadata = (result.metadata ?? {}) as Record<string, unknown>;
-      const title =
-        (typeof metadata.title === "string" && metadata.title) ||
-        (typeof metadata.ogTitle === "string" && metadata.ogTitle) ||
-        null;
-
-      pages.push({
-        url: target,
-        pageType: classifyPageType(target, url),
-        title,
-        markdown: markdown.slice(0, 24000),
-        metadata,
-      });
-    } catch {
-      // Skip individual page failures
-    }
-  }
+  const pages = scraped.filter((p): p is ScrapedPage => Boolean(p));
 
   if (pages.length === 0) {
     throw new Error(PUBLIC_CRAWL_ERROR);
@@ -155,6 +231,14 @@ export async function crawlWebsite(url: string): Promise<ScrapedPage[]> {
   if (!pages.some((p) => p.pageType === "homepage")) {
     pages[0] = { ...pages[0], pageType: "homepage" };
   }
+
+  log("info", "firecrawl_crawl_done", {
+    url,
+    mapped: mappedUrls.length,
+    targets: targets.length,
+    pages: pages.length,
+    durationMs: Date.now() - started,
+  });
 
   return pages;
 }

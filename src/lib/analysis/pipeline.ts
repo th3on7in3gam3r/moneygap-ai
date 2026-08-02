@@ -69,6 +69,45 @@ async function failAnalysis(analysisId: string, websiteId: string, message: stri
     .where(eq(websites.id, websiteId));
 }
 
+/** Fail a stale run that never produced a report (hung crawl / killed serverless). */
+export async function failStalePreReportAnalysis(analysisId: string) {
+  const analysis = await db.query.websiteAnalyses.findFirst({
+    where: eq(websiteAnalyses.id, analysisId),
+    columns: {
+      id: true,
+      status: true,
+      reportId: true,
+      startedAt: true,
+      createdAt: true,
+      websiteId: true,
+      stage: true,
+    },
+  });
+  if (!analysis) return { ok: false as const, reason: "missing" as const };
+  if (analysis.reportId) return { ok: false as const, reason: "has_report" as const };
+  if (analysis.status !== "running" && analysis.status !== "queued") {
+    return { ok: false as const, reason: "not_running" as const };
+  }
+
+  const clock = analysis.startedAt ?? analysis.createdAt;
+  if (Date.now() - clock.getTime() < STALE_RUNNING_MS) {
+    return { ok: false as const, reason: "too_fresh" as const };
+  }
+
+  log("warn", "analysis_fail_stale_pre_report", {
+    analysisId,
+    stage: analysis.stage,
+    status: analysis.status,
+  });
+
+  await failAnalysis(
+    analysisId,
+    analysis.websiteId,
+    "Reading pages timed out (crawl took too long or the worker was interrupted). Please try analyzing again.",
+  );
+  return { ok: true as const, reason: "failed_stale" as const };
+}
+
 function toUserSafeError(err: unknown): string {
   if (err instanceof Error) {
     if (
@@ -342,13 +381,15 @@ export async function resumeStuckAnalysis(analysisId: string) {
   }
 }
 
-/** True when a running analysis looks abandoned (serverless kill / hung OpenAI). */
+/** True when a running analysis looks abandoned (serverless kill / hung crawl / OpenAI). */
 export function isStaleRunningAnalysis(input: {
   status: string;
   startedAt: Date | null;
   reportId: string | null;
 }): boolean {
-  if (input.status !== "running" || !input.startedAt) return false;
+  if ((input.status !== "running" && input.status !== "queued") || !input.startedAt) {
+    return false;
+  }
   return Date.now() - input.startedAt.getTime() >= STALE_RUNNING_MS;
 }
 
