@@ -1,17 +1,32 @@
 "use client";
 
+import { Check, Copy } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 
 export function ClientInviteButton({ clientId }: { clientId: string }) {
   const [email, setEmail] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  async function copyLink(link: string) {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setMsg("Could not copy — select the link and copy manually.");
+    }
+  }
 
   function invite() {
     startTransition(() => {
       void (async () => {
         setMsg(null);
+        setInviteLink(null);
+        setCopied(false);
         const res = await fetch("/api/team/invites", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -31,9 +46,9 @@ export function ClientInviteButton({ clientId }: { clientId: string }) {
         }
         if (data.invite?.invitePath) {
           const full = `${window.location.origin}${data.invite.invitePath}`;
-          await navigator.clipboard.writeText(full);
-          setMsg(`Invite link copied: ${full}`);
+          setInviteLink(full);
           setEmail("");
+          await copyLink(full);
         }
       })();
     });
@@ -45,7 +60,8 @@ export function ClientInviteButton({ clientId }: { clientId: string }) {
         Invite client
       </p>
       <p className="text-xs text-fg-muted">
-        Secure token — they join this workspace with limited Client access.
+        Secure token — they join this workspace with limited Client access. Share the
+        link yourself (email is not sent automatically).
       </p>
       <div className="flex flex-wrap gap-2">
         <input
@@ -63,7 +79,35 @@ export function ClientInviteButton({ clientId }: { clientId: string }) {
           Create invite
         </Button>
       </div>
-      {msg && <p className="text-xs text-fg-muted break-all">{msg}</p>}
+
+      {inviteLink ? (
+        <div className="flex items-stretch gap-2">
+          <input
+            readOnly
+            value={inviteLink}
+            className="min-w-0 flex-1 truncate rounded-lg border border-border bg-bg px-3 py-2 font-mono text-xs text-fg"
+            aria-label="Invite link"
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="shrink-0 gap-1.5"
+            onClick={() => void copyLink(inviteLink)}
+            aria-label={copied ? "Invite link copied" : "Copy invite link"}
+            title={copied ? "Copied" : "Copy invite link"}
+          >
+            {copied ? (
+              <Check className="size-3.5" aria-hidden />
+            ) : (
+              <Copy className="size-3.5" aria-hidden />
+            )}
+            {copied ? "Copied" : "Copy"}
+          </Button>
+        </div>
+      ) : null}
+
+      {msg && <p className="text-xs text-danger break-all">{msg}</p>}
     </div>
   );
 }
