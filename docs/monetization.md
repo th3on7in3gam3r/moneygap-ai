@@ -36,6 +36,13 @@ Events: `website_analysis`, `ai_generation`, `report_created`, `competitor_analy
 - `usage_events` / `usage_periods`
 - `billing_invoices` — scaffold until Phase 9
 
+### Stripe Sandbox catalog setup
+
+1. Put Sandbox keys in `.env.local`: `STRIPE_SECRET_KEY` (`sk_test_...`), `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (`pk_test_...`).
+2. Run `npm run stripe:setup` — creates 5 products × monthly/annual prices from [`src/lib/billing/catalog.ts`](../src/lib/billing/catalog.ts), writes `STRIPE_PRICE_*` into `.env.local`, and ensures webhook `https://moneygap-ai.com/api/billing/webhooks` (events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`).
+3. Mirror the same vars in Vercel Production + Preview.
+4. Restart the app and test Checkout at `/dashboard/billing`.
+
 ## Upgrade UX
 
 Premium, opportunity-forward copy. Example:

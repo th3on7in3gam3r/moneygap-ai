@@ -48,6 +48,8 @@ export default async function DashboardPage() {
   let journey = null as Awaited<ReturnType<typeof getGrowthJourney>> | null;
   let agencyOverview = null;
   let isAgency = false;
+  let workspaceType: "individual" | "agency" | "enterprise" = "individual";
+  let planLabel = "free";
   let workspaceName = "Your workspace";
   let today = null as Awaited<ReturnType<typeof getTodayDashboard>> | null;
   let sites: Awaited<ReturnType<typeof listUserWebsites>> = [];
@@ -60,6 +62,13 @@ export default async function DashboardPage() {
         redirect("/dashboard/my-growth");
       }
       isAgency = ctx.isAgency;
+      workspaceType =
+        ctx.workspace.type === "enterprise"
+          ? "enterprise"
+          : ctx.workspace.type === "agency"
+            ? "agency"
+            : "individual";
+      planLabel = (ctx.workspace.plan || "free").replace(/_/g, " ");
       workspaceName = ctx.workspace.agencyName || ctx.workspace.name;
       journey = await getGrowthJourney(ctx.workspace.id);
       today = await getTodayDashboard(ctx.workspace.id);
@@ -70,6 +79,13 @@ export default async function DashboardPage() {
       try {
         const { workspace } = await ensureUserAndWorkspace();
         workspaceName = workspace.name;
+        planLabel = (workspace.plan || "free").replace(/_/g, " ");
+        workspaceType =
+          workspace.type === "enterprise"
+            ? "enterprise"
+            : workspace.type === "agency"
+              ? "agency"
+              : "individual";
         journey = await getGrowthJourney(workspace.id);
         today = await getTodayDashboard(workspace.id);
       } catch {
@@ -92,56 +108,83 @@ export default async function DashboardPage() {
   const dailySeries = topAnalytics?.dailySeries ?? [];
   const scoreSeries = topAnalytics?.scoreSeries ?? [];
 
+  const headerTitle =
+    workspaceType === "enterprise"
+      ? "Enterprise Overview"
+      : workspaceType === "agency"
+        ? "Agency Overview"
+        : "Overview";
+  const headerSubtitle =
+    workspaceType === "enterprise"
+      ? "Portfolio command center — priorities, journey, and organization controls."
+      : workspaceType === "agency"
+        ? "Portfolio growth for your clients — Today, Journey, and delivery."
+        : "Know exactly what to work on next across your sites.";
+  const typeBadge =
+    workspaceType === "enterprise"
+      ? "Enterprise"
+      : workspaceType === "agency"
+        ? "Agency"
+        : "Growth OS™";
+
+  const toolLinks = [
+    { href: "/dashboard/copilot", label: "Concierge" },
+    { href: "/dashboard/goals", label: "Goals" },
+    { href: "/dashboard/predictive", label: "Predictive" },
+    { href: "/dashboard/self-optimization", label: "Self Optimization" },
+    { href: "/dashboard/marketplace", label: "Marketplace" },
+    { href: "/dashboard/launch", label: "Launch" },
+    { href: "/dashboard/success", label: "Success" },
+    ...(isAgency ? [{ href: "/dashboard/team", label: "Team" }] : []),
+  ] as const;
+
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       <OnboardingReminders />
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
-            {workspaceName}
-          </p>
-          <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight">
-            Growth Workspace
-          </h1>
-          <p className="mt-1 text-sm text-fg-muted">
-            {isAgency
-              ? "Mission control for agency portfolio growth — Today, Journey, and clients."
-              : "Mission control for business growth — know exactly what to work on next."}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge tone="accent">{isAgency ? "Agency workspace" : "Growth OS™"}</Badge>
-          <Button href="/dashboard/copilot" size="sm" variant="secondary">
-            Ask MoneyGap
-          </Button>
-          <Button href="/dashboard/predictive" size="sm" variant="secondary">
-            Predictive
-          </Button>
-          <Button href="/dashboard/self-optimization" size="sm" variant="secondary">
-            Self Optimization
-          </Button>
-          <Button href="/dashboard/marketplace" size="sm" variant="secondary">
-            Marketplace
-          </Button>
-          <Button href="/dashboard/launch" size="sm" variant="secondary">
-            Launch
-          </Button>
-          <Button href="/dashboard/success" size="sm" variant="secondary">
-            Success
-          </Button>
-          {isAgency ? (
-            <Button href="/dashboard/team" size="sm" variant="secondary">
-              Team
+      <header className="space-y-5 border-b border-border pb-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0 max-w-2xl">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-fg-subtle">
+                {workspaceName}
+              </p>
+              <Badge tone="accent">{typeBadge}</Badge>
+              <span className="text-xs capitalize text-fg-subtle">{planLabel}</span>
+            </div>
+            <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-fg">
+              {headerTitle}
+            </h1>
+            <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">
+              {headerSubtitle}
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <Button href="/dashboard/copilot" size="sm" variant="secondary">
+              Ask Concierge
             </Button>
-          ) : null}
-          <Button href="/dashboard/goals" size="sm" variant="secondary">
-            Goals
-          </Button>
-          <Button href="/dashboard/analyze" size="sm">
-            Analyze New Website
-          </Button>
+            <Button href="/dashboard/analyze" size="sm">
+              Analyze New Website
+            </Button>
+          </div>
         </div>
-      </div>
+        <nav
+          aria-label="Workspace tools"
+          className="flex flex-wrap items-center gap-x-1 gap-y-2 text-sm text-fg-muted"
+        >
+          {toolLinks.map((link, i) => (
+            <span key={link.href} className="inline-flex items-center">
+              {i > 0 ? (
+                <span className="mx-2 text-border" aria-hidden>
+                  ·
+                </span>
+              ) : null}
+              <Link href={link.href} className="transition hover:text-fg">
+                {link.label}
+              </Link>
+            </span>
+          ))}
+        </nav>
+      </header>
 
       {today ? <TodayFocusPanel data={today} /> : null}
       {today ? <Top3TodayPanel priorities={today.priorities} /> : null}

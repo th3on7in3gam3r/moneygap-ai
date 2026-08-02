@@ -84,7 +84,7 @@ export default function GoalsPage() {
       <div>
         <p className="text-xs uppercase tracking-[0.12em] text-fg-subtle">
           <Button href="/dashboard" size="sm" variant="ghost">
-            ← Growth Workspace
+            ← Overview
           </Button>
         </p>
         <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight">
