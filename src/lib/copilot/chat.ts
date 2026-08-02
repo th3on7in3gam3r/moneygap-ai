@@ -4,6 +4,7 @@ import { db } from "@/db";
 import {
   copilotMessages,
   copilotThreads,
+  type ConciergeProposedAction,
   type CopilotMessageMeta,
   type CopilotMode,
 } from "@/db/schema";
@@ -12,8 +13,12 @@ import {
   formatCopilotContextForPrompt,
   loadCopilotContext,
 } from "@/lib/copilot/context";
+import { resolveConciergeNav } from "@/lib/copilot/concierge-nav";
 import { systemPromptForMode } from "@/lib/copilot/modes";
-import { hintFixPathForText } from "@/lib/copilot/fix-path-hints";
+import {
+  fixPathHref,
+  hintFixPathForText,
+} from "@/lib/copilot/fix-path-hints";
 
 function extractOutputText(response: OpenAI.Responses.Response): string {
   if (typeof response.output_text === "string" && response.output_text.trim()) {
@@ -33,6 +38,7 @@ function extractOutputText(response: OpenAI.Responses.Response): string {
 
 function buildMeta(
   reply: string,
+  userMessage: string,
   ctx: Awaited<ReturnType<typeof loadCopilotContext>>,
 ): CopilotMessageMeta {
   const ctxGaps = ctx.openGaps;
@@ -59,15 +65,55 @@ function buildMeta(
       reply,
     );
 
+  const safetyLabels = ["Recommendation"];
+  if (ctxGaps.length > 0) safetyLabels.unshift("Verified");
+  if (/AI Estimate|estimate|\$|revenue|traffic|leads/i.test(reply)) {
+    safetyLabels.push("AI Estimate");
+  }
+
+  const proposedActions: ConciergeProposedAction[] = [];
+
+  const nav = resolveConciergeNav(userMessage);
+  if (nav) {
+    proposedActions.push({
+      type: "navigate",
+      label: nav.label,
+      href: nav.href,
+      requiresConfirmation: true,
+    });
+  }
+
+  if (top?.reportId) {
+    proposedActions.push({
+      type: "open_report",
+      label: "Open report",
+      href: `/reports/${top.reportId}${top.id ? `?focus=${encodeURIComponent(top.id)}` : ""}`,
+      requiresConfirmation: true,
+    });
+  }
+
+  if (hint.recommendedId) {
+    proposedActions.push({
+      type: "recommend_fix_path",
+      label: `Fix Path: ${hint.recommendedId.replace(/_/g, " ")}`,
+      href: fixPathHref(hint.recommendedId, top?.id),
+      requiresConfirmation: true,
+    });
+  }
+
   return {
     evidence,
-    confidence: top ? Math.min(92, 55 + Math.round((top.opportunityIndex ?? 40) / 3)) : 50,
+    confidence: top
+      ? Math.min(92, 55 + Math.round((top.opportunityIndex ?? 40) / 3))
+      : 50,
     fixPathId: hint.recommendedId,
     requiresApproval: needsApproval || true,
-    citations: [hint.reason],
+    citations: [hint.reason, ...(nav ? [nav.reason] : [])],
     websiteId: ctx.focusWebsite?.id ?? top?.websiteId ?? null,
     websiteName: ctx.focusWebsite?.name ?? top?.websiteName ?? null,
     websiteDomain: ctx.focusWebsite?.domain ?? top?.websiteDomain ?? null,
+    safetyLabels: [...new Set(safetyLabels)],
+    proposedActions,
   };
 }
 
@@ -84,7 +130,7 @@ export async function createCopilotThread(input: {
       workspaceId: input.workspaceId,
       userId: input.userId,
       mode: input.mode ?? "ceo",
-      title: input.title?.trim() || "Ask MoneyGap",
+      title: input.title?.trim() || "Growth Concierge",
       clientId: input.clientId ?? null,
     })
     .returning();
@@ -171,7 +217,7 @@ ${historyText ? `RECENT CHAT:\n${historyText}\n\n` : ""}USER: ${input.message}`,
       : `I can help once you run an analysis or add Business Memory facts. Start with goals and your top Money Gaps. Drafts only — never auto-publish.`;
   }
 
-  const meta = buildMeta(reply, ctx);
+  const meta = buildMeta(reply, input.message, ctx);
 
   const [assistant] = await db
     .insert(copilotMessages)

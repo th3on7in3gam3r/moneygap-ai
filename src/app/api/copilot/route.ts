@@ -7,6 +7,10 @@ import {
   COPILOT_MODES,
   loadCopilotContext,
 } from "@/lib/copilot";
+import {
+  listActiveNudges,
+  refreshCoachNudges,
+} from "@/lib/growth-os/coach";
 
 export async function GET(req: Request) {
   const { isAuthenticated } = await auth();
@@ -17,13 +21,14 @@ export async function GET(req: Request) {
   if (!isGrowthCopilotEnabled()) {
     return Response.json({
       enabled: false,
-      message: "Growth Copilot™ is disabled (FEATURE_GROWTH_COPILOT).",
+      message: "AI Growth Concierge™ is disabled (FEATURE_GROWTH_COPILOT).",
       modes: COPILOT_MODES,
       memoryCount: 0,
       threads: [],
       context: null,
       websites: [],
       focusWebsite: null,
+      insights: [],
     });
   }
 
@@ -40,6 +45,17 @@ export async function GET(req: Request) {
       }),
     ]);
 
+    let insights: Awaited<ReturnType<typeof listActiveNudges>> = [];
+    try {
+      insights = await listActiveNudges(ctx.workspace.id);
+      if (insights.length === 0) {
+        insights = await refreshCoachNudges(ctx.workspace.id);
+      }
+      insights = insights.slice(0, 3);
+    } catch {
+      insights = [];
+    }
+
     return Response.json({
       enabled: true,
       message: null,
@@ -53,6 +69,7 @@ export async function GET(req: Request) {
       })),
       websites: context.websites,
       focusWebsite: context.focusWebsite,
+      insights,
       context: {
         notes: context.notes,
         openGapCount: context.openGaps.length,
@@ -65,6 +82,9 @@ export async function GET(req: Request) {
       },
     });
   } catch {
-    return Response.json({ error: "Could not load Growth Copilot" }, { status: 500 });
+    return Response.json(
+      { error: "Could not load AI Growth Concierge™" },
+      { status: 500 },
+    );
   }
 }

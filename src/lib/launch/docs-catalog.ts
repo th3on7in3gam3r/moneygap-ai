@@ -114,6 +114,13 @@ export const DOC_CATALOG: DocCatalogEntry[] = [
     category: "grow",
     path: "docs/ai-publishing.md",
   },
+  {
+    slug: "ai-growth-concierge",
+    title: "AI Growth Concierge™",
+    summary: "Logged-in growth consultant — navigate, recommend, act with confirmation.",
+    category: "product",
+    path: "docs/ai-growth-concierge.md",
+  },
 ];
 
 export function listDocCatalog(category?: string | null) {

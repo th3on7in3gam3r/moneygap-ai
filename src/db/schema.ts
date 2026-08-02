@@ -3226,6 +3226,13 @@ export type BusinessMemoryKind =
 
 export type CopilotMode = "ceo" | "marketing" | "developer" | "agency";
 
+export type ConciergeProposedAction = {
+  type: "navigate" | "open_report" | "recommend_fix_path";
+  label: string;
+  href: string;
+  requiresConfirmation: boolean;
+};
+
 export type CopilotMessageMeta = {
   evidence?: string[];
   confidence?: number | null;
@@ -3235,6 +3242,9 @@ export type CopilotMessageMeta = {
   websiteId?: string | null;
   websiteName?: string | null;
   websiteDomain?: string | null;
+  /** Verified | Recommendation | AI Estimate */
+  safetyLabels?: string[];
+  proposedActions?: ConciergeProposedAction[];
 };
 
 export type DecisionSimulationResult = {

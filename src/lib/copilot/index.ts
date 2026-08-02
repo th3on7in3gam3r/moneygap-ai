@@ -37,3 +37,7 @@ export {
   hintFixPathForText,
   fixPathHref,
 } from "@/lib/copilot/fix-path-hints";
+export {
+  resolveConciergeNav,
+  type ConciergeNavMatch,
+} from "@/lib/copilot/concierge-nav";

@@ -47,6 +47,7 @@ function buildNav(isAgency: boolean, isClient: boolean) {
     { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
     { href: "/dashboard/money-gaps", label: "Money Gaps", icon: Gauge },
     { href: "/dashboard/reports", label: "Reports", icon: FileText },
+    { href: "/dashboard/copilot", label: "Growth Concierge", icon: Sparkles },
     { href: "/dashboard/websites", label: "Websites", icon: Globe2 },
     { href: "/dashboard/academy", label: "Growth Academy", icon: BookOpen },
   ];

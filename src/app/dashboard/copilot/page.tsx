@@ -28,6 +28,13 @@ type Overview = {
   threads: { id: string; title: string; mode: Mode; updatedAt: string }[];
   websites?: { id: string; name: string; domain: string; url?: string }[];
   focusWebsite?: { id: string; name: string; domain: string } | null;
+  insights?: {
+    id: string;
+    severity: string;
+    message: string;
+    ctaLabel: string | null;
+    ctaHref: string | null;
+  }[];
   context: {
     notes: string[];
     openGapCount: number;
@@ -38,6 +45,13 @@ type Overview = {
     isAgency: boolean;
     focusDomain?: string | null;
   } | null;
+};
+
+type ProposedAction = {
+  type: "navigate" | "open_report" | "recommend_fix_path";
+  label: string;
+  href: string;
+  requiresConfirmation: boolean;
 };
 
 type Msg = {
@@ -52,6 +66,8 @@ type Msg = {
     citations?: string[];
     websiteDomain?: string | null;
     websiteName?: string | null;
+    safetyLabels?: string[];
+    proposedActions?: ProposedAction[];
   } | null;
 };
 
@@ -117,11 +133,18 @@ const TABS = [
   { id: "memory", label: "Memory" },
 ] as const;
 
+const SAFETY_TONE: Record<string, "accent" | "gap" | "neutral"> = {
+  Verified: "accent",
+  Recommendation: "neutral",
+  "AI Estimate": "gap",
+};
+
 const SUGGESTIONS = [
   "What should I prioritize this week?",
-  "Hiring vs automation — which is smarter now?",
-  "Draft a quarterly growth focus",
+  "Take me to my Reports",
+  "Show my Integrations",
   "How do I close my top Money Gap?",
+  "Start a scan",
 ];
 
 function fixPathHref(id: string) {
@@ -162,7 +185,7 @@ export default function GrowthCopilotPage() {
         const qs = wid ? `?website=${wid}` : "";
         const res = await fetch(`/api/copilot${qs}`);
         if (!res.ok) {
-          setError("Could not load Growth Copilot");
+          setError("Could not load Growth Concierge");
           return;
         }
         const body = (await res.json()) as Overview;
@@ -222,7 +245,7 @@ export default function GrowthCopilotPage() {
     const res = await fetch("/api/copilot/threads", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode, title: `Ask MoneyGap · ${mode}` }),
+      body: JSON.stringify({ mode, title: `Concierge · ${mode}` }),
     });
     if (!res.ok) {
       const body = (await res.json()) as { error?: string };
@@ -270,7 +293,7 @@ export default function GrowthCopilotPage() {
         const res = await fetch("/api/copilot/threads", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mode, title: `Ask MoneyGap · ${mode}` }),
+          body: JSON.stringify({ mode, title: `Concierge · ${mode}` }),
         });
         if (!res.ok) {
           setError("Could not start thread");
@@ -309,15 +332,16 @@ export default function GrowthCopilotPage() {
         <div className="min-w-0 space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
-              Growth Copilot™
+              AI Growth Concierge™
             </p>
+            <Badge tone="neutral">powered by Growth Copilot™</Badge>
           </div>
           <h1 className="font-display text-3xl font-semibold tracking-tight text-fg">
-            Ask MoneyGap™
+            Growth Concierge™
           </h1>
           <p className="max-w-xl text-sm leading-relaxed text-fg-muted">
-            Strategic partner for priorities, decisions, and Fix Paths. Drafts
-            only — never auto-publishes.
+            Product guide, advisor, and execution companion — navigate, recommend
+            Fix Paths, and act with confirmation. Drafts only — never auto-publishes.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -354,6 +378,34 @@ export default function GrowthCopilotPage() {
         </p>
       )}
 
+      {(overview?.insights?.length ?? 0) > 0 ? (
+        <Card>
+          <CardHeader className="pb-2">
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-fg-subtle">
+              Insights
+            </h2>
+          </CardHeader>
+          <CardBody className="space-y-3 pt-0">
+            {(overview?.insights ?? []).map((n) => (
+              <div
+                key={n.id}
+                className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-border bg-bg px-3.5 py-3"
+              >
+                <p className="min-w-0 flex-1 text-sm leading-relaxed text-fg-muted">
+                  {n.message}
+                </p>
+                {n.ctaHref && n.ctaLabel ? (
+                  <Button href={n.ctaHref} size="sm" variant="secondary">
+                    {n.ctaLabel}
+                    <ArrowRight className="size-3" />
+                  </Button>
+                ) : null}
+              </div>
+            ))}
+          </CardBody>
+        </Card>
+      ) : null}
+
       <Card>
         <CardBody className="space-y-3">
           <div>
@@ -371,7 +423,7 @@ export default function GrowthCopilotPage() {
               </>
             ) : (
               <p className="mt-1 text-sm text-fg-muted">
-                Analyze a website to unlock property-scoped Copilot context.
+                Analyze a website to unlock property-scoped Concierge context.
               </p>
             )}
           </div>
@@ -404,7 +456,7 @@ export default function GrowthCopilotPage() {
       {overview && !overview.enabled && (
         <Card>
           <CardBody className="text-sm text-fg-muted">
-            {overview.message ?? "Growth Copilot is disabled."}
+            {overview.message ?? "AI Growth Concierge™ is disabled."}
           </CardBody>
         </Card>
       )}
@@ -647,7 +699,7 @@ export default function GrowthCopilotPage() {
                       >
                         {!isUser && (
                           <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-fg-subtle">
-                            Copilot
+                            Concierge
                           </p>
                         )}
                         <p className="whitespace-pre-wrap">{m.content}</p>
@@ -660,6 +712,17 @@ export default function GrowthCopilotPage() {
                             }`}
                           >
                             <div className="flex flex-wrap gap-2">
+                              {(m.meta.safetyLabels?.length
+                                ? m.meta.safetyLabels
+                                : ["Recommendation"]
+                              ).map((label) => (
+                                <Badge
+                                  key={label}
+                                  tone={SAFETY_TONE[label] ?? "neutral"}
+                                >
+                                  {label}
+                                </Badge>
+                              ))}
                               {m.meta.confidence != null && (
                                 <Badge tone="neutral">
                                   Confidence {m.meta.confidence}
@@ -671,7 +734,7 @@ export default function GrowthCopilotPage() {
                                 </Badge>
                               )}
                               {m.meta.requiresApproval && (
-                                <Badge tone="gap">Approval required</Badge>
+                                <Badge tone="gap">Confirm before acting</Badge>
                               )}
                             </div>
                             {m.meta.evidence?.length ? (
@@ -680,7 +743,22 @@ export default function GrowthCopilotPage() {
                                 {m.meta.evidence.slice(0, 3).join(" · ")}
                               </p>
                             ) : null}
-                            {m.meta.fixPathId && (
+                            {m.meta.proposedActions &&
+                            m.meta.proposedActions.length > 0 ? (
+                              <div className="flex flex-wrap gap-2 pt-1">
+                                {m.meta.proposedActions.map((a) => (
+                                  <Button
+                                    key={`${a.type}-${a.href}`}
+                                    href={a.href}
+                                    size="sm"
+                                    variant="secondary"
+                                  >
+                                    {a.label}
+                                    <ArrowRight className="size-3" />
+                                  </Button>
+                                ))}
+                              </div>
+                            ) : m.meta.fixPathId ? (
                               <Link
                                 href={fixPathHref(m.meta.fixPathId)}
                                 className="inline-flex items-center gap-1 font-medium text-accent underline-offset-2 hover:underline"
@@ -690,7 +768,7 @@ export default function GrowthCopilotPage() {
                                   m.meta.fixPathId}
                                 <ArrowRight className="size-3" />
                               </Link>
-                            )}
+                            ) : null}
                           </div>
                         )}
                       </div>
@@ -710,7 +788,7 @@ export default function GrowthCopilotPage() {
                     }
                   }}
                   rows={2}
-                  placeholder="Ask MoneyGap…"
+                  placeholder="Ask Concierge — navigate, prioritize, or close a Money Gap…"
                   className="min-h-[72px] w-full resize-none border-0 bg-transparent px-2.5 py-2 text-sm text-fg outline-none placeholder:text-fg-subtle"
                 />
                 <div className="flex items-center justify-between gap-2 px-1 pb-1">

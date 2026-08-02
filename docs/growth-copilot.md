@@ -4,6 +4,8 @@
 
 MoneyGap AI becomes a trusted strategic partner: understand the business, explain opportunities, recommend actions, and help founders make better growth decisions through conversation.
 
+**Product surface:** [AI Growth Concierge™](./ai-growth-concierge.md) is the logged-in UX built on this Copilot engine (`/dashboard/copilot`).
+
 ## Phase
 
 **Phase 19 — MoneyGap AI Growth Copilot™**  
@@ -21,7 +23,7 @@ MoneyGap AI becomes a trusted strategic partner: understand the business, explai
 
 | Surface | Role |
 | --- | --- |
-| `/dashboard/copilot` | Ask MoneyGap™ — modes, chat, memory, decisions, plans, reports |
+| `/dashboard/copilot` | AI Growth Concierge™ — modes, chat, actions, memory, decisions, plans, reports |
 | Business Memory™ | Durable workspace facts (see [`business-memory.md`](./business-memory.md)) |
 | Decision Engine™ | Compare options (see [`decision-engine.md`](./decision-engine.md)) |
 | Fix Path hints | Copilot replies may deep-link Fix Paths without replacing Action Center |
