@@ -60,6 +60,11 @@ type Overview = {
     aiVisibility: number | null;
     contentCoverage: number | null;
     backlinkHealth: number | null;
+    crawlability: number | null;
+    crawlabilityStatus?: string | null;
+    crawlabilityContributors?: Record<string, number | null> | null;
+    crawlabilitySummary?: string | null;
+    crawlabilityEstimatedImprovement?: string | null;
     unavailableReasons: Record<string, string>;
     estimatedOpportunity: number | null;
     labeled: string;
@@ -81,8 +86,18 @@ type Overview = {
     seo: number | null;
     trust: number | null;
     conversion: number | null;
+    crawlability?: number | null;
   }[];
   deltas: Record<string, number | null>;
+  crawlability?: {
+    score: number | null;
+    status: string | null;
+    contributors: Record<string, number | null> | null;
+    summary: string | null;
+    estimatedImprovement: string | null;
+    previous: number | null;
+    delta: number | null;
+  } | null;
   findings: Finding[];
   drafts: Draft[];
   stats: {
@@ -95,6 +110,7 @@ type Overview = {
 
 const SCORE_LABELS: { key: keyof NonNullable<Overview["scores"]>; label: string }[] = [
   { key: "overall", label: "Overall Growth" },
+  { key: "crawlability", label: "Crawlability Score™" },
   { key: "seo", label: "SEO" },
   { key: "trust", label: "Trust" },
   { key: "conversion", label: "Conversion" },
@@ -307,13 +323,22 @@ export default function SelfOptimizationPage() {
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {SCORE_LABELS.map(({ key, label }) => {
-              if (key === "unavailableReasons" || key === "estimatedOpportunity" || key === "labeled") {
+              if (
+                key === "unavailableReasons" ||
+                key === "estimatedOpportunity" ||
+                key === "labeled" ||
+                key === "crawlabilityStatus" ||
+                key === "crawlabilityContributors" ||
+                key === "crawlabilitySummary" ||
+                key === "crawlabilityEstimatedImprovement"
+              ) {
                 return null;
               }
               const value = data.scores?.[key] as number | null | undefined;
-              const reason = reasons[key === "aiVisibility" ? "aiVisibility" : key];
-              return (
-                <Card key={key}>
+              const reason = reasons[key === "aiVisibility" ? "aiVisibility" : String(key)];
+              const isCrawl = key === "crawlability";
+              const status = isCrawl ? data.scores?.crawlabilityStatus : null;
+              const body = (
                   <CardBody className="py-4">
                     <p className="text-[10px] uppercase tracking-[0.08em] text-fg-subtle">
                       {label}
@@ -326,13 +351,25 @@ export default function SelfOptimizationPage() {
                         </span>
                       ) : null}
                     </p>
+                    {status ? (
+                      <p className="mt-1 text-xs font-medium text-fg-muted">{status}</p>
+                    ) : null}
                     {value == null && reason ? (
                       <p className="mt-1 text-[11px] leading-snug text-fg-muted">
                         {reason}
                       </p>
                     ) : null}
+                    {isCrawl ? (
+                      <p className="mt-2 text-[11px] text-accent">Open Crawlability Report →</p>
+                    ) : null}
                   </CardBody>
-                </Card>
+              );
+              return isCrawl ? (
+                <a key={key} href="/dashboard/self-optimization/crawlability" className="block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+                  <Card className="transition hover:border-accent/40">{body}</Card>
+                </a>
+              ) : (
+                <Card key={key}>{body}</Card>
               );
             })}
           </div>

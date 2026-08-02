@@ -70,6 +70,10 @@ Matched Growth Pattern Library™ recommendations may soft-boost findings that c
 - Never imply guarantee of financial results
 - Show category breakdown with progress bars on the report hero
 
+## Crawlability Score™
+
+Separate **health** metric (0–100, higher = better) for discovery/crawl/indexability. Status bands: Excellent / Good / Needs Attention / Critical. See `docs/crawlability-score.md`. Not a MoneyGap Engine category score (those use opposite polarity).
+
 ## Score evolution (Phase 6)
 
 Track over time via `score_snapshots`:

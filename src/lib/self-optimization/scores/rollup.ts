@@ -1,4 +1,5 @@
 import type { SelfOptScoreBreakdown } from "@/db/schema";
+import type { CrawlabilityResult } from "@/lib/crawlability";
 import type { ScoreResult } from "../types";
 
 export function rollupScores(parts: {
@@ -9,14 +10,29 @@ export function rollupScores(parts: {
   aiVisibility: ScoreResult;
   contentCoverage: ScoreResult;
   backlinkHealth: ScoreResult;
+  crawlability?: CrawlabilityResult | ScoreResult | null;
 }): SelfOptScoreBreakdown {
   const unavailableReasons: Record<string, string> = {};
-  const pick = (key: string, r: ScoreResult): number | null => {
-    if (r.score == null) {
-      if (r.unavailableReason) unavailableReasons[key] = r.unavailableReason;
+  const pick = (key: string, r: ScoreResult | CrawlabilityResult | null | undefined): number | null => {
+    if (!r || r.score == null) {
+      if (r && "unavailableReason" in r && r.unavailableReason) {
+        unavailableReasons[key] = r.unavailableReason;
+      }
+      if (r && "unavailableReasons" in r && r.unavailableReasons) {
+        for (const [k, v] of Object.entries(r.unavailableReasons)) {
+          unavailableReasons[`${key}.${k}`] = v;
+        }
+      }
       return null;
     }
-    if (r.unavailableReason) unavailableReasons[key] = r.unavailableReason;
+    if ("unavailableReason" in r && r.unavailableReason) {
+      unavailableReasons[key] = r.unavailableReason;
+    }
+    if ("unavailableReasons" in r && r.unavailableReasons) {
+      for (const [k, v] of Object.entries(r.unavailableReasons)) {
+        unavailableReasons[`${key}.${k}`] = v;
+      }
+    }
     return r.score;
   };
 
@@ -27,6 +43,7 @@ export function rollupScores(parts: {
   const aiVisibility = pick("aiVisibility", parts.aiVisibility);
   const contentCoverage = pick("contentCoverage", parts.contentCoverage);
   const backlinkHealth = pick("backlinkHealth", parts.backlinkHealth);
+  const crawlability = pick("crawlability", parts.crawlability ?? null);
 
   const available = [
     seo,
@@ -36,12 +53,18 @@ export function rollupScores(parts: {
     aiVisibility,
     contentCoverage,
     backlinkHealth,
+    crawlability,
   ].filter((n): n is number => n != null);
 
   const overall =
     available.length === 0
       ? null
       : Math.round(available.reduce((a, b) => a + b, 0) / available.length);
+
+  const crawl =
+    parts.crawlability && "contributors" in parts.crawlability
+      ? parts.crawlability
+      : null;
 
   return {
     overall,
@@ -52,6 +75,11 @@ export function rollupScores(parts: {
     aiVisibility,
     contentCoverage,
     backlinkHealth,
+    crawlability,
+    crawlabilityStatus: crawl?.status ?? null,
+    crawlabilityContributors: crawl?.contributors ?? null,
+    crawlabilitySummary: crawl?.executiveSummary ?? null,
+    crawlabilityEstimatedImprovement: crawl?.estimatedImprovement ?? null,
     unavailableReasons,
   };
 }

@@ -126,6 +126,22 @@ export async function compareReports(input: {
     competitorNotes.push("Competitive brief updated after re-analysis.");
   }
 
+  const crawlPrev = previous?.crawlabilityReport?.score ?? null;
+  const crawlCurr = current.crawlabilityReport?.score ?? null;
+  const crawlabilityDelta =
+    crawlPrev != null && crawlCurr != null ? crawlCurr - crawlPrev : null;
+  if (crawlabilityDelta != null) {
+    if (crawlabilityDelta > 0) {
+      reasons.push(
+        `Crawlability Score™ improved by ${crawlabilityDelta} points (${crawlPrev} → ${crawlCurr}).`,
+      );
+    } else if (crawlabilityDelta < 0) {
+      reasons.push(
+        `Crawlability Score™ dropped by ${Math.abs(crawlabilityDelta)} points (${crawlPrev} → ${crawlCurr}).`,
+      );
+    }
+  }
+
   const summary = previous
     ? `Score ${previous.moneyGapScore} → ${current.moneyGapScore} (${scoreDelta >= 0 ? "+" : ""}${scoreDelta}). ${newOpportunities.length} new, ${resolved.length} resolved.`
     : `Baseline MoneyGap Score™ ${current.moneyGapScore} with ${currentOps.length} opportunities.`;
@@ -140,6 +156,9 @@ export async function compareReports(input: {
       categoryDeltas,
       competitorNotes,
       reasons,
+      crawlabilityDelta,
+      crawlabilityPrevious: crawlPrev,
+      crawlabilityCurrent: crawlCurr,
     },
   };
 }

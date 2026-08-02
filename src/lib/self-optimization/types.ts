@@ -14,6 +14,7 @@ export type SelfOptFindingInput = {
   difficulty: string;
   estimatedTime: string;
   verificationSteps: string[];
+  priority?: string | null;
   pageUrl?: string | null;
   prompts?: SelfOptPrompts | null;
   metadataDraftId?: string | null;

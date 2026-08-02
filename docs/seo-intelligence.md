@@ -23,9 +23,11 @@ Site files:
 
 `src/lib/self-optimization/seo/score.ts` weights evidence into an SEO score 0–100 and emits findings with Fix Path™, confidence, and verification steps.
 
+**Crawlability Score™** is a separate health metric (higher = better crawl/discovery). See `docs/crawlability-score.md` and `docs/crawlability-engine.md`.
+
 ## Engine composition
 
-The existing LLM SEO module (`src/lib/analysis/engine/modules/seo.ts`) continues to power customer analyses. Self Optimization links the latest completed analysis opportunities when available.
+The existing LLM SEO module (`src/lib/analysis/engine/modules/seo.ts`) continues to power customer analyses. Self Optimization links the latest completed analysis opportunities when available. Customer analyses also soft-run the Crawlability Engine and attach high/critical crawl issues as SEO opportunities.
 
 ## Soft limits
 

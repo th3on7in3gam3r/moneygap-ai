@@ -1,10 +1,11 @@
-import { eq } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import {
   moneyGapOpportunities,
   reports,
   websiteClassifications,
   type ConfidenceIntelJson,
+  type CrawlabilityReportSnapshot,
 } from "@/db/schema";
 import type { IntelligenceResult } from "@/lib/analysis/openai";
 import { runMoneyGapEngine } from "@/lib/analysis/money-gap-engine";
@@ -19,6 +20,10 @@ import {
   enrichOpportunityConfidence,
   isConfidenceIntelEnabled,
 } from "@/lib/confidence";
+import {
+  crawlabilityFindingsToMoneyGaps,
+  runCrawlabilityAudit,
+} from "@/lib/crawlability";
 import { getTechProfile } from "@/lib/developer/memory";
 import {
   buildEngineKgContext,
@@ -97,7 +102,57 @@ export async function persistMoneyGapEngineResult(input: {
       kgContext,
     });
 
-    let findings = engineResult.opportunities;
+    let crawlabilitySnapshot: CrawlabilityReportSnapshot | null = null;
+    let crawlabilityGaps: ReturnType<typeof crawlabilityFindingsToMoneyGaps> = [];
+    try {
+      const reportMeta = await db.query.reports.findFirst({
+        where: eq(reports.id, input.reportId),
+        columns: { workspaceId: true, websiteId: true },
+      });
+      const crawl = await runCrawlabilityAudit(input.url, {
+        workspaceId: reportMeta?.workspaceId,
+        maxPages: 10,
+        maxLinkChecks: 12,
+      });
+      crawlabilityGaps = crawlabilityFindingsToMoneyGaps(crawl.findings);
+
+      let previousScore: number | null = null;
+      if (reportMeta?.websiteId) {
+        const prev = await db.query.reports.findFirst({
+          where: and(
+            eq(reports.websiteId, reportMeta.websiteId),
+            eq(reports.type, "intelligence"),
+            ne(reports.id, input.reportId),
+          ),
+          orderBy: [desc(reports.createdAt)],
+          columns: { crawlabilityReport: true },
+        });
+        previousScore = prev?.crawlabilityReport?.score ?? null;
+      }
+      const delta =
+        crawl.score != null && previousScore != null
+          ? crawl.score - previousScore
+          : null;
+
+      crawlabilitySnapshot = {
+        score: crawl.score,
+        status: crawl.status,
+        contributors: crawl.contributors,
+        executiveSummary: crawl.executiveSummary,
+        estimatedImprovement: crawl.estimatedImprovement,
+        unavailableReasons: crawl.unavailableReasons,
+        previousScore,
+        delta,
+        findingCount: crawl.findings.length,
+      };
+    } catch (err) {
+      log("warn", "crawlability_audit_soft_fail", {
+        analysisId: input.analysisId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    let findings = [...engineResult.opportunities, ...crawlabilityGaps];
     let industryPlaybook = null as Awaited<
       ReturnType<typeof runKnowledgeGraphPass>
     >["industryPlaybook"];
@@ -279,6 +334,7 @@ export async function persistMoneyGapEngineResult(input: {
         revenueArchitecture: revenueArchitecture,
         businessModelGapReport: businessModelGapReport,
         patternMatchReport: patternMatchReport,
+        crawlabilityReport: crawlabilitySnapshot,
         moneyGapEngineStatus: "completed",
         moneyGapEngineError: null,
       })
@@ -297,6 +353,7 @@ export async function persistMoneyGapEngineResult(input: {
       hasRevenueArchitecture: Boolean(revenueArchitecture),
       hasBusinessModelGapReport: Boolean(businessModelGapReport),
       hasPatternMatchReport: Boolean(patternMatchReport),
+      crawlabilityScore: crawlabilitySnapshot?.score ?? null,
     });
 
     return { ok: true };

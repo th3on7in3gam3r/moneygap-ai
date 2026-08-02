@@ -81,6 +81,7 @@ export async function getScanSummaries(workspaceId: string) {
         seo: s.scores?.seo ?? null,
         trust: s.scores?.trust ?? null,
         conversion: s.scores?.conversion ?? null,
+        crawlability: s.scores?.crawlability ?? null,
       })),
     dailyCount: daily.length,
     weeklyCount: weekly.length,
@@ -90,7 +91,19 @@ export async function getScanSummaries(workspaceId: string) {
       seo: scoreDelta("seo"),
       trust: scoreDelta("trust"),
       conversion: scoreDelta("conversion"),
+      crawlability: scoreDelta("crawlability"),
     },
+    crawlability: latest?.scores
+      ? {
+          score: latest.scores.crawlability,
+          status: latest.scores.crawlabilityStatus,
+          contributors: latest.scores.crawlabilityContributors,
+          summary: latest.scores.crawlabilitySummary,
+          estimatedImprovement: latest.scores.crawlabilityEstimatedImprovement,
+          previous: prev?.scores?.crawlability ?? null,
+          delta: scoreDelta("crawlability"),
+        }
+      : null,
     topFindings,
     resolvedHint:
       prev && latest

@@ -10,6 +10,7 @@ import {
   websiteAnalyses,
   websites,
 } from "@/db/schema";
+import { runCrawlabilityAudit } from "@/lib/crawlability";
 import { scoreBacklinks } from "./backlinks/probe";
 import { resolveSelfScanTarget, validateSelfOptimizationUrl } from "./config";
 import { pathsToProbe, scoreContentCoverage } from "./content-gaps/catalog";
@@ -25,6 +26,7 @@ import { fetchSiteFiles } from "./seo/site-files";
 import { scoreSeo } from "./seo/score";
 import { scoreTrust } from "./trust/heuristics";
 import type { SelfOptFindingInput } from "./types";
+import type { CrawlabilityResult } from "@/lib/crawlability";
 
 /** Scans left in "running" after a crash / killed dev server block the UI forever. */
 const STALE_RUNNING_MS = 90_000;
@@ -165,6 +167,19 @@ export async function runSelfOptimizationScan(opts: {
       fetchSiteFiles(target.url),
     ]);
 
+    let crawlability: CrawlabilityResult | null = null;
+    try {
+      crawlability = await runCrawlabilityAudit(target.url, {
+        paths: probePaths,
+        knownUrls: pages.map((p) => p.url),
+        workspaceId: opts.workspaceId,
+        maxPages: 12,
+        maxLinkChecks: 16,
+      });
+    } catch (e) {
+      console.error("crawlability audit soft-fail", e);
+    }
+
     const seo = scoreSeo(pages, siteFiles);
     const content = scoreContentCoverage(pages);
     const trust = scoreTrust(pages);
@@ -181,9 +196,31 @@ export async function runSelfOptimizationScan(opts: {
       aiVisibility,
       contentCoverage: content,
       backlinkHealth,
+      crawlability,
     });
 
+    const crawlFindings: SelfOptFindingInput[] = (crawlability?.findings ?? []).map(
+      (f) => ({
+        category: f.category,
+        title: f.title,
+        problem: f.problem,
+        businessImpact: f.businessImpact,
+        whyItMatters: f.whyItMatters,
+        estimatedOpportunity: f.estimatedOpportunity,
+        estimateLabeled: f.estimateLabeled,
+        confidence: f.confidence,
+        evidence: f.evidence,
+        fixPath: f.fixPath,
+        difficulty: f.difficulty,
+        estimatedTime: f.estimatedTime,
+        verificationSteps: f.verificationSteps,
+        priority: f.priority,
+        pageUrl: f.pageUrl ?? null,
+      }),
+    );
+
     let findings: SelfOptFindingInput[] = [
+      ...crawlFindings,
       ...seo.findings,
       ...content.findings,
       ...trust.findings,
@@ -284,6 +321,12 @@ export async function runSelfOptimizationScan(opts: {
       aiVisibility: breakdown.aiVisibility,
       contentCoverage: breakdown.contentCoverage,
       backlinkHealth: breakdown.backlinkHealth,
+      crawlability: breakdown.crawlability,
+      crawlabilityStatus: breakdown.crawlabilityStatus ?? null,
+      crawlabilityContributors: breakdown.crawlabilityContributors ?? null,
+      crawlabilitySummary: breakdown.crawlabilitySummary ?? null,
+      crawlabilityEstimatedImprovement:
+        breakdown.crawlabilityEstimatedImprovement ?? null,
       unavailableReasons: breakdown.unavailableReasons,
       estimatedOpportunity,
     });
@@ -308,6 +351,7 @@ export async function runSelfOptimizationScan(opts: {
         fixPath: f.fixPath,
         difficulty: f.difficulty,
         estimatedTime: f.estimatedTime,
+        priority: f.priority ?? null,
         verificationSteps: f.verificationSteps,
         prompts: f.prompts ?? null,
         pageUrl: f.pageUrl ?? null,

@@ -67,6 +67,12 @@ export async function GET() {
             aiVisibility: scores.aiVisibility,
             contentCoverage: scores.contentCoverage,
             backlinkHealth: scores.backlinkHealth,
+            crawlability: scores.crawlability,
+            crawlabilityStatus: scores.crawlabilityStatus,
+            crawlabilityContributors: scores.crawlabilityContributors,
+            crawlabilitySummary: scores.crawlabilitySummary,
+            crawlabilityEstimatedImprovement:
+              scores.crawlabilityEstimatedImprovement,
             unavailableReasons: scores.unavailableReasons ?? {},
             estimatedOpportunity: scores.estimatedOpportunity,
             labeled: "AI Estimate",
@@ -91,6 +97,7 @@ export async function GET() {
         : null,
       trend: summaries.trend,
       deltas: summaries.deltas,
+      crawlability: summaries.crawlability,
       findings: latestFindings.map((f) => ({
         id: f.id,
         category: f.category,
@@ -105,6 +112,7 @@ export async function GET() {
         fixPath: f.fixPath,
         difficulty: f.difficulty,
         estimatedTime: f.estimatedTime,
+        priority: f.priority,
         verificationSteps: f.verificationSteps,
         prompts: f.prompts,
         pageUrl: f.pageUrl,

@@ -79,6 +79,7 @@ export default async function IntelligenceReportPage({
           })),
         })),
         scoreBreakdown: report.scoreBreakdown ?? null,
+        crawlabilityReport: report.crawlabilityReport ?? null,
         website: {
           name: report.website.name,
           domain: report.website.domain,

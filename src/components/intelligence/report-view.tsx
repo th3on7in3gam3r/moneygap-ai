@@ -116,6 +116,17 @@ export type IntelligenceReportView = {
     contentAuthority: number;
     trustSignals: number;
   } | null;
+  crawlabilityReport?: {
+    score: number | null;
+    status: string | null;
+    contributors: Record<string, number | null> | null;
+    executiveSummary: string | null;
+    estimatedImprovement: string | null;
+    unavailableReasons?: Record<string, string>;
+    previousScore?: number | null;
+    delta?: number | null;
+    findingCount?: number;
+  } | null;
   website: {
     name: string;
     domain: string;
@@ -1198,6 +1209,69 @@ export function IntelligenceReport({
                 </>
               );
             })()}
+          </CardBody>
+        </Card>
+      )}
+
+      {report.crawlabilityReport && (
+        <Card>
+          <CardHeader>
+            <h2 className="font-display text-lg font-semibold">
+              Crawlability Score™
+            </h2>
+            <p className="mt-1 text-sm text-fg-muted">
+              Higher = healthier discovery for search engines and AI systems (distinct from
+              MoneyGap Score™ opportunity polarity).
+            </p>
+          </CardHeader>
+          <CardBody className="space-y-4">
+            <div className="flex flex-wrap items-end gap-4">
+              <p className="font-display text-4xl font-semibold tabular-nums">
+                {report.crawlabilityReport.score != null
+                  ? report.crawlabilityReport.score
+                  : "—"}
+                {report.crawlabilityReport.score != null ? (
+                  <span className="ml-1 text-base font-medium text-fg-subtle">/100</span>
+                ) : null}
+              </p>
+              {report.crawlabilityReport.status ? (
+                <Badge tone="accent">{report.crawlabilityReport.status}</Badge>
+              ) : null}
+              {report.crawlabilityReport.delta != null ? (
+                <p className="text-sm text-fg-muted">
+                  Trend: {report.crawlabilityReport.delta > 0 ? "+" : ""}
+                  {report.crawlabilityReport.delta} vs previous
+                  {report.crawlabilityReport.previousScore != null
+                    ? ` (${report.crawlabilityReport.previousScore})`
+                    : ""}
+                </p>
+              ) : null}
+            </div>
+            {report.crawlabilityReport.executiveSummary ? (
+              <p className="text-sm text-fg-muted">
+                {report.crawlabilityReport.executiveSummary}
+              </p>
+            ) : null}
+            {report.crawlabilityReport.contributors ? (
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(report.crawlabilityReport.contributors).map(
+                  ([key, value]) => (
+                    <span
+                      key={key}
+                      className="rounded-md border border-border px-2 py-1 text-[11px] text-fg-muted"
+                    >
+                      {key}: {value != null ? value : "—"}
+                    </span>
+                  ),
+                )}
+              </div>
+            ) : null}
+            <p className="text-xs text-fg-subtle">
+              Critical/high crawl issues appear under Opportunities as SEO · Crawlability.
+              {report.crawlabilityReport.estimatedImprovement
+                ? ` ${report.crawlabilityReport.estimatedImprovement}`
+                : ""}
+            </p>
           </CardBody>
         </Card>
       )}

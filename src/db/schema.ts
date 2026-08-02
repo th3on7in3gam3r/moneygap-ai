@@ -215,6 +215,8 @@ export const reports = pgTable(
     businessModelGapReport: jsonb("business_model_gap_report").$type<BusinessModelGapSnapshot | null>(),
     /** Phase 13.4 Growth Pattern Library™ */
     patternMatchReport: jsonb("pattern_match_report").$type<PatternMatchSnapshot | null>(),
+    /** Crawlability Score™ (health; higher = better) */
+    crawlabilityReport: jsonb("crawlability_report").$type<CrawlabilityReportSnapshot | null>(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
@@ -223,6 +225,18 @@ export const reports = pgTable(
     index("reports_type_idx").on(t.type),
   ],
 );
+
+export type CrawlabilityReportSnapshot = {
+  score: number | null;
+  status: string | null;
+  contributors: CrawlabilityContributorScores | null;
+  executiveSummary: string | null;
+  estimatedImprovement: string | null;
+  unavailableReasons: Record<string, string>;
+  previousScore?: number | null;
+  delta?: number | null;
+  findingCount?: number;
+};
 
 export type IndustryPlaybookSnapshot = {
   slug: string;
@@ -883,6 +897,9 @@ export type AnalysisComparisonChanges = {
   categoryDeltas: Partial<Record<keyof CategoryScores, number>>;
   competitorNotes: string[];
   reasons: string[];
+  crawlabilityDelta?: number | null;
+  crawlabilityPrevious?: number | null;
+  crawlabilityCurrent?: number | null;
 };
 
 export const analysisComparisons = pgTable(
@@ -3955,6 +3972,15 @@ export type SelfOptPrompts = {
   copilot: string;
 };
 
+export type CrawlabilityContributorScores = {
+  robots: number | null;
+  sitemap: number | null;
+  canonical: number | null;
+  internalLinks: number | null;
+  redirects: number | null;
+  indexability: number | null;
+};
+
 export type SelfOptScoreBreakdown = {
   overall: number | null;
   seo: number | null;
@@ -3964,6 +3990,11 @@ export type SelfOptScoreBreakdown = {
   aiVisibility: number | null;
   contentCoverage: number | null;
   backlinkHealth: number | null;
+  crawlability: number | null;
+  crawlabilityStatus?: string | null;
+  crawlabilityContributors?: CrawlabilityContributorScores | null;
+  crawlabilitySummary?: string | null;
+  crawlabilityEstimatedImprovement?: string | null;
   unavailableReasons: Record<string, string>;
 };
 
@@ -4030,6 +4061,11 @@ export const selfOptimizationScores = pgTable(
     aiVisibility: integer("ai_visibility"),
     contentCoverage: integer("content_coverage"),
     backlinkHealth: integer("backlink_health"),
+    crawlability: integer("crawlability"),
+    crawlabilityStatus: text("crawlability_status"),
+    crawlabilityContributors: jsonb("crawlability_contributors").$type<CrawlabilityContributorScores | null>(),
+    crawlabilitySummary: text("crawlability_summary"),
+    crawlabilityEstimatedImprovement: text("crawlability_estimated_improvement"),
     unavailableReasons: jsonb("unavailable_reasons")
       .$type<Record<string, string>>()
       .default({}),
@@ -4103,6 +4139,7 @@ export const selfOptimizationFindings = pgTable(
     fixPath: text("fix_path"),
     difficulty: text("difficulty"),
     estimatedTime: text("estimated_time"),
+    priority: text("priority"),
     verificationSteps: jsonb("verification_steps").$type<string[]>().default([]),
     prompts: jsonb("prompts").$type<SelfOptPrompts>(),
     pageUrl: text("page_url"),
