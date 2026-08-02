@@ -36,6 +36,11 @@ export {
 } from "./service";
 export { generateArticleDraft } from "./generate";
 export {
+  recommendPlaybooksForOpenGaps,
+  sectionSlugForGap,
+  type GapPlaybookRec,
+} from "./recommend-for-gaps";
+export {
   articleMetadata,
   articleJsonLd,
   articleCanonical,

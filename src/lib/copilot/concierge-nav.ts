@@ -61,7 +61,13 @@ const ROUTES: {
     id: "academy",
     label: "Open Growth Academy™",
     href: "/dashboard/academy",
-    patterns: [/growth academy/, /\bacademy\b/, /blog cms/],
+    patterns: [/growth academy/, /\bacademy\b/, /playbooks?/, /close (the )?gaps?/],
+  },
+  {
+    id: "academy_cms",
+    label: "Open Academy CMS",
+    href: "/dashboard/academy/cms",
+    patterns: [/academy cms/, /publishing engine/, /blog cms/, /content editor/],
   },
   {
     id: "scan",

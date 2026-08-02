@@ -16,7 +16,10 @@ Growth Academy™ is MoneyGap’s public content hub for SEO, conversion, AI vis
 | Search | `/academy/search` |
 | RSS | `/academy/rss.xml` |
 | Blog alias | `/blog` → `/academy` |
-| CMS | `/dashboard/academy` |
+| Learner home (gap-closing) | `/dashboard/academy` |
+| CMS / AI Publishing Engine | `/dashboard/academy/cms` |
+
+The dashboard **Growth Academy** nav opens the learner home: playbooks matched to open Money Gaps, with Fix CTAs into reports. Editors publish from `/dashboard/academy/cms`.
 
 ## Feature flag
 

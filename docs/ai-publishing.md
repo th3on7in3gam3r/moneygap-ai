@@ -2,7 +2,7 @@
 
 ## Role
 
-Assist editors inside Growth Academy™ CMS. Generation is draft-only.
+Assist editors inside Growth Academy™ CMS (`/dashboard/academy/cms`). Generation is draft-only.
 
 ## What AI can produce
 

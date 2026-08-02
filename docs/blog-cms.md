@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Internal editorial CMS at `/dashboard/academy` for creating and managing Growth Academy content.
+Internal editorial CMS at `/dashboard/academy/cms` for creating and managing Growth Academy content. The learner home (gap-closing playbooks) lives at `/dashboard/academy`.
 
 ## Capabilities (Phase 1)
 
