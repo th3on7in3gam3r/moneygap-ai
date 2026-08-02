@@ -118,13 +118,8 @@ export function SmartConsent({
 
   if (mode === "hidden" && !embedded) return null;
 
-  const panel = (
-    <div
-      className={cn(
-        "w-full max-w-lg rounded-2xl border border-border bg-bg-elevated p-6 shadow-[var(--shadow)]",
-        embedded && "max-w-none shadow-none",
-      )}
-    >
+  const header = (
+    <>
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">
         Smart Consent™
       </p>
@@ -138,66 +133,70 @@ export function SmartConsent({
         <br />
         We&apos;ll always explain why we ask.
       </p>
+    </>
+  );
 
-      {(mode === "customize" || embedded) && (
-        <ul className="mt-5 space-y-3">
-          {CONSENT_CATEGORY_DEFS.map((def) => {
-            const on = categories[def.id];
-            return (
-              <li
-                key={def.id}
-                className="rounded-xl border border-border bg-bg px-4 py-3"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-fg">
-                      {def.locked || on ? "✓ " : ""}
-                      {def.label}
-                    </p>
-                    <ul className="mt-1 space-y-0.5 text-xs text-fg-muted">
-                      {def.bullets.map((b) => (
-                        <li key={b}>{b}</li>
-                      ))}
-                    </ul>
-                    {!def.currentlyActive && def.inactiveNote ? (
-                      <p className="mt-1.5 text-[11px] text-fg-subtle">{def.inactiveNote}</p>
-                    ) : null}
-                  </div>
-                  {!def.locked ? (
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={on}
-                      onClick={() =>
-                        setCategories((c) => ({ ...c, [def.id]: !c[def.id] }))
-                      }
-                      className={cn(
-                        "mt-0.5 h-6 w-11 shrink-0 rounded-full border transition",
-                        on
-                          ? "border-accent bg-accent"
-                          : "border-border bg-bg-muted",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "block h-5 w-5 translate-x-0.5 rounded-full bg-bg-elevated transition",
-                          on && "translate-x-[1.35rem]",
-                        )}
-                      />
-                    </button>
-                  ) : (
-                    <span className="text-[11px] font-medium text-fg-subtle">Required</span>
-                  )}
+  const categoryList =
+    mode === "customize" || embedded ? (
+      <ul className="space-y-3">
+        {CONSENT_CATEGORY_DEFS.map((def) => {
+          const on = categories[def.id];
+          return (
+            <li
+              key={def.id}
+              className="rounded-xl border border-border bg-bg px-4 py-3"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-fg">
+                    {def.locked || on ? "✓ " : ""}
+                    {def.label}
+                  </p>
+                  <ul className="mt-1 space-y-0.5 text-xs text-fg-muted">
+                    {def.bullets.map((b) => (
+                      <li key={b}>{b}</li>
+                    ))}
+                  </ul>
+                  {!def.currentlyActive && def.inactiveNote ? (
+                    <p className="mt-1.5 text-[11px] text-fg-subtle">{def.inactiveNote}</p>
+                  ) : null}
                 </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                {!def.locked ? (
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={on}
+                    onClick={() =>
+                      setCategories((c) => ({ ...c, [def.id]: !c[def.id] }))
+                    }
+                    className={cn(
+                      "mt-0.5 h-6 w-11 shrink-0 rounded-full border transition",
+                      on
+                        ? "border-accent bg-accent"
+                        : "border-border bg-bg-muted",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "block h-5 w-5 translate-x-0.5 rounded-full bg-bg-elevated transition",
+                        on && "translate-x-[1.35rem]",
+                      )}
+                    />
+                  </button>
+                ) : (
+                  <span className="text-[11px] font-medium text-fg-subtle">Required</span>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    ) : null;
 
-      {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
-
-      <div className="mt-5 flex flex-wrap gap-2">
+  const actions = (
+    <>
+      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      <div className="flex flex-wrap gap-2">
         {mode === "welcome" && !embedded ? (
           <>
             <Button
@@ -252,8 +251,7 @@ export function SmartConsent({
           </>
         )}
       </div>
-
-      <p className="mt-4 text-[11px] leading-relaxed text-fg-subtle">
+      <p className="text-[11px] leading-relaxed text-fg-subtle">
         Not legal advice. Review policies with counsel for your organization.{" "}
         <Link href="/privacy" className="text-accent hover:underline">
           Privacy Policy
@@ -267,15 +265,59 @@ export function SmartConsent({
           Privacy Center™
         </Link>
       </p>
-    </div>
+    </>
   );
 
-  if (embedded) return panel;
+  if (embedded) {
+    return (
+      <div className="w-full max-w-none rounded-2xl border border-border bg-bg-elevated p-6">
+        {header}
+        {categoryList ? <div className="mt-5">{categoryList}</div> : null}
+        <div className="mt-5 space-y-3">{actions}</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[60] flex justify-center p-4 sm:bottom-6 sm:justify-end sm:p-6">
-      <div className="absolute inset-0 -z-10 bg-bg/40 backdrop-blur-[2px] sm:hidden" />
-      {panel}
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center p-4 sm:items-center sm:justify-end sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="smart-consent-title"
+    >
+      <div className="absolute inset-0 bg-bg/50 backdrop-blur-[2px]" aria-hidden />
+      <div
+        className={cn(
+          "relative flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border bg-bg-elevated shadow-[var(--shadow)]",
+          "max-h-[min(100dvh-2rem,40rem)]",
+        )}
+      >
+        <div className="shrink-0 border-b border-border px-6 pb-4 pt-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">
+            Smart Consent™
+          </p>
+          <h2
+            id="smart-consent-title"
+            className="mt-2 font-display text-2xl font-semibold tracking-tight text-fg"
+          >
+            Welcome to MoneyGap AI
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-fg-muted">
+            We respect your privacy. You control what information you share.
+            We&apos;ll always explain why we ask.
+          </p>
+        </div>
+
+        {categoryList ? (
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4">
+            {categoryList}
+          </div>
+        ) : null}
+
+        <div className="shrink-0 space-y-3 border-t border-border bg-bg-elevated px-6 py-4">
+          {actions}
+        </div>
+      </div>
     </div>
   );
 }
