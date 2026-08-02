@@ -627,6 +627,41 @@ export default function DeveloperModePage() {
           </CardBody>
         </Card>
       )}
+
+      <Card>
+        <CardHeader>
+          <h2 className="font-display text-lg font-semibold">
+            Privacy Intelligence™ · technical view
+          </h2>
+        </CardHeader>
+        <CardBody className="space-y-3 text-sm text-fg-muted">
+          <p>
+            Cookie headers, Set-Cookie security flags, and consent storage are audited by
+            Privacy Intelligence™ probes (verified evidence only). Use Privacy Center™ for
+            the live Cookie Intelligence™ inventory.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button href="/dashboard/settings/privacy" size="sm" variant="secondary">
+              Cookie Intelligence™
+            </Button>
+            <Button href="/dashboard/self-optimization/privacy" size="sm" variant="secondary">
+              Privacy Report
+            </Button>
+            <Button
+              href="/docs"
+              size="sm"
+              variant="ghost"
+            >
+              Docs hub
+            </Button>
+          </div>
+          <p className="text-xs text-fg-subtle">
+            Auth sessions use Clerk Secure/HttpOnly cookies. Smart Consent™ stores{" "}
+            <code className="font-mono">mg_consent</code> (HttpOnly, SameSite=Lax). No
+            third-party analytics cookies are loaded today.
+          </p>
+        </CardBody>
+      </Card>
     </div>
   );
 }

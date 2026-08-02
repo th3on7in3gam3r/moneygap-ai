@@ -73,6 +73,11 @@ export async function GET() {
             crawlabilitySummary: scores.crawlabilitySummary,
             crawlabilityEstimatedImprovement:
               scores.crawlabilityEstimatedImprovement,
+            privacy: scores.privacy,
+            privacyStatus: scores.privacyStatus,
+            privacyContributors: scores.privacyContributors,
+            privacySummary: scores.privacySummary,
+            privacyEstimatedImprovement: scores.privacyEstimatedImprovement,
             unavailableReasons: scores.unavailableReasons ?? {},
             estimatedOpportunity: scores.estimatedOpportunity,
             labeled: "AI Estimate",
@@ -98,6 +103,7 @@ export async function GET() {
       trend: summaries.trend,
       deltas: summaries.deltas,
       crawlability: summaries.crawlability,
+      privacy: summaries.privacy,
       findings: latestFindings.map((f) => ({
         id: f.id,
         category: f.category,

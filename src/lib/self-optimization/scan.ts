@@ -11,6 +11,7 @@ import {
   websites,
 } from "@/db/schema";
 import { runCrawlabilityAudit } from "@/lib/crawlability";
+import { runPrivacyAudit, type PrivacyResult } from "@/lib/privacy";
 import { scoreBacklinks } from "./backlinks/probe";
 import { resolveSelfScanTarget, validateSelfOptimizationUrl } from "./config";
 import { pathsToProbe, scoreContentCoverage } from "./content-gaps/catalog";
@@ -180,6 +181,15 @@ export async function runSelfOptimizationScan(opts: {
       console.error("crawlability audit soft-fail", e);
     }
 
+    let privacy: PrivacyResult | null = null;
+    try {
+      privacy = await runPrivacyAudit(target.url, {
+        workspaceId: opts.workspaceId,
+      });
+    } catch (e) {
+      console.error("privacy audit soft-fail", e);
+    }
+
     const seo = scoreSeo(pages, siteFiles);
     const content = scoreContentCoverage(pages);
     const trust = scoreTrust(pages);
@@ -197,6 +207,7 @@ export async function runSelfOptimizationScan(opts: {
       contentCoverage: content,
       backlinkHealth,
       crawlability,
+      privacy,
     });
 
     const crawlFindings: SelfOptFindingInput[] = (crawlability?.findings ?? []).map(
@@ -219,8 +230,29 @@ export async function runSelfOptimizationScan(opts: {
       }),
     );
 
+    const privacyFindings: SelfOptFindingInput[] = (privacy?.findings ?? []).map(
+      (f) => ({
+        category: f.category,
+        title: f.title,
+        problem: f.problem,
+        businessImpact: f.businessImpact,
+        whyItMatters: f.whyItMatters,
+        estimatedOpportunity: f.estimatedOpportunity,
+        estimateLabeled: f.estimateLabeled,
+        confidence: f.confidence,
+        evidence: f.evidence,
+        fixPath: f.fixPath,
+        difficulty: f.difficulty,
+        estimatedTime: f.estimatedTime,
+        verificationSteps: f.verificationSteps,
+        priority: f.priority,
+        pageUrl: f.pageUrl ?? null,
+      }),
+    );
+
     let findings: SelfOptFindingInput[] = [
       ...crawlFindings,
+      ...privacyFindings,
       ...seo.findings,
       ...content.findings,
       ...trust.findings,
@@ -327,6 +359,11 @@ export async function runSelfOptimizationScan(opts: {
       crawlabilitySummary: breakdown.crawlabilitySummary ?? null,
       crawlabilityEstimatedImprovement:
         breakdown.crawlabilityEstimatedImprovement ?? null,
+      privacy: breakdown.privacy,
+      privacyStatus: breakdown.privacyStatus ?? null,
+      privacyContributors: breakdown.privacyContributors ?? null,
+      privacySummary: breakdown.privacySummary ?? null,
+      privacyEstimatedImprovement: breakdown.privacyEstimatedImprovement ?? null,
       unavailableReasons: breakdown.unavailableReasons,
       estimatedOpportunity,
     });

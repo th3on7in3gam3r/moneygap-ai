@@ -82,6 +82,26 @@ const ROUTES: {
     patterns: [/websites?/, /my sites?/],
   },
   {
+    id: "privacy_center",
+    label: "Open Privacy Center™",
+    href: "/dashboard/settings/privacy",
+    patterns: [
+      /privacy center/,
+      /cookie (prefs|preferences|inventory)/,
+      /consent history/,
+      /smart consent/,
+      /what cookies/,
+      /delete my (data|account)/,
+      /privacy score/,
+    ],
+  },
+  {
+    id: "privacy_report",
+    label: "Open Privacy Report",
+    href: "/dashboard/self-optimization/privacy",
+    patterns: [/privacy report/, /privacy intelligence/],
+  },
+  {
     id: "settings",
     label: "Open Settings",
     href: "/dashboard/settings",
@@ -109,7 +129,7 @@ export function resolveConciergeNav(message: string): ConciergeNavMatch | null {
     if (!route.patterns.some((p) => p.test(hay))) continue;
     if (!wantsNav && !/take me|open|show|go to|start/i.test(hay)) {
       // Still allow strong destination-only phrases for common destinations
-      if (!/reports?|integrations?|money gaps?|scan|academy|backlinks?/i.test(hay)) {
+      if (!/reports?|integrations?|money gaps?|scan|academy|backlinks?|privacy|cookie|consent/i.test(hay)) {
         continue;
       }
     }

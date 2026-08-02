@@ -16,6 +16,8 @@ Launch-ready public SaaS marketing for MoneyGap AI: explain the product, build t
 | `/docs` | Public docs hub |
 | `/security` | Security practices + disclosure |
 | `/privacy` | Privacy policy scaffold (counsel review) |
+| `/dashboard/settings/privacy` | Privacy Center™ (Smart Consent™, Cookie Intelligence™) |
+| `/dashboard/self-optimization/privacy` | Privacy Score™ report |
 | `/terms` | Terms of service scaffold (counsel review) |
 | `/academy` | Growth Academy™ |
 | `/integrations`, `/api`, `/marketplace` | Product area landings |

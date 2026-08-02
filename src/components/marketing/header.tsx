@@ -96,6 +96,17 @@ export function MarketingFooter() {
           <Link href="/privacy" className="hover:text-fg">
             Privacy
           </Link>
+          <button
+            type="button"
+            className="hover:text-fg"
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("mg:open-smart-consent"));
+              }
+            }}
+          >
+            Privacy preferences
+          </button>
           <Link href="/terms" className="hover:text-fg">
             Terms
           </Link>

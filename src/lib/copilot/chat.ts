@@ -83,6 +83,25 @@ function buildMeta(
     });
   }
 
+  if (
+    /cookie|consent|privacy|personalization|analytics category|delete my data/i.test(
+      userMessage,
+    )
+  ) {
+    proposedActions.push({
+      type: "navigate",
+      label: "Privacy Center™",
+      href: "/dashboard/settings/privacy",
+      requiresConfirmation: true,
+    });
+    if (ctx.privacy.score != null) {
+      evidence.unshift(`Privacy Score™: ${ctx.privacy.score}`);
+    }
+    evidence.push(
+      `Cookie catalog: ${ctx.privacy.catalogCookieNames.slice(0, 6).join(", ")}`,
+    );
+  }
+
   if (top?.reportId) {
     proposedActions.push({
       type: "open_report",

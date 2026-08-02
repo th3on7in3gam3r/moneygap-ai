@@ -65,6 +65,11 @@ type Overview = {
     crawlabilityContributors?: Record<string, number | null> | null;
     crawlabilitySummary?: string | null;
     crawlabilityEstimatedImprovement?: string | null;
+    privacy: number | null;
+    privacyStatus?: string | null;
+    privacyContributors?: Record<string, number | null> | null;
+    privacySummary?: string | null;
+    privacyEstimatedImprovement?: string | null;
     unavailableReasons: Record<string, string>;
     estimatedOpportunity: number | null;
     labeled: string;
@@ -110,6 +115,7 @@ type Overview = {
 
 const SCORE_LABELS: { key: keyof NonNullable<Overview["scores"]>; label: string }[] = [
   { key: "overall", label: "Overall Growth" },
+  { key: "privacy", label: "Privacy Score™" },
   { key: "crawlability", label: "Crawlability Score™" },
   { key: "seo", label: "SEO" },
   { key: "trust", label: "Trust" },
@@ -330,14 +336,23 @@ export default function SelfOptimizationPage() {
                 key === "crawlabilityStatus" ||
                 key === "crawlabilityContributors" ||
                 key === "crawlabilitySummary" ||
-                key === "crawlabilityEstimatedImprovement"
+                key === "crawlabilityEstimatedImprovement" ||
+                key === "privacyStatus" ||
+                key === "privacyContributors" ||
+                key === "privacySummary" ||
+                key === "privacyEstimatedImprovement"
               ) {
                 return null;
               }
               const value = data.scores?.[key] as number | null | undefined;
               const reason = reasons[key === "aiVisibility" ? "aiVisibility" : String(key)];
               const isCrawl = key === "crawlability";
-              const status = isCrawl ? data.scores?.crawlabilityStatus : null;
+              const isPrivacy = key === "privacy";
+              const status = isCrawl
+                ? data.scores?.crawlabilityStatus
+                : isPrivacy
+                  ? data.scores?.privacyStatus
+                  : null;
               const body = (
                   <CardBody className="py-4">
                     <p className="text-[10px] uppercase tracking-[0.08em] text-fg-subtle">
@@ -362,15 +377,26 @@ export default function SelfOptimizationPage() {
                     {isCrawl ? (
                       <p className="mt-2 text-[11px] text-accent">Open Crawlability Report →</p>
                     ) : null}
+                    {isPrivacy ? (
+                      <p className="mt-2 text-[11px] text-accent">Open Privacy Report →</p>
+                    ) : null}
                   </CardBody>
               );
-              return isCrawl ? (
+              if (isCrawl) {
+                return (
                 <a key={key} href="/dashboard/self-optimization/crawlability" className="block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">
                   <Card className="transition hover:border-accent/40">{body}</Card>
                 </a>
-              ) : (
-                <Card key={key}>{body}</Card>
-              );
+                );
+              }
+              if (isPrivacy) {
+                return (
+                <a key={key} href="/dashboard/self-optimization/privacy" className="block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+                  <Card className="transition hover:border-accent/40">{body}</Card>
+                </a>
+                );
+              }
+              return <Card key={key}>{body}</Card>;
             })}
           </div>
 

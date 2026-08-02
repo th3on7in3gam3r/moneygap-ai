@@ -217,6 +217,8 @@ export const reports = pgTable(
     patternMatchReport: jsonb("pattern_match_report").$type<PatternMatchSnapshot | null>(),
     /** Crawlability Score™ (health; higher = better) */
     crawlabilityReport: jsonb("crawlability_report").$type<CrawlabilityReportSnapshot | null>(),
+    /** Privacy Score™ (health; higher = better) */
+    privacyReport: jsonb("privacy_report").$type<PrivacyReportSnapshot | null>(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
@@ -236,6 +238,28 @@ export type CrawlabilityReportSnapshot = {
   previousScore?: number | null;
   delta?: number | null;
   findingCount?: number;
+};
+
+export type PrivacyContributorScores = {
+  consentUx: number | null;
+  cookieSecurity: number | null;
+  policyDocs: number | null;
+  trackingHygiene: number | null;
+  thirdPartyExposure: number | null;
+  consentStorage: number | null;
+};
+
+export type PrivacyReportSnapshot = {
+  score: number | null;
+  status: string | null;
+  contributors: PrivacyContributorScores | null;
+  executiveSummary: string | null;
+  estimatedImprovement: string | null;
+  unavailableReasons: Record<string, string>;
+  previousScore?: number | null;
+  delta?: number | null;
+  findingCount?: number;
+  trackingDetected?: string[];
 };
 
 export type IndustryPlaybookSnapshot = {
@@ -3995,6 +4019,11 @@ export type SelfOptScoreBreakdown = {
   crawlabilityContributors?: CrawlabilityContributorScores | null;
   crawlabilitySummary?: string | null;
   crawlabilityEstimatedImprovement?: string | null;
+  privacy: number | null;
+  privacyStatus?: string | null;
+  privacyContributors?: PrivacyContributorScores | null;
+  privacySummary?: string | null;
+  privacyEstimatedImprovement?: string | null;
   unavailableReasons: Record<string, string>;
 };
 
@@ -4066,6 +4095,11 @@ export const selfOptimizationScores = pgTable(
     crawlabilityContributors: jsonb("crawlability_contributors").$type<CrawlabilityContributorScores | null>(),
     crawlabilitySummary: text("crawlability_summary"),
     crawlabilityEstimatedImprovement: text("crawlability_estimated_improvement"),
+    privacy: integer("privacy"),
+    privacyStatus: text("privacy_status"),
+    privacyContributors: jsonb("privacy_contributors").$type<PrivacyContributorScores | null>(),
+    privacySummary: text("privacy_summary"),
+    privacyEstimatedImprovement: text("privacy_estimated_improvement"),
     unavailableReasons: jsonb("unavailable_reasons")
       .$type<Record<string, string>>()
       .default({}),
@@ -4543,3 +4577,70 @@ export type GaCategory = typeof gaCategories.$inferSelect;
 export type GaTag = typeof gaTags.$inferSelect;
 export type GaArticle = typeof gaArticles.$inferSelect;
 export type GaContentIdea = typeof gaContentIdeas.$inferSelect;
+
+/** Phase 20.9 — Privacy Intelligence™ Smart Consent™ */
+export type PrivacyConsentCategories = {
+  essential: boolean;
+  performance: boolean;
+  analytics: boolean;
+  personalization: boolean;
+  productImprovement: boolean;
+};
+
+export type PrivacyConsentSource =
+  | "smart_consent"
+  | "privacy_center"
+  | "withdraw";
+
+export const privacyConsentRecords = pgTable(
+  "privacy_consent_records",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    workspaceId: uuid("workspace_id").references(() => workspaces.id, {
+      onDelete: "cascade",
+    }),
+    visitorKey: text("visitor_key"),
+    categories: jsonb("categories").$type<PrivacyConsentCategories>().notNull(),
+    policyVersion: text("policy_version").notNull(),
+    consentVersion: text("consent_version").notNull(),
+    source: text("source").$type<PrivacyConsentSource>().notNull(),
+    regionHint: text("region_hint"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("privacy_consent_user_idx").on(t.userId),
+    index("privacy_consent_workspace_idx").on(t.workspaceId),
+    index("privacy_consent_visitor_idx").on(t.visitorKey),
+  ],
+);
+
+export const privacyConsentEvents = pgTable(
+  "privacy_consent_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    recordId: uuid("record_id").references(() => privacyConsentRecords.id, {
+      onDelete: "set null",
+    }),
+    userId: text("user_id"),
+    workspaceId: uuid("workspace_id"),
+    eventType: text("event_type").notNull(),
+    // consent_created | consent_updated
+    categoriesEnabled: jsonb("categories_enabled").$type<string[]>().notNull().default([]),
+    categoriesDisabled: jsonb("categories_disabled").$type<string[]>().notNull().default([]),
+    categories: jsonb("categories").$type<PrivacyConsentCategories>().notNull(),
+    policyVersion: text("policy_version").notNull(),
+    consentVersion: text("consent_version").notNull(),
+    source: text("source").$type<PrivacyConsentSource>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("privacy_consent_events_user_idx").on(t.userId),
+    index("privacy_consent_events_workspace_idx").on(t.workspaceId),
+    index("privacy_consent_events_created_idx").on(t.createdAt),
+  ],
+);
+
+export type PrivacyConsentRecord = typeof privacyConsentRecords.$inferSelect;
+export type PrivacyConsentEvent = typeof privacyConsentEvents.$inferSelect;

@@ -639,6 +639,22 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <div>
+            <h2 className="font-display text-lg font-semibold">Privacy Center™</h2>
+            <p className="mt-1 text-xs text-fg-muted">
+              Smart Consent™, Cookie Intelligence™, consent history, and data export.
+            </p>
+          </div>
+        </CardHeader>
+        <CardBody>
+          <Button type="button" size="sm" href="/dashboard/settings/privacy">
+            Open Privacy Center™
+          </Button>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div>
             <h2 className="font-display text-lg font-semibold">Account</h2>
             <p className="mt-1 text-xs text-fg-muted">
               Profile, email, connected accounts, and security.

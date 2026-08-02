@@ -3,6 +3,7 @@
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useSyncExternalStore } from "react";
+import { hasConsent } from "@/lib/privacy/client-gate";
 import { cn } from "@/lib/utils";
 
 function subscribe() {
@@ -27,12 +28,30 @@ export function ThemeToggle({ className }: { className?: string }) {
   }
 
   const isDark = resolvedTheme === "dark";
+  const personalizationOk = hasConsent("personalization");
 
   return (
     <button
       type="button"
-      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      onClick={() => setTheme(isDark ? "light" : "dark")}
+      aria-label={
+        personalizationOk
+          ? isDark
+            ? "Switch to light mode"
+            : "Switch to dark mode"
+          : "Enable Personalization to change theme"
+      }
+      title={
+        personalizationOk
+          ? undefined
+          : "Enable Personalization in Smart Consent™ to change theme"
+      }
+      onClick={() => {
+        if (!personalizationOk) {
+          window.dispatchEvent(new CustomEvent("mg:open-smart-consent"));
+          return;
+        }
+        setTheme(isDark ? "light" : "dark");
+      }}
       className={cn(
         "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-bg-elevated text-fg-muted transition hover:border-border-strong hover:text-fg",
         className,

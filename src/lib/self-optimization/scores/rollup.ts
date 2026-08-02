@@ -1,5 +1,6 @@
 import type { SelfOptScoreBreakdown } from "@/db/schema";
 import type { CrawlabilityResult } from "@/lib/crawlability";
+import type { PrivacyResult } from "@/lib/privacy";
 import type { ScoreResult } from "../types";
 
 export function rollupScores(parts: {
@@ -11,9 +12,13 @@ export function rollupScores(parts: {
   contentCoverage: ScoreResult;
   backlinkHealth: ScoreResult;
   crawlability?: CrawlabilityResult | ScoreResult | null;
+  privacy?: PrivacyResult | ScoreResult | null;
 }): SelfOptScoreBreakdown {
   const unavailableReasons: Record<string, string> = {};
-  const pick = (key: string, r: ScoreResult | CrawlabilityResult | null | undefined): number | null => {
+  const pick = (
+    key: string,
+    r: ScoreResult | CrawlabilityResult | PrivacyResult | null | undefined,
+  ): number | null => {
     if (!r || r.score == null) {
       if (r && "unavailableReason" in r && r.unavailableReason) {
         unavailableReasons[key] = r.unavailableReason;
@@ -44,6 +49,7 @@ export function rollupScores(parts: {
   const contentCoverage = pick("contentCoverage", parts.contentCoverage);
   const backlinkHealth = pick("backlinkHealth", parts.backlinkHealth);
   const crawlability = pick("crawlability", parts.crawlability ?? null);
+  const privacy = pick("privacy", parts.privacy ?? null);
 
   const available = [
     seo,
@@ -54,6 +60,7 @@ export function rollupScores(parts: {
     contentCoverage,
     backlinkHealth,
     crawlability,
+    privacy,
   ].filter((n): n is number => n != null);
 
   const overall =
@@ -65,6 +72,8 @@ export function rollupScores(parts: {
     parts.crawlability && "contributors" in parts.crawlability
       ? parts.crawlability
       : null;
+  const priv =
+    parts.privacy && "contributors" in parts.privacy ? parts.privacy : null;
 
   return {
     overall,
@@ -80,6 +89,11 @@ export function rollupScores(parts: {
     crawlabilityContributors: crawl?.contributors ?? null,
     crawlabilitySummary: crawl?.executiveSummary ?? null,
     crawlabilityEstimatedImprovement: crawl?.estimatedImprovement ?? null,
+    privacy,
+    privacyStatus: priv?.status ?? null,
+    privacyContributors: priv?.contributors ?? null,
+    privacySummary: priv?.executiveSummary ?? null,
+    privacyEstimatedImprovement: priv?.estimatedImprovement ?? null,
     unavailableReasons,
   };
 }

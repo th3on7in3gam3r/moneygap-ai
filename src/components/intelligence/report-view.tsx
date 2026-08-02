@@ -127,6 +127,18 @@ export type IntelligenceReportView = {
     delta?: number | null;
     findingCount?: number;
   } | null;
+  privacyReport?: {
+    score: number | null;
+    status: string | null;
+    contributors: Record<string, number | null> | null;
+    executiveSummary: string | null;
+    estimatedImprovement: string | null;
+    unavailableReasons?: Record<string, string>;
+    previousScore?: number | null;
+    delta?: number | null;
+    findingCount?: number;
+    trackingDetected?: string[];
+  } | null;
   website: {
     name: string;
     domain: string;
@@ -1270,6 +1282,71 @@ export function IntelligenceReport({
               Critical/high crawl issues appear under Opportunities as SEO · Crawlability.
               {report.crawlabilityReport.estimatedImprovement
                 ? ` ${report.crawlabilityReport.estimatedImprovement}`
+                : ""}
+            </p>
+          </CardBody>
+        </Card>
+      )}
+
+      {report.privacyReport && (
+        <Card>
+          <CardHeader>
+            <h2 className="font-display text-lg font-semibold">Privacy Score™</h2>
+            <p className="mt-1 text-sm text-fg-muted">
+              Higher = healthier privacy posture (verified probes only — no invented cookies).
+            </p>
+          </CardHeader>
+          <CardBody className="space-y-4">
+            <div className="flex flex-wrap items-end gap-4">
+              <p className="font-display text-4xl font-semibold tabular-nums">
+                {report.privacyReport.score != null ? report.privacyReport.score : "—"}
+                {report.privacyReport.score != null ? (
+                  <span className="ml-1 text-base font-medium text-fg-subtle">/100</span>
+                ) : null}
+              </p>
+              {report.privacyReport.status ? (
+                <Badge tone="accent">{report.privacyReport.status}</Badge>
+              ) : null}
+              {report.privacyReport.delta != null ? (
+                <p className="text-sm text-fg-muted">
+                  Trend: {report.privacyReport.delta > 0 ? "+" : ""}
+                  {report.privacyReport.delta} vs previous
+                  {report.privacyReport.previousScore != null
+                    ? ` (${report.privacyReport.previousScore})`
+                    : ""}
+                </p>
+              ) : null}
+            </div>
+            {report.privacyReport.executiveSummary ? (
+              <p className="text-sm text-fg-muted">{report.privacyReport.executiveSummary}</p>
+            ) : null}
+            {report.privacyReport.contributors ? (
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(report.privacyReport.contributors).map(([key, value]) => (
+                  <span
+                    key={key}
+                    className="rounded-md border border-border px-2 py-1 text-[11px] text-fg-muted"
+                  >
+                    {key}: {value != null ? value : "—"}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            {report.privacyReport.trackingDetected &&
+            report.privacyReport.trackingDetected.length > 0 ? (
+              <p className="text-xs text-fg-subtle">
+                Tracking / third-party hosts detected:{" "}
+                {report.privacyReport.trackingDetected.slice(0, 8).join(", ")}
+              </p>
+            ) : (
+              <p className="text-xs text-fg-subtle">
+                No analytics hosts detected on probed pages.
+              </p>
+            )}
+            <p className="text-xs text-fg-subtle">
+              Critical/high privacy issues appear under Opportunities as Trust · Privacy.
+              {report.privacyReport.estimatedImprovement
+                ? ` ${report.privacyReport.estimatedImprovement}`
                 : ""}
             </p>
           </CardBody>

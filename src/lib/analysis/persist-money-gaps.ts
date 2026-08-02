@@ -6,6 +6,7 @@ import {
   websiteClassifications,
   type ConfidenceIntelJson,
   type CrawlabilityReportSnapshot,
+  type PrivacyReportSnapshot,
 } from "@/db/schema";
 import type { IntelligenceResult } from "@/lib/analysis/openai";
 import { runMoneyGapEngine } from "@/lib/analysis/money-gap-engine";
@@ -24,6 +25,10 @@ import {
   crawlabilityFindingsToMoneyGaps,
   runCrawlabilityAudit,
 } from "@/lib/crawlability";
+import {
+  privacyFindingsToMoneyGaps,
+  runPrivacyAudit,
+} from "@/lib/privacy";
 import { getTechProfile } from "@/lib/developer/memory";
 import {
   buildEngineKgContext,
@@ -152,7 +157,60 @@ export async function persistMoneyGapEngineResult(input: {
       });
     }
 
-    let findings = [...engineResult.opportunities, ...crawlabilityGaps];
+    let privacySnapshot: PrivacyReportSnapshot | null = null;
+    let privacyGaps: ReturnType<typeof privacyFindingsToMoneyGaps> = [];
+    try {
+      const reportMeta = await db.query.reports.findFirst({
+        where: eq(reports.id, input.reportId),
+        columns: { workspaceId: true, websiteId: true },
+      });
+      const privacy = await runPrivacyAudit(input.url, {
+        workspaceId: reportMeta?.workspaceId,
+      });
+      privacyGaps = privacyFindingsToMoneyGaps(privacy.findings);
+
+      let previousScore: number | null = null;
+      if (reportMeta?.websiteId) {
+        const prev = await db.query.reports.findFirst({
+          where: and(
+            eq(reports.websiteId, reportMeta.websiteId),
+            eq(reports.type, "intelligence"),
+            ne(reports.id, input.reportId),
+          ),
+          orderBy: [desc(reports.createdAt)],
+          columns: { privacyReport: true },
+        });
+        previousScore = prev?.privacyReport?.score ?? null;
+      }
+      const delta =
+        privacy.score != null && previousScore != null
+          ? privacy.score - previousScore
+          : null;
+
+      privacySnapshot = {
+        score: privacy.score,
+        status: privacy.status,
+        contributors: privacy.contributors,
+        executiveSummary: privacy.executiveSummary,
+        estimatedImprovement: privacy.estimatedImprovement,
+        unavailableReasons: privacy.unavailableReasons,
+        previousScore,
+        delta,
+        findingCount: privacy.findings.length,
+        trackingDetected: privacy.trackingDetected,
+      };
+    } catch (err) {
+      log("warn", "privacy_audit_soft_fail", {
+        analysisId: input.analysisId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    let findings = [
+      ...engineResult.opportunities,
+      ...crawlabilityGaps,
+      ...privacyGaps,
+    ];
     let industryPlaybook = null as Awaited<
       ReturnType<typeof runKnowledgeGraphPass>
     >["industryPlaybook"];
@@ -335,6 +393,7 @@ export async function persistMoneyGapEngineResult(input: {
         businessModelGapReport: businessModelGapReport,
         patternMatchReport: patternMatchReport,
         crawlabilityReport: crawlabilitySnapshot,
+        privacyReport: privacySnapshot,
         moneyGapEngineStatus: "completed",
         moneyGapEngineError: null,
       })
@@ -354,6 +413,7 @@ export async function persistMoneyGapEngineResult(input: {
       hasBusinessModelGapReport: Boolean(businessModelGapReport),
       hasPatternMatchReport: Boolean(patternMatchReport),
       crawlabilityScore: crawlabilitySnapshot?.score ?? null,
+      privacyScore: privacySnapshot?.score ?? null,
     });
 
     return { ok: true };

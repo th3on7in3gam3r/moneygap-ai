@@ -12,6 +12,8 @@ import { getTechProfile } from "@/lib/developer/memory";
 import { listIntegrationsOverview } from "@/lib/integrations/connections";
 import { getTodayPriorities } from "@/lib/growth-os/priority";
 import { listQueueItems } from "@/lib/automation/queue";
+import { getLatestScores } from "@/lib/self-optimization/reports/daily";
+import { COOKIE_CATALOG, getLatestConsent } from "@/lib/privacy";
 import {
   listWorkspaceWebsites,
   resolveFocusWebsite,
@@ -50,6 +52,13 @@ export type CopilotWorkspaceContext = {
   clientNames: string[];
   websites: WorkspaceWebsite[];
   focusWebsite: { id: string; name: string; domain: string } | null;
+  privacy: {
+    score: number | null;
+    status: string | null;
+    summary: string | null;
+    consentCategories: Record<string, boolean> | null;
+    catalogCookieNames: string[];
+  };
 };
 
 export async function loadCopilotContext(input: {
@@ -231,6 +240,31 @@ export async function loadCopilotContext(input: {
     notes.unshift(`Focus website: ${focus.name} (${focus.domain}).`);
   }
 
+  let privacy: CopilotWorkspaceContext["privacy"] = {
+    score: null,
+    status: null,
+    summary: null,
+    consentCategories: null,
+    catalogCookieNames: COOKIE_CATALOG.map((c) => c.name),
+  };
+  try {
+    const scores = await getLatestScores(input.workspaceId);
+    privacy = {
+      ...privacy,
+      score: scores?.privacy ?? null,
+      status: scores?.privacyStatus ?? null,
+      summary: scores?.privacySummary ?? null,
+    };
+  } catch {
+    notes.push("Privacy Score™ soft-failed.");
+  }
+  try {
+    const consent = await getLatestConsent({ workspaceId: input.workspaceId });
+    if (consent) privacy.consentCategories = consent.categories;
+  } catch {
+    notes.push("Consent record soft-failed.");
+  }
+
   return {
     notes,
     memorySummary,
@@ -247,6 +281,7 @@ export async function loadCopilotContext(input: {
     focusWebsite: focus
       ? { id: focus.id, name: focus.name, domain: focus.domain }
       : null,
+    privacy,
   };
 }
 
@@ -288,5 +323,16 @@ INTEGRATION HUB CONNECTED: ${ctx.hubConnected.join(", ") || "(none)"}
 PROJECT MEMORY / STACK: ${ctx.stackSummary || "(none)"}
 CONFIDENCE OVERALL: ${ctx.confidenceOverall ?? "n/a"}
 AUTOMATION QUEUE DEPTH: ${ctx.queueDepth}
-AGENCY: ${ctx.isAgency ? `yes — clients: ${ctx.clientNames.join(", ") || "(none)"}` : "no"}`;
+AGENCY: ${ctx.isAgency ? `yes — clients: ${ctx.clientNames.join(", ") || "(none)"}` : "no"}
+
+PRIVACY INTELLIGENCE™:
+- Privacy Score™: ${ctx.privacy.score ?? "n/a"}${ctx.privacy.status ? ` (${ctx.privacy.status})` : ""}
+- Summary: ${ctx.privacy.summary ?? "(no self-opt privacy summary yet)"}
+- Consent categories: ${
+  ctx.privacy.consentCategories
+    ? JSON.stringify(ctx.privacy.consentCategories)
+    : "(none stored)"
+}
+- Verified cookie catalog names: ${ctx.privacy.catalogCookieNames.join(", ")}
+- Do NOT invent cookies or claim compliance certification. Direct users to Privacy Center™ for preferences and inventory.`;
 }

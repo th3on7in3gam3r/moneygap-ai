@@ -1,6 +1,7 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { DM_Sans, Geist_Mono, Space_Grotesk } from "next/font/google";
+import { SmartConsentHost } from "@/components/privacy/smart-consent-host";
 import { ThemeProvider } from "@/components/theme-provider";
 import {
   SITE_DEFAULT_DESCRIPTION,
@@ -73,7 +74,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{ __html: jsonLdScript(jsonLd) }}
         />
         <ClerkProvider>
-          <ThemeProvider>{children}</ThemeProvider>
+          <ThemeProvider>
+            {children}
+            <SmartConsentHost />
+          </ThemeProvider>
         </ClerkProvider>
       </body>
     </html>
