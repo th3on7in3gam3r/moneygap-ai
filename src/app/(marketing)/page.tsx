@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { CheckCircle2, LineChart, ScanSearch, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { StartFreeButton } from "@/components/auth-buttons";
+import { CtaBand } from "@/components/marketing/cta-band";
+import { FaqBlock } from "@/components/marketing/faq-block";
+import { SectionHeading } from "@/components/marketing/section-heading";
 import {
   CapturePotentialBar,
   MoneyGapCard,
@@ -26,6 +29,29 @@ export const metadata: Metadata = {
   title: { absolute: SITE_DEFAULT_TITLE },
 };
 
+const HOME_FAQ = [
+  {
+    question: "What is a Money Gap™?",
+    answer:
+      "A Money Gap™ is a concrete miss on your site — visibility, conversion, trust, content, or AI discovery — that leaves revenue on the table. MoneyGap AI surfaces them with an AI Estimate of impact and a Fix Path™ you can implement with human review.",
+  },
+  {
+    question: "Are revenue estimates guaranteed?",
+    answer:
+      "No. Opportunity figures are AI Estimates / Estimated Opportunity — decision aids, not guarantees of financial results. Always review findings before acting.",
+  },
+  {
+    question: "How does MoneyGap AI work?",
+    answer:
+      "Analyze a public site, review Money Gaps™ ranked by Opportunity Index™, choose a Fix Path™, then monitor and re-scan. Growth Academy™ and Copilot help you learn and prioritize along the way.",
+  },
+  {
+    question: "Who is MoneyGap AI for?",
+    answer:
+      "Founders, growth teams, agencies, and operators who want a Growth Operating System™ — not a one-off audit PDF.",
+  },
+];
+
 export default function HomePage() {
   return (
     <>
@@ -40,13 +66,14 @@ export default function HomePage() {
               Find the revenue your website is leaving on the table.
             </h1>
             <p className="animate-rise-delay-2 mt-5 max-w-lg text-base leading-relaxed text-fg-muted sm:text-lg">
-              A precision SaaS for growth teams who want to see money gaps, quantify impact, and
-              close leaks before they compound.
+              An AI-powered Growth Operating System™ that finds Money Gaps™,
+              prioritizes Fix Paths™, and helps teams close leaks before they
+              compound.
             </p>
             <div className="animate-rise-delay-3 mt-8 flex flex-wrap items-center gap-3">
               <StartFreeButton label="Start free" size="lg" />
-              <Button href="/pricing" variant="secondary" size="lg">
-                View pricing
+              <Button href="/features" variant="secondary" size="lg">
+                Explore features
               </Button>
             </div>
           </div>
@@ -77,7 +104,9 @@ export default function HomePage() {
                     <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-accent" />
                     6 open gaps prioritized by monthly impact
                   </span>
-                  <span className="tabular-nums text-gap">{formatCurrency(18400)} top leak</span>
+                  <span className="tabular-nums text-gap">
+                    {formatCurrency(18400)} top leak
+                  </span>
                 </div>
               </div>
             </div>
@@ -85,42 +114,66 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="product" className="border-t border-border bg-bg-elevated py-20 sm:py-24">
+      <section className="border-t border-border py-20 sm:py-24">
         <div className="mx-auto max-w-6xl px-5 sm:px-8">
-          <div className="max-w-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Product</p>
-            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-              Built for teams who measure revenue in leaks, not vanity metrics.
-            </h2>
-            <p className="mt-4 text-base leading-relaxed text-fg-muted">
-              The Growth OS delivers dashboards, reports, and Money Gap scoring —
-              plus AI analysis, competitor intelligence, Copilot, and guided capture
-              across every property you manage.
-            </p>
-          </div>
+          <SectionHeading
+            eyebrow="What is MoneyGap AI?"
+            title="A Growth Operating System™ — not another audit PDF."
+            description="MoneyGap AI analyzes public websites, surfaces Money Gaps™ across SEO, conversion, trust, content, and AI visibility, then helps you prioritize and execute with Fix Paths™, Copilot, and Growth Academy™."
+          />
+          <p className="mt-6 max-w-2xl text-sm text-fg-muted">
+            Learn more on{" "}
+            <Link href="/about" className="text-accent hover:underline">
+              About
+            </Link>{" "}
+            and see the full capability map on{" "}
+            <Link href="/features" className="text-accent hover:underline">
+              Features
+            </Link>
+            .
+          </p>
+        </div>
+      </section>
 
+      <section
+        id="product"
+        className="border-t border-border bg-bg-elevated py-20 sm:py-24"
+      >
+        <div className="mx-auto max-w-6xl px-5 sm:px-8">
+          <SectionHeading
+            eyebrow="How it works"
+            title="Analyze. Prioritize. Close the gap."
+            description="Three steps from URL to execution — framed in business impact, not vanity metrics."
+          />
           <div className="mt-12 grid gap-5 md:grid-cols-3">
             {[
               {
                 icon: ScanSearch,
-                title: "See the gap",
-                body: "Score every property on how much revenue is slipping through UX, pricing, and conversion cracks.",
+                title: "1. Analyze your site",
+                body: "Crawl and score the property. MoneyGap Engine™ finds gaps across modules tied to traffic → leads → revenue.",
               },
               {
                 icon: LineChart,
-                title: "Quantify impact",
-                body: "Every finding is tied to estimated monthly dollars so roadmap debates stay grounded in cash.",
+                title: "2. Prioritize with Opportunity Index™",
+                body: "Every finding carries confidence, estimated impact (AI Estimate), and priority so roadmap debates stay grounded.",
               },
               {
                 icon: Sparkles,
-                title: "Prioritize capture",
-                body: "Ranked recommendations show what to fix first — with confidence and recoverable upside.",
+                title: "3. Ship a Fix Path™",
+                body: "Choose how to execute — Action Center, checklist, Developer Mode, or Copilot — then re-scan and measure.",
               },
             ].map((item) => (
-              <div key={item.title} className="rounded-2xl border border-border bg-bg p-6">
+              <div
+                key={item.title}
+                className="rounded-2xl border border-border bg-bg p-6"
+              >
                 <item.icon className="h-5 w-5 text-accent" />
-                <h3 className="mt-4 font-display text-xl font-semibold">{item.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-fg-muted">{item.body}</p>
+                <h3 className="mt-4 font-display text-xl font-semibold">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-fg-muted">
+                  {item.body}
+                </p>
               </div>
             ))}
           </div>
@@ -129,63 +182,136 @@ export default function HomePage() {
 
       <section className="border-t border-border py-20 sm:py-24">
         <div className="mx-auto max-w-6xl px-5 sm:px-8">
-          <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gap">
-                Example findings
-              </p>
-              <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-                Findings that read like a war room, not a spreadsheet.
-              </h2>
-              <p className="mt-2 max-w-xl text-sm text-fg-muted">
-                Illustrative examples — not your workspace data.
-              </p>
-            </div>
-            <Link
-              href="/dashboard/money-gaps"
-              className="text-sm font-medium text-accent hover:underline"
-            >
-              Open gap board →
-            </Link>
-          </div>
-          <div className="grid gap-4 lg:grid-cols-2">
+          <SectionHeading
+            eyebrow="Money Gap™"
+            title="Hidden revenue leaks — made visible."
+            description="A Money Gap™ is a concrete miss: weak CTA, thin trust, crawl blockers, missing buyer-intent pages, or AI discoverability holes. We name it, estimate impact, and give you a Fix Path™."
+          />
+          <div className="mt-10 grid gap-4 lg:grid-cols-2">
             {SAMPLE_GAPS.slice(0, 4).map((gap) => (
               <MoneyGapCard key={gap.id} {...gap} />
             ))}
           </div>
+          <p className="mt-4 text-xs text-fg-subtle">
+            Illustrative examples — not live workspace data.
+          </p>
         </div>
       </section>
 
-      <section className="border-t border-border bg-bg-elevated py-20">
+      <section className="border-t border-border bg-bg-elevated py-20 sm:py-24">
         <div className="mx-auto max-w-6xl px-5 sm:px-8">
-          <div className="overflow-hidden rounded-[1.75rem] border border-border bg-hero px-6 py-12 sm:px-12">
-            <div className="max-w-2xl">
-              <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-                Your revenue leaks have a number. Make it smaller.
-              </h2>
-              <p className="mt-4 text-fg-muted">
-                Join the workspace, analyze your site, and see every opportunity
-                framed in dollars — from your real reports, not demos.
-              </p>
-              <ul className="mt-6 space-y-2">
-                {[
-                  "Premium dashboard with dark mode",
-                  "Live Money Gap scores from your analyses",
-                  "AI Copilot, Predictive, and guided capture",
-                ].map((item) => (
-                  <li key={item} className="flex items-center gap-2 text-sm text-fg">
-                    <CheckCircle2 className="h-4 w-4 text-accent" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-8">
-                <StartFreeButton label="Create your account" size="lg" />
-              </div>
-            </div>
+          <SectionHeading
+            eyebrow="Core Growth Scores™"
+            title="Health and opportunity — clearly separated."
+            description="MoneyGap Score™ shows uncaptured opportunity (higher = more work left). Crawlability Score™ and Technical SEO health scores run the other way — higher means healthier discovery for search and AI systems."
+          />
+          <div className="mt-8 flex flex-wrap gap-3 text-sm">
+            <Link href="/features" className="text-accent hover:underline">
+              See all scores & engines →
+            </Link>
+            <Link href="/security" className="text-fg-muted hover:text-fg">
+              Security practices
+            </Link>
           </div>
         </div>
       </section>
+
+      <section className="border-t border-border py-20 sm:py-24">
+        <div className="mx-auto grid max-w-6xl gap-12 px-5 sm:px-8 lg:grid-cols-2">
+          <div>
+            <SectionHeading
+              eyebrow="AI Growth Copilot™"
+              title="Ask what to fix next — get a path, not a wall of text."
+              description="Copilot navigates Money Gaps™, reports, and Fix Paths™ with transparent estimates and human-in-the-loop execution."
+            />
+          </div>
+          <div>
+            <SectionHeading
+              eyebrow="Fix Path™"
+              title="From insight to implementation."
+              description="Every priority opportunity can ship via Action Center, checklists, Developer Mode, automation, or advisor guidance — with verification steps."
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-border bg-bg-elevated py-20 sm:py-24">
+        <div className="mx-auto max-w-6xl px-5 sm:px-8">
+          <SectionHeading
+            eyebrow="Growth Academy™"
+            title="Education that maps to the gaps you find."
+            description="Playbooks for SEO, conversion, trust, and AI visibility — linked from the product so learning closes loops instead of floating as a blog."
+          />
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Button href="/academy" size="lg">
+              Open Growth Academy
+            </Button>
+            <Button href="/integrations" variant="secondary" size="lg">
+              Integrations
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-border py-20 sm:py-24">
+        <div className="mx-auto max-w-6xl px-5 sm:px-8">
+          <SectionHeading
+            eyebrow="Pricing & demo"
+            title="Start free. Upgrade when capture compounds."
+            description="Explore Free, then scale with Growth, Professional, Agency, or Enterprise. Soft plan switching in Billing; Checkout when Stripe is configured."
+          />
+          <div className="mt-8 flex flex-wrap gap-3">
+            <StartFreeButton label="Start free analysis" size="lg" />
+            <Button href="/pricing" variant="secondary" size="lg">
+              View pricing
+            </Button>
+            <Button href="/contact" variant="ghost" size="lg">
+              Talk to sales
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-border bg-bg-elevated py-20 sm:py-24">
+        <div className="mx-auto max-w-6xl px-5 sm:px-8">
+          <SectionHeading
+            eyebrow="Trust"
+            title="Built for operators who need transparency."
+          />
+          <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              "Estimates labeled AI Estimate — never presented as guarantees",
+              "Human review before publishing or auto-acting on recommendations",
+              "Auth via Clerk; billing via Stripe when enabled",
+              "Crawlability & SEO scanners cite evidence, not invented rankings",
+              "Privacy, Terms, and Security pages for launch readiness",
+              "Responsible disclosure contact on /security",
+            ].map((item) => (
+              <li
+                key={item}
+                className="flex items-start gap-2 text-sm text-fg-muted"
+              >
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section id="faq" className="border-t border-border py-20 sm:py-24">
+        <div className="mx-auto max-w-6xl px-5 sm:px-8">
+          <FaqBlock items={HOME_FAQ} />
+        </div>
+      </section>
+
+      <CtaBand
+        title="Your revenue leaks have a number. Make it smaller."
+        description="Join the workspace, analyze your site, and see every opportunity framed in dollars — from your reports, with Fix Paths™ you can ship."
+        primaryLabel="Create your account"
+        secondaryHref="/pricing"
+        secondaryLabel="View pricing"
+      />
     </>
   );
 }

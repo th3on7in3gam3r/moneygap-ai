@@ -16,6 +16,7 @@ const STATIC_PATHS: { path: string; changeFrequency: MetadataRoute.Sitemap[numbe
   { path: "/contact", changeFrequency: "monthly", priority: 0.5 },
   { path: "/privacy", changeFrequency: "yearly", priority: 0.3 },
   { path: "/terms", changeFrequency: "yearly", priority: 0.3 },
+  { path: "/security", changeFrequency: "yearly", priority: 0.45 },
   { path: "/academy", changeFrequency: "daily", priority: 0.9 },
   { path: "/docs", changeFrequency: "monthly", priority: 0.6 },
   { path: "/marketplace", changeFrequency: "monthly", priority: 0.6 },

@@ -1,67 +1,190 @@
-import { buildPageMetadata } from "@/lib/seo";
 import { MarketingPageShell } from "@/components/marketing/page-shell";
+import { buildPageMetadata } from "@/lib/seo";
 
 export const metadata = buildPageMetadata({
   title: "Terms of Service",
   description:
-    "Terms governing use of MoneyGap AI, including accounts, subscriptions, and acceptable use.",
+    "Terms governing use of MoneyGap AI — accounts, acceptable use, payments, AI estimates, IP, and liability.",
   path: "/terms",
 });
+
+const UPDATED = "2026-08-02";
 
 export default function TermsPage() {
   return (
     <MarketingPageShell
       eyebrow="Legal"
       title="Terms of Service"
-      description="These terms govern access to MoneyGap AI. Engage counsel to finalize jurisdiction-specific language for your entity."
+      description="These Terms govern access to MoneyGap AI. Have counsel review before treating this as final production legal text for your jurisdiction."
       breadcrumbs={[
         { name: "Home", path: "/" },
         { name: "Terms", path: "/terms" },
       ]}
       primaryCta={{ label: "Contact us", href: "/contact" }}
     >
-      <div className="max-w-3xl space-y-6 text-base leading-relaxed text-fg-muted">
+      <div className="max-w-3xl space-y-8 text-base leading-relaxed text-fg-muted">
         <p>
-          <strong className="text-fg">Last updated:</strong>{" "}
-          {new Date().toISOString().slice(0, 10)}
+          <strong className="text-fg">Last updated:</strong> {UPDATED}
         </p>
-        <h2 className="font-display text-xl font-semibold text-fg">Agreement</h2>
-        <p>
-          By creating an account or using MoneyGap AI, you agree to these Terms
-          and our Privacy Policy. If you use MoneyGap AI for an organization, you
-          represent that you have authority to bind that organization.
+        <p className="rounded-xl border border-border bg-bg px-4 py-3 text-sm">
+          Counsel review recommended before production launch in your markets.
         </p>
-        <h2 className="font-display text-xl font-semibold text-fg">The service</h2>
-        <p>
-          MoneyGap AI provides analysis, recommendations, and related tools on an
-          “as available” basis. Insights, scores, and revenue estimates are
-          informational and may include AI-assisted outputs that require human
-          review. We do not guarantee specific business results.
-        </p>
-        <h2 className="font-display text-xl font-semibold text-fg">Accounts & billing</h2>
-        <p>
-          You are responsible for account credentials and activity. Paid plans
-          renew according to the interval you select until canceled. Fees are
-          processed by our payment provider and are generally non-refundable
-          except where required by law.
-        </p>
-        <h2 className="font-display text-xl font-semibold text-fg">Acceptable use</h2>
-        <p>
-          Do not misuse the service, attempt unauthorized access, scrape in ways
-          that harm the platform, or use MoneyGap AI to violate law or third-party
-          rights.
-        </p>
-        <h2 className="font-display text-xl font-semibold text-fg">Contact</h2>
-        <p>
-          Questions:{" "}
-          <a href="mailto:support@moneygap-ai.com" className="text-accent hover:underline">
-            support@moneygap-ai.com
-          </a>
-        </p>
-        <p className="text-sm">
-          This page is a production-ready legal scaffold and should be reviewed by
-          qualified counsel before use as final terms.
-        </p>
+
+        <section className="space-y-3">
+          <h2 className="font-display text-xl font-semibold text-fg">
+            Service description
+          </h2>
+          <p>
+            MoneyGap AI provides an AI-powered Growth Operating System™ that
+            analyzes websites, surfaces Money Gaps™, scores opportunities, and
+            offers Fix Paths™, education, and related tools. Features vary by
+            plan and may change as we improve the product.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="font-display text-xl font-semibold text-fg">
+            Account requirements
+          </h2>
+          <p>
+            You must provide accurate registration information, keep credentials
+            secure, and be authorized to use the URLs and data you submit. You
+            are responsible for activity under your account and workspace seats
+            you invite.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="font-display text-xl font-semibold text-fg">
+            User responsibilities
+          </h2>
+          <p>
+            You will use MoneyGap AI only for lawful purposes, respect
+            third-party site terms when analyzing properties you do not own, and
+            review AI outputs before acting. You will not attempt to bypass plan
+            limits, reverse engineer the service, or disrupt infrastructure.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="font-display text-xl font-semibold text-fg">
+            Acceptable use
+          </h2>
+          <p>
+            Prohibited uses include scraping or attacking systems you are not
+            authorized to test, uploading malware, infringing IP, processing
+            unlawful content, or using the service to harm others. We may
+            suspend access for abuse or security risk.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="font-display text-xl font-semibold text-fg">
+            Payments & subscriptions
+          </h2>
+          <p>
+            Paid plans are billed according to the pricing shown at purchase.
+            Stripe (or another processor) may handle payment details. Soft plan
+            switches in-product may not equal a completed Checkout; unpaid
+            access may be limited. Taxes may apply. Fees are generally
+            non-refundable except where required by law or stated otherwise.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="font-display text-xl font-semibold text-fg">
+            AI-generated recommendations
+          </h2>
+          <p>
+            Recommendations, drafts, prompts, and summaries may be generated by
+            AI. They can be incomplete or incorrect. You are responsible for
+            validating outputs and for decisions you make based on them.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="font-display text-xl font-semibold text-fg">
+            Estimated opportunity disclaimer
+          </h2>
+          <p>
+            Revenue, lead, traffic, and conversion figures shown as AI Estimate
+            or Estimated Opportunity are illustrative decision aids —{" "}
+            <strong className="text-fg">not guarantees</strong> of financial
+            results. Past or simulated examples on marketing pages are not your
+            workspace data.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="font-display text-xl font-semibold text-fg">
+            Intellectual property
+          </h2>
+          <p>
+            MoneyGap AI, trademarks (including Money Gaps™, Fix Path™, Growth
+            Operating System™), software, and branding are owned by us or our
+            licensors. You retain rights to your content and sites. You grant us
+            a license to process submitted content solely to provide the
+            service.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="font-display text-xl font-semibold text-fg">
+            Termination
+          </h2>
+          <p>
+            You may stop using the service and request account closure. We may
+            suspend or terminate access for breach, non-payment, or risk to the
+            platform. Provisions that should survive (IP, disclaimers, liability
+            limits) will survive termination.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="font-display text-xl font-semibold text-fg">
+            Limitation of liability
+          </h2>
+          <p>
+            To the fullest extent permitted by law, MoneyGap AI is provided “as
+            is,” and we disclaim warranties of merchantability, fitness for a
+            particular purpose, and non-infringement. We are not liable for
+            indirect, incidental, special, consequential, or lost-profit damages,
+            or for decisions made based on AI Estimates. Our aggregate liability
+            is limited to fees paid for the service in the three months before
+            the claim (or $100 if no fees were paid), where such limit is
+            allowed.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="font-display text-xl font-semibold text-fg">
+            Changes to the service
+          </h2>
+          <p>
+            We may modify features, plans, or these Terms. Material changes will
+            be reflected by updating the “Last updated” date and, where
+            appropriate, in-product notice. Continued use after changes
+            constitutes acceptance where permitted by law.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="font-display text-xl font-semibold text-fg">Contact</h2>
+          <p>
+            Questions about these Terms:{" "}
+            <a
+              href="mailto:support@moneygap-ai.com"
+              className="text-accent hover:underline"
+            >
+              support@moneygap-ai.com
+            </a>{" "}
+            or{" "}
+            <a href="/contact" className="text-accent hover:underline">
+              Contact
+            </a>
+            .
+          </p>
+        </section>
       </div>
     </MarketingPageShell>
   );
