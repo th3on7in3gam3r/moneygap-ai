@@ -215,15 +215,68 @@ export default async function GrowthAcademyHubPage() {
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
-              <div className="relative min-h-[12rem] overflow-hidden rounded-[1.5rem] border border-border bg-accent-soft/40">
-                <div className="absolute inset-0 bg-grid opacity-60" />
-                <div className="relative flex h-full flex-col justify-end p-6 sm:p-8">
-                  <p className="font-display text-2xl font-semibold text-fg">
-                    Growth Academy™
-                  </p>
-                  <p className="mt-2 text-sm text-fg-muted">
-                    Editorial depth for teams running MoneyGap AI.
-                  </p>
+              <div className="relative min-h-[14rem] overflow-hidden rounded-[1.5rem] border border-border bg-accent-soft/40 lg:min-h-[16rem]">
+                {featured.featuredImageUrl || featured.ogImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={featured.featuredImageUrl || featured.ogImage || ""}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-grid opacity-50" />
+                )}
+                <div
+                  className={
+                    featured.featuredImageUrl || featured.ogImage
+                      ? "absolute inset-0 bg-gradient-to-t from-bg via-bg/80 to-bg/20"
+                      : "absolute inset-0 bg-gradient-to-t from-bg-elevated/90 via-transparent to-transparent"
+                  }
+                />
+                <div className="relative flex h-full min-h-[14rem] flex-col justify-between gap-6 p-6 sm:min-h-[16rem] sm:p-8">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-accent">
+                      Featured playbook
+                    </p>
+                    <p className="mt-3 font-display text-xl font-semibold leading-snug text-fg sm:text-2xl">
+                      Learn → spot → fix
+                    </p>
+                    <p className="mt-2 max-w-sm text-sm leading-relaxed text-fg-muted">
+                      Read the pattern, then run the same opportunity on your live
+                      site inside MoneyGap AI.
+                    </p>
+                  </div>
+                  <ul className="space-y-2 text-sm text-fg">
+                    <li className="flex items-start gap-2">
+                      <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+                      <span>
+                        {featured.readingTimeMinutes} min read — operator-ready,
+                        not fluff
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Search className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+                      <span>Maps to SEO, conversion, and AI visibility gaps</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <LineChart className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+                      <span>Close it with Fix Paths™ after you analyze</span>
+                    </li>
+                  </ul>
+                  <div className="flex flex-wrap gap-3 text-sm">
+                    <Link
+                      href={`/academy/${featured.slug}`}
+                      className="font-medium text-accent hover:underline"
+                    >
+                      Start reading →
+                    </Link>
+                    <Link
+                      href="/academy#reading"
+                      className="text-fg-muted transition hover:text-fg"
+                    >
+                      More in the library
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>
