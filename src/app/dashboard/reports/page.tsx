@@ -13,7 +13,7 @@ export default async function ReportsPage() {
   const intelligence = userId ? await listUserIntelligenceReports(userId) : [];
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="w-full space-y-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight">

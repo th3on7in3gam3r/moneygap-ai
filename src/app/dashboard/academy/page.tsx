@@ -31,7 +31,7 @@ export default async function DashboardAcademyLearnerPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="w-full space-y-8">
       <header className="space-y-5 border-b border-border pb-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0 max-w-2xl">

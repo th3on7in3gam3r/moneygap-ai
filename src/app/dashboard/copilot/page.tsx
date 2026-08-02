@@ -327,7 +327,7 @@ export default function GrowthCopilotPage() {
   const modes = overview?.modes ?? [];
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5 px-4 py-8 sm:px-6">
+    <div className="w-full space-y-5">
       <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0 space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">

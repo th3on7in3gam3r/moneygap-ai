@@ -80,7 +80,7 @@ export default function GoalsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className="w-full space-y-8">
       <div>
         <p className="text-xs uppercase tracking-[0.12em] text-fg-subtle">
           <Button href="/dashboard" size="sm" variant="ghost">

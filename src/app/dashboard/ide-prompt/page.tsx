@@ -121,7 +121,7 @@ export default function IdePromptPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5 px-4 py-8 sm:px-6">
+    <div className="w-full space-y-5">
       <header className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1.5">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">

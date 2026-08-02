@@ -77,7 +77,7 @@ export default function MyGrowthPage() {
   const accent = brand?.accentColor || brand?.primaryColor || undefined;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
+    <div className="w-full space-y-8">
       <header
         className="rounded-2xl border border-border px-6 py-8"
         style={

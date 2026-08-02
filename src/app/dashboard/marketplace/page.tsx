@@ -246,7 +246,7 @@ export default function MarketplacePage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="w-full space-y-6">
       <header className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
           Growth Marketplace™

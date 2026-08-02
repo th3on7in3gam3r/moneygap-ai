@@ -415,18 +415,21 @@ export function TimelinePanel({ timeline }: { timeline: TodayPayload["timeline"]
         <h2 className="font-display text-lg font-semibold">Business Timeline</h2>
       </CardHeader>
       <CardBody>
-        <ol className="space-y-3 border-l border-border pl-4">
+        <ol className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {timeline.map((e) => (
-            <li key={e.id} className="relative">
-              <span className="absolute -left-[1.35rem] top-1.5 h-2 w-2 rounded-full bg-accent" />
+            <li
+              key={e.id}
+              className="relative rounded-xl border border-border bg-bg px-4 py-3 pl-5"
+            >
+              <span className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-accent" />
               <p className="text-[11px] uppercase tracking-[0.08em] text-fg-subtle">
                 {new Date(e.occurredAt).toLocaleDateString(undefined, {
                   month: "short",
                   year: "numeric",
                 })}
               </p>
-              <p className="text-sm font-medium text-fg">{e.title}</p>
-              {e.body && <p className="text-xs text-fg-muted">{e.body}</p>}
+              <p className="mt-0.5 text-sm font-medium text-fg">{e.title}</p>
+              {e.body && <p className="mt-1 text-xs leading-relaxed text-fg-muted">{e.body}</p>}
             </li>
           ))}
         </ol>

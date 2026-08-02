@@ -49,7 +49,7 @@ export default function EnterprisePage() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="w-full space-y-8">
       <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight">
           Enterprise

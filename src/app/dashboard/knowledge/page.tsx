@@ -199,7 +199,7 @@ export default function KnowledgeCenterPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
+    <div className="w-full space-y-8">
       <div>
         <Button href="/dashboard/settings" size="sm" variant="ghost">
           ← Settings

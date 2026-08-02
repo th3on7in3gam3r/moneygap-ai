@@ -127,7 +127,7 @@ export default function TeamWorkspacePage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
+    <div className="w-full space-y-8">
       <header className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
           Team Workspace™

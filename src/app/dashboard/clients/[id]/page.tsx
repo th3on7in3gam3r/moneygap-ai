@@ -29,7 +29,7 @@ export default async function ClientDetailPage({
   const { client, reports, scoreHistory, projects, completedProjects } = history;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="w-full space-y-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <Link href="/dashboard/clients" className="text-sm text-accent hover:underline">

@@ -69,7 +69,7 @@ export default function SystemPage() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
+    <div className="w-full space-y-8">
       <div>
         <p className="text-xs uppercase tracking-[0.12em] text-fg-subtle">
           <Link href="/dashboard/settings" className="hover:text-accent">

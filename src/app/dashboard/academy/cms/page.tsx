@@ -8,7 +8,7 @@ export default function DashboardAcademyCmsPage() {
   const enabled = isGrowthAcademyEnabled();
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6">
+    <div className="w-full space-y-6">
       <header className="flex flex-col gap-3 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">

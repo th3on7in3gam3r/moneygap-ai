@@ -13,7 +13,7 @@ export default async function AnalyzePage({
   const params = await searchParams;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
+    <div className="w-full space-y-8">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-accent">
           New analysis

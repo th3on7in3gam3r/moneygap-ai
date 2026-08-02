@@ -139,7 +139,7 @@ export default async function DashboardPage() {
   ] as const;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="w-full space-y-8">
       <OnboardingReminders />
       <header className="space-y-5 border-b border-border pb-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">

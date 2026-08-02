@@ -133,7 +133,7 @@ export default function AutomationStudioPage() {
   const pending = busyKey != null;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
+    <div className="w-full space-y-6">
       <FlashToast toast={toast} onDismiss={dismissToast} />
 
       <header className="space-y-2">

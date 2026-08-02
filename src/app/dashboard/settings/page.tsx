@@ -248,7 +248,7 @@ export default function SettingsPage() {
   const limits = ws?.planLimits ?? getPlanLimits("free");
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="w-full space-y-8">
       <FlashToast toast={toast} onDismiss={dismissToast} />
       <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Settings</h1>

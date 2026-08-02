@@ -892,7 +892,7 @@ export function IntelligenceReport({
   const engineFailed = report.moneyGapEngineStatus === "failed";
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
+    <div className="mx-auto w-full max-w-[1600px] space-y-8">
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="gap">Growth intelligence</Badge>
