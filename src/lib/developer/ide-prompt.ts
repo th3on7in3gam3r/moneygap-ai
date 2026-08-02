@@ -3,6 +3,7 @@ import { db } from "@/db";
 import {
   moneyGapOpportunities,
   reports,
+  websites,
   type DeveloperBlueprintTool,
   type OpportunityFix,
   type TechStackProfile,
@@ -25,6 +26,13 @@ export type IdePromptOpportunity = {
   opportunityIndex: number;
   estimatedAnnualRevenue: number | null;
   fixes: OpportunityFix[] | null;
+};
+
+export type IdePromptWebsite = {
+  id: string;
+  name: string;
+  domain: string;
+  url: string;
 };
 
 export type IdePromptItem = {
@@ -79,17 +87,30 @@ function fixPlanBlock(fixes: OpportunityFix[] | null | undefined): string {
 
 export function buildIdePrompts(input: {
   opportunity: IdePromptOpportunity;
+  website?: IdePromptWebsite | null;
   stack?: TechStackProfile | null;
 }): IdePromptItem[] {
   const o = input.opportunity;
+  const site = input.website;
   const impact =
     o.estimatedAnnualRevenue != null && o.estimatedAnnualRevenue > 0
       ? `Estimated annual impact (AI Estimate): $${o.estimatedAnnualRevenue.toLocaleString()} — not a guarantee.`
       : "Impact: treat figures as AI Estimate only — never claim guaranteed ROI.";
 
+  const websiteBlock = site
+    ? [
+        "Website (apply this fix for this site only):",
+        `- Name: ${site.name}`,
+        `- Domain: ${site.domain}`,
+        `- URL: ${site.url}`,
+        "",
+      ].join("\n")
+    : "Website: (unknown — confirm which site this MoneyGap belongs to before implementing.)\n\n";
+
   const problemBlock = [
     `# MoneyGap problem: ${o.title}`,
     "",
+    websiteBlock,
     `Category: ${o.category} | Module: ${o.moduleId}`,
     `Difficulty: ${o.difficulty}${o.estimatedTime ? ` | Est. time: ${o.estimatedTime}` : ""}`,
     `Opportunity Index™: ${o.opportunityIndex}`,
@@ -180,12 +201,26 @@ export async function getIdePromptPayload(input: {
     return { ok: false as const, error: "Opportunity not found" };
   }
 
+  let website: IdePromptWebsite | null = null;
   try {
     const report = await db.query.reports.findFirst({
       where: eq(reports.id, opportunity.reportId),
+      columns: { id: true, workspaceId: true, websiteId: true },
     });
     if (!report || report.workspaceId !== input.workspaceId) {
       return { ok: false as const, error: "Forbidden" };
+    }
+    const site = await db.query.websites.findFirst({
+      where: eq(websites.id, report.websiteId),
+      columns: { id: true, name: true, domain: true, url: true },
+    });
+    if (site) {
+      website = {
+        id: site.id,
+        name: site.name,
+        domain: site.domain,
+        url: site.url,
+      };
     }
   } catch {
     return { ok: false as const, error: "Could not verify report access" };
@@ -199,11 +234,12 @@ export async function getIdePromptPayload(input: {
     stack = null;
   }
 
-  const prompts = buildIdePrompts({ opportunity, stack });
+  const prompts = buildIdePrompts({ opportunity, website, stack });
 
   return {
     ok: true as const,
     opportunity,
+    website,
     prompts,
     stackSummary: stackSummary(stack),
     hasStack: Boolean(stackSummary(stack)),

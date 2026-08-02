@@ -27,6 +27,7 @@ export async function GET(req: Request) {
 
     return Response.json({
       opportunity: payload.opportunity,
+      website: payload.website,
       prompts: payload.prompts,
       stackSummary: payload.stackSummary,
       hasStack: payload.hasStack,

@@ -37,8 +37,16 @@ type Opportunity = {
   fixes: OpportunityFix[] | null;
 };
 
+type Website = {
+  id: string;
+  name: string;
+  domain: string;
+  url: string;
+};
+
 type Payload = {
   opportunity: Opportunity;
+  website: Website | null;
   prompts: PromptItem[];
   stackSummary: string | null;
   hasStack: boolean;
@@ -130,6 +138,22 @@ export default function IdePromptPage() {
           <h1 className="font-display text-3xl font-semibold tracking-tight text-fg">
             IDE Prompt
           </h1>
+          {data?.website ? (
+            <p className="mt-1 text-sm font-medium text-fg">
+              Website:{" "}
+              <a
+                href={data.website.url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-accent hover:underline"
+              >
+                {data.website.name || data.website.domain}
+              </a>
+              <span className="ml-1.5 font-normal text-fg-muted">
+                ({data.website.domain})
+              </span>
+            </p>
+          ) : null}
           <p className="max-w-xl text-sm leading-relaxed text-fg-muted">
             Copy a ready-made prompt for Cursor, Claude, or your IDE of choice.
             Review before applying — never auto-publishes.
@@ -194,6 +218,11 @@ export default function IdePromptPage() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
+                    {data.website ? (
+                      <Badge tone="accent" className="normal-case tracking-normal">
+                        {data.website.domain}
+                      </Badge>
+                    ) : null}
                     <Badge tone="neutral">{data.opportunity.category}</Badge>
                     <Badge tone="neutral">{data.opportunity.moduleId}</Badge>
                     <Badge tone="accent">
@@ -203,6 +232,19 @@ export default function IdePromptPage() {
                   <h2 className="mt-2 font-display text-xl font-semibold tracking-tight text-fg">
                     {data.opportunity.title}
                   </h2>
+                  {data.website ? (
+                    <p className="mt-1 text-sm text-fg-muted">
+                      For{" "}
+                      <a
+                        href={data.website.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-medium text-accent hover:underline"
+                      >
+                        {data.website.url}
+                      </a>
+                    </p>
+                  ) : null}
                   <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">
                     {data.opportunity.summary ?? data.opportunity.whatsMissing}
                   </p>
