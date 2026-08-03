@@ -4,6 +4,7 @@ import {
   listCategories,
   listPublishedArticles,
 } from "@/lib/growth-academy";
+import { listPublicDocs } from "@/lib/docs";
 import { db } from "@/db";
 import { gaTags } from "@/db/schema";
 import { absoluteUrl } from "@/lib/seo";
@@ -30,6 +31,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     url: absoluteUrl(r.path),
     changeFrequency: r.changeFrequency,
     priority: r.priority,
+  }));
+
+  const docRoutes: MetadataRoute.Sitemap = listPublicDocs().map((d) => ({
+    url: absoluteUrl(`/docs/${d.slug}`),
+    changeFrequency: "monthly" as const,
+    priority: 0.55,
   }));
 
   try {
@@ -67,12 +74,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     return [
       ...staticRoutes,
+      ...docRoutes,
       ...categoryRoutes,
       ...authorRoutes,
       ...tagRoutes,
       ...articleRoutes,
     ];
   } catch {
-    return staticRoutes;
+    return [...staticRoutes, ...docRoutes];
   }
 }

@@ -13,7 +13,8 @@ Launch-ready public SaaS marketing for MoneyGap AI: explain the product, build t
 | `/pricing` | Plans, FAQ, Enterprise contact |
 | `/about` | Story, mission, vision, philosophy |
 | `/contact` | Form + support/sales/partnership emails |
-| `/docs` | Public docs hub |
+| `/docs` | Public Documentation hub (sidebar + categorized guides) |
+| `/docs/[slug]` | Customer-facing doc articles (`content/docs/*.md`) |
 | `/security` | Security practices + disclosure |
 | `/privacy` | Privacy policy scaffold (counsel review) |
 | `/dashboard/settings/privacy` | Privacy Center™ (Smart Consent™, Cookie Intelligence™) |
@@ -39,8 +40,12 @@ Privacy and Terms are professional scaffolds with an explicit review banner. Fin
 
 ## Nav
 
-- Header: Features, Growth Academy, Pricing, About
+- Header: Features, Growth Academy, Docs, Pricing, About
 - Footer: Features, Academy, Pricing, About, Contact, Docs, Security, Privacy, Terms
+
+## Documentation
+
+Public guides live in `content/docs/` and are cataloged in `src/lib/docs/catalog.ts`. Do not publish repo-root `docs/*.md` engineering specs on the public site. Signed-in Documentation Center™ (`/dashboard/docs`) lists the same public catalog and links to `/docs/[slug]`.
 
 ## Related
 

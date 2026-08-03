@@ -4,15 +4,24 @@ import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { Card, CardBody } from "@/components/ui/card";
 
 type Doc = {
   slug: string;
   title: string;
   summary: string;
   category: string;
-  path: string;
+  href: string;
 };
+
+const FILTERS = [
+  { id: "", label: "All" },
+  { id: "start", label: "Getting started" },
+  { id: "product", label: "Product" },
+  { id: "privacy", label: "Privacy" },
+  { id: "platform", label: "Platform" },
+  { id: "grow", label: "Grow" },
+];
 
 export default function DocumentationCenterPage() {
   const [docs, setDocs] = useState<Doc[]>([]);
@@ -53,23 +62,27 @@ export default function DocumentationCenterPage() {
           Knowledge base
         </h1>
         <p className="max-w-2xl text-sm text-fg-muted">
-          Curated index of MoneyGap docs for launch, security, API, and growth.
+          The same public MoneyGap guides as{" "}
+          <Link href="/docs" className="text-accent hover:underline">
+            /docs
+          </Link>
+          — getting started, scores, Fix Paths™, privacy, and Academy.
         </p>
       </header>
 
       <div className="flex flex-wrap gap-2">
-        {["", "product", "platform", "security", "grow"].map((c) => (
+        {FILTERS.map((c) => (
           <Button
-            key={c || "all"}
+            key={c.id || "all"}
             type="button"
             size="sm"
-            variant={category === c ? "primary" : "secondary"}
+            variant={category === c.id ? "primary" : "secondary"}
             onClick={() => {
-              setCategory(c);
-              load(c || undefined);
+              setCategory(c.id);
+              load(c.id || undefined);
             }}
           >
-            {c || "all"}
+            {c.label}
           </Button>
         ))}
       </div>
@@ -87,14 +100,16 @@ export default function DocumentationCenterPage() {
         {docs.map((d) => (
           <Card key={d.slug}>
             <CardBody className="flex flex-wrap items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="font-display text-lg font-semibold">{d.title}</h2>
                   <Badge tone="neutral">{d.category}</Badge>
                 </div>
                 <p className="mt-1 text-sm text-fg-muted">{d.summary}</p>
-                <p className="mt-2 text-xs text-fg-subtle">{d.path}</p>
               </div>
+              <Button href={d.href} size="sm" variant="secondary">
+                Open guide
+              </Button>
             </CardBody>
           </Card>
         ))}
@@ -104,6 +119,10 @@ export default function DocumentationCenterPage() {
       </div>
 
       <p className="text-xs text-fg-muted">
+        <Link href="/docs" className="text-accent hover:underline">
+          Public documentation
+        </Link>
+        {" · "}
         <Link href="/dashboard/success" className="text-accent hover:underline">
           Customer Success
         </Link>

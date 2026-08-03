@@ -75,6 +75,10 @@ Score 0–100 from:
 
 Hub data is **not** injected into MoneyGap Engine yet (future expansion).
 
+## UX
+
+Hub surfaces a persistent **Why connect** band and a one-time acknowledgement dialog before the first Connect (`mg_integrations_ack_v1`). OAuth return with `?connected=` shows a success note. Copy stays honest: stack context + GitHub Developer Mode today; Engine enrichment incremental; no score rewrite.
+
 ## Code map
 
 - `src/lib/integrations/` — crypto, catalog, registry, connectors, connections, health, audit

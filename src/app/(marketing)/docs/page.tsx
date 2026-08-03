@@ -1,12 +1,24 @@
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+import { StartFreeButton } from "@/components/auth-buttons";
 import { FaqBlock } from "@/components/marketing/faq-block";
-import { MarketingPageShell } from "@/components/marketing/page-shell";
-import { buildPageMetadata } from "@/lib/seo";
+import { Button } from "@/components/ui/button";
+import {
+  listPublicDocs,
+  publicDocsByCategory,
+  type PublicDocEntry,
+} from "@/lib/docs";
+import {
+  breadcrumbJsonLd,
+  buildPageMetadata,
+  faqPageJsonLd,
+  jsonLdScript,
+} from "@/lib/seo";
 
 export const metadata = buildPageMetadata({
   title: "Documentation",
   description:
-    "Getting started with MoneyGap AI — analyses, Fix Paths™, integrations, AI capabilities, API overview, and Growth Academy™.",
+    "MoneyGap AI documentation — getting started, MoneyGap Score™, Fix Paths™, Crawlability, Privacy, integrations, and Growth Academy™.",
   path: "/docs",
 });
 
@@ -19,100 +31,152 @@ const DOCS_FAQ = [
   {
     question: "Is there a public Help Center?",
     answer:
-      "This page is the public documentation hub. Signed-in teams also get product surfaces in the dashboard. Growth Academy™ covers educational playbooks.",
+      "This Documentation hub is the public help center. Signed-in teams also get Documentation Center™ in the dashboard, which opens the same guides.",
+  },
+  {
+    question: "Are opportunity dollar figures guaranteed?",
+    answer:
+      "No. Impact numbers are AI Estimates — directional signals for prioritization. Always keep a human in the loop before publishing or auto-acting.",
+  },
+  {
+    question: "Where do I change cookie preferences?",
+    answer:
+      "Use Privacy preferences in the site footer to reopen Smart Consent™, or open Settings → Privacy when signed in.",
   },
 ];
 
-export default function DocsMarketingPage() {
+function GuideLink({ doc, featured = false }: { doc: PublicDocEntry; featured?: boolean }) {
   return (
-    <MarketingPageShell
-      eyebrow="Documentation"
-      title="Guides for closing gaps faster"
-      description="Public overview of MoneyGap AI. Use this hub to get oriented, then dive into the product and Growth Academy™."
-      breadcrumbs={[
-        { name: "Home", path: "/" },
-        { name: "Docs", path: "/docs" },
-      ]}
-      primaryCta={{ label: "Open dashboard", href: "/dashboard" }}
+    <Link
+      href={`/docs/${doc.slug}`}
+      className={
+        featured
+          ? "group flex flex-col justify-between border-b border-border py-5 transition first:pt-0 last:border-b-0 hover:border-accent/40 sm:py-6"
+          : "group block border-b border-border py-4 last:border-b-0"
+      }
     >
-      <div className="space-y-12">
-        <section>
-          <h2 className="font-display text-xl font-semibold text-fg">
-            Getting started
-          </h2>
-          <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-fg-muted">
-            <li>Create an account and workspace.</li>
-            <li>Analyze a public website URL.</li>
-            <li>Review MoneyGap Score™, category scores, and opportunities.</li>
-            <li>Open a Fix Path™ and verify the change.</li>
-            <li>Re-scan and watch deltas over time.</li>
-          </ol>
-        </section>
+      <span className="font-display text-lg font-semibold tracking-tight text-fg transition group-hover:text-accent">
+        {doc.title}
+      </span>
+      <span className="mt-1.5 block text-sm leading-relaxed text-fg-muted">
+        {doc.summary}
+      </span>
+      <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-accent">
+        Read guide
+        <ArrowRight className="size-3.5 transition group-hover:translate-x-0.5" />
+      </span>
+    </Link>
+  );
+}
 
-        <section>
-          <h2 className="font-display text-xl font-semibold text-fg">Features</h2>
-          <p className="mt-2 text-sm text-fg-muted">
-            Full capability map — Engine, Crawlability Score™, Copilot, Trust
-            Engine™, Academy, and more — on{" "}
-            <Link href="/features" className="text-accent hover:underline">
-              Features
-            </Link>
-            .
+export default function DocsMarketingPage() {
+  const startHere = listPublicDocs("start")[0];
+  const groups = publicDocsByCategory().filter((g) => g.category !== "start");
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: jsonLdScript([
+            breadcrumbJsonLd([
+              { name: "Home", path: "/" },
+              { name: "Docs", path: "/docs" },
+            ]),
+            faqPageJsonLd(DOCS_FAQ),
+          ]),
+        }}
+      />
+
+      <section className="relative overflow-hidden bg-hero">
+        <div className="pointer-events-none absolute inset-0 bg-grid opacity-70" />
+        <div className="relative mx-auto max-w-3xl px-0 pb-2 pt-2 lg:pt-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">
+            Documentation
           </p>
-        </section>
-
-        <section>
-          <h2 className="font-display text-xl font-semibold text-fg">
-            Integrations
-          </h2>
-          <p className="mt-2 text-sm text-fg-muted">
-            Learn how MoneyGap connects to the rest of your stack on{" "}
-            <Link href="/integrations" className="text-accent hover:underline">
-              Integrations
-            </Link>
-            . Unavailable connectors never invent findings.
+          <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight text-fg sm:text-5xl">
+            MoneyGap AI
+          </h1>
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-fg-muted sm:text-lg">
+            Guides for closing gaps faster — analyses, scores, Fix Paths™, privacy,
+            and Academy playbooks. Start here, then open the dashboard when you are
+            ready to scan.
           </p>
-        </section>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            {startHere ? (
+              <Button href={`/docs/${startHere.slug}`} size="lg">
+                Start with Getting started
+              </Button>
+            ) : null}
+            <Button href="/dashboard" variant="secondary" size="lg">
+              Open dashboard
+            </Button>
+            <StartFreeButton label="Start free" size="lg" />
+          </div>
+        </div>
+      </section>
 
-        <section>
-          <h2 className="font-display text-xl font-semibold text-fg">
-            API (future)
-          </h2>
-          <p className="mt-2 text-sm text-fg-muted">
-            Public API access is reserved on higher plans. Product overview:{" "}
-            <Link href="/api" className="text-accent hover:underline">
-              API
-            </Link>
-            .
+      {startHere ? (
+        <section className="mt-10 border-t border-border pt-10">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+            Start here
           </p>
+          <GuideLink doc={startHere} featured />
         </section>
+      ) : null}
 
-        <section>
-          <h2 className="font-display text-xl font-semibold text-fg">
-            AI capabilities
-          </h2>
-          <p className="mt-2 text-sm text-fg-muted">
-            Copilot, Engine modules, metadata drafts, and estimates are AI-assisted.
-            Always treat opportunity numbers as AI Estimates and keep a human in
-            the loop before publishing or auto-acting.
-          </p>
-        </section>
+      <div className="mt-12 space-y-12">
+        {groups.map((group) => (
+          <section key={group.category}>
+            <h2 className="font-display text-xl font-semibold tracking-tight text-fg">
+              {group.label}
+            </h2>
+            <div className="mt-2">
+              {group.docs.map((doc) => (
+                <GuideLink key={doc.slug} doc={doc} />
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
 
-        <section>
-          <h2 className="font-display text-xl font-semibold text-fg">
-            Growth Academy™
-          </h2>
-          <p className="mt-2 text-sm text-fg-muted">
-            Educational playbooks that map to Fix Paths™:{" "}
-            <Link href="/academy" className="text-accent hover:underline">
-              /academy
-            </Link>
-            .
-          </p>
-        </section>
-
+      <div className="mt-14">
         <FaqBlock items={DOCS_FAQ} title="Docs FAQ" />
       </div>
-    </MarketingPageShell>
+
+      <section className="relative mt-14 overflow-hidden rounded-[1.5rem] border border-border bg-hero px-6 py-10 sm:px-10">
+        <div className="pointer-events-none absolute inset-0 bg-grid opacity-40" />
+        <h2 className="relative font-display text-2xl font-semibold tracking-tight text-fg sm:text-3xl">
+          Ready to find your Money Gaps™?
+        </h2>
+        <p className="relative mt-3 max-w-xl text-sm leading-relaxed text-fg-muted sm:text-base">
+          Analyze a public site, review AI Estimates with a human in the loop, and
+          ship Fix Paths™ you can verify.
+        </p>
+        <div className="relative mt-6 flex flex-wrap gap-3">
+          <StartFreeButton label="Start free analysis" size="lg" />
+          <Button href="/academy" variant="secondary" size="lg">
+            Growth Academy™
+          </Button>
+          <Button href="/dashboard" variant="secondary" size="lg">
+            Open dashboard
+          </Button>
+        </div>
+      </section>
+
+      <p className="mt-10 text-sm text-fg-subtle">
+        <Link href="/" className="hover:text-fg">
+          ← Home
+        </Link>
+        {" · "}
+        <Link href="/features" className="hover:text-fg">
+          Features
+        </Link>
+        {" · "}
+        <Link href="/academy" className="hover:text-fg">
+          Growth Academy
+        </Link>
+      </p>
+    </>
   );
 }

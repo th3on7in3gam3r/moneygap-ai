@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
-import { isPlatform10Enabled, listDocCatalog } from "@/lib/launch";
+import { listPublicDocs } from "@/lib/docs";
+import { isPlatform10Enabled } from "@/lib/launch";
 
 export async function GET(req: Request) {
   const { isAuthenticated } = await auth();
@@ -16,8 +17,16 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const category = url.searchParams.get("category");
+  const docs = listPublicDocs(category).map((d) => ({
+    slug: d.slug,
+    title: d.title,
+    summary: d.summary,
+    category: d.category,
+    href: `/docs/${d.slug}`,
+  }));
+
   return Response.json({
     enabled: true,
-    docs: listDocCatalog(category),
+    docs,
   });
 }

@@ -1,9 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import {
+  ConnectAckDialog,
+  hasIntegrationsAck,
+} from "@/components/integrations/connect-ack-dialog";
+import { WhyConnectBand } from "@/components/integrations/why-connect-band";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import {
+  connectedSuccessMessage,
+  providerUnlockLine,
+} from "@/lib/integrations/unlock-copy";
 
 type ProviderRow = {
   slug: string;
@@ -77,15 +86,17 @@ function statusTone(
 export default function IntegrationsPage() {
   const [data, setData] = useState<Overview | null>(null);
   const [audit, setAudit] = useState<AuditRow[]>([]);
-  const [error, setError] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    const params = new URLSearchParams(window.location.search);
-    const oauthError = params.get("error");
-    return oauthError ? `OAuth: ${oauthError}` : null;
-  });
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [category, setCategory] = useState<string>("all");
   const [apiKeyDraft, setApiKeyDraft] = useState<Record<string, string>>({});
   const [pending, startTransition] = useTransition();
+  const [ackOpen, setAckOpen] = useState(false);
+  const [pendingConnect, setPendingConnect] = useState<{
+    slug: string;
+    authType: string;
+    name: string;
+  } | null>(null);
 
   function load() {
     void (async () => {
@@ -94,8 +105,24 @@ export default function IntegrationsPage() {
         setError("Could not load Integration Hub");
         return;
       }
-      setData((await res.json()) as Overview);
+      const overview = (await res.json()) as Overview;
+      setData(overview);
       setError((prev) => (prev?.startsWith("OAuth:") ? prev : null));
+
+      const params = new URLSearchParams(window.location.search);
+      const connectedSlug = params.get("connected")?.trim();
+      if (connectedSlug) {
+        const name =
+          overview.providers.find((p) => p.slug === connectedSlug)?.name ??
+          connectedSlug;
+        setSuccess(connectedSuccessMessage(connectedSlug, name));
+        params.delete("connected");
+        const next = params.toString();
+        const url = next
+          ? `${window.location.pathname}?${next}`
+          : window.location.pathname;
+        window.history.replaceState({}, "", url);
+      }
 
       const auditRes = await fetch("/api/integrations/audit");
       if (auditRes.ok) {
@@ -106,6 +133,19 @@ export default function IntegrationsPage() {
   }
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const oauthError = params.get("error");
+      if (oauthError) {
+        setError(`OAuth: ${oauthError}`);
+        params.delete("error");
+        const next = params.toString();
+        const url = next
+          ? `${window.location.pathname}?${next}`
+          : window.location.pathname;
+        window.history.replaceState({}, "", url);
+      }
+    }
     const t = setTimeout(load, 0);
     return () => clearTimeout(t);
   }, []);
@@ -155,9 +195,21 @@ export default function IntegrationsPage() {
         window.location.href = json.authUrl;
         return;
       }
+      const name = data?.providers.find((p) => p.slug === slug)?.name ?? slug;
+      setSuccess(connectedSuccessMessage(slug, name));
+      setError(null);
       if (json.message) setError(json.message);
       load();
     });
+  }
+
+  function requestConnect(slug: string, authType: string, name: string) {
+    if (!hasIntegrationsAck()) {
+      setPendingConnect({ slug, authType, name });
+      setAckOpen(true);
+      return;
+    }
+    connect(slug, authType);
   }
 
   function disconnect(slug: string) {
@@ -169,6 +221,7 @@ export default function IntegrationsPage() {
         setError("Disconnect failed");
         return;
       }
+      setSuccess(null);
       load();
     });
   }
@@ -202,7 +255,32 @@ export default function IntegrationsPage() {
         </p>
       </div>
 
+      <WhyConnectBand />
+
+      {success && (
+        <p
+          role="status"
+          className="rounded-xl border border-accent/30 bg-accent-soft px-4 py-3 text-sm text-accent"
+        >
+          {success}
+        </p>
+      )}
       {error && <p className="text-sm text-gap">{error}</p>}
+
+      <ConnectAckDialog
+        open={ackOpen}
+        providerName={pendingConnect?.name ?? "this app"}
+        onCancel={() => {
+          setAckOpen(false);
+          setPendingConnect(null);
+        }}
+        onConfirmed={() => {
+          const next = pendingConnect;
+          setAckOpen(false);
+          setPendingConnect(null);
+          if (next) connect(next.slug, next.authType);
+        }}
+      />
 
       {!data ? (
         <p className="text-sm text-fg-muted">Loading integrations…</p>
@@ -304,6 +382,10 @@ export default function IntegrationsPage() {
                   </CardHeader>
                   <CardBody className="space-y-3 text-sm text-fg-muted">
                     {p.description && <p>{p.description}</p>}
+                    <p className="text-xs leading-relaxed text-fg-subtle">
+                      <span className="font-medium text-fg-muted">What this unlocks: </span>
+                      {providerUnlockLine(p.slug)}
+                    </p>
                     {conn?.lastError && (
                       <p className="text-xs text-gap">{conn.lastError}</p>
                     )}
@@ -342,7 +424,7 @@ export default function IntegrationsPage() {
                           type="button"
                           size="sm"
                           disabled={pending}
-                          onClick={() => connect(p.slug, p.authType)}
+                          onClick={() => requestConnect(p.slug, p.authType, p.name)}
                         >
                           Connect
                         </Button>
