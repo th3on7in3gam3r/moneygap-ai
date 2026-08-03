@@ -4775,3 +4775,29 @@ export const partnerReferrals = pgTable(
 
 export type PartnerProfile = typeof partnerProfiles.$inferSelect;
 export type PartnerReferral = typeof partnerReferrals.$inferSelect;
+
+/**
+ * Browser extension MoneyGapReport payloads — public share via /report/ext/[shareId].
+ * Separate from SaaS `reports` (workspace/website-bound).
+ */
+export const extensionReports = pgTable(
+  "extension_reports",
+  {
+    id: text("id").primaryKey(),
+    shareId: text("share_id").notNull().unique(),
+    url: text("url").notNull(),
+    hostname: text("hostname").notNull(),
+    overallScore: integer("overall_score").notNull(),
+    /** Full extension MoneyGapReport JSON wire format */
+    payload: jsonb("payload").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("extension_reports_share_id_idx").on(t.shareId),
+    index("extension_reports_hostname_idx").on(t.hostname),
+    index("extension_reports_created_idx").on(t.createdAt),
+  ],
+);
+
+export type ExtensionReport = typeof extensionReports.$inferSelect;
