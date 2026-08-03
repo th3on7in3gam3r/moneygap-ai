@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Award,
   BarChart3,
   BookOpen,
   FileText,
@@ -49,6 +50,7 @@ function buildNav(isAgency: boolean, isClient: boolean) {
     { href: "/dashboard/reports", label: "Reports", icon: FileText },
     { href: "/dashboard/copilot", label: "Growth Concierge", icon: Sparkles },
     { href: "/dashboard/websites", label: "Websites", icon: Globe2 },
+    { href: "/dashboard/badge", label: "Growth Badge", icon: Award },
     { href: "/dashboard/academy", label: "Growth Academy", icon: BookOpen },
   ];
   if (isAgency) {

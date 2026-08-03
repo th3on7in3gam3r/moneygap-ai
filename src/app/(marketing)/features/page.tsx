@@ -9,7 +9,7 @@ import { buildPageMetadata, breadcrumbJsonLd, jsonLdScript } from "@/lib/seo";
 export const metadata = buildPageMetadata({
   title: "Features — Growth Operating System™",
   description:
-    "MoneyGap Engine™, Crawlability Score™, Fix Path™, Copilot, SEO Intelligence™, Trust Engine™, Growth Academy™, and more — the full MoneyGap AI capability map.",
+    "MoneyGap Engine™, Crawlability Score™, Fix Path™, Copilot, Growth Badge™, Trust Engine™, Growth Academy™, and more — the full MoneyGap AI capability map.",
   path: "/features",
 });
 
@@ -134,6 +134,14 @@ const FEATURES: FeatureBlock[] = [
     why: "Agencies need client isolation and brandable delivery.",
     impact: "Run MoneyGap as an operating layer across a portfolio.",
     useCase: "An agency switches clients, exports a branded Growth Report, and tracks capture per account.",
+  },
+  {
+    id: "badge",
+    title: "Growth Badge™",
+    does: "Issue a branded badge (MG-######), copy embed HTML for WordPress/Shopify/Webflow/custom sites, and let visitors verify observed MoneyGap Score™ journey.",
+    why: "Attribution spreads MoneyGap across customer sites without claiming legal certification or guaranteed ROI.",
+    impact: "Businesses and agencies display proof of analysis with a public verification page.",
+    useCase: "An agency embeds Growth Optimized by MoneyGap AI™ in a client footer after shipping Fix Paths™.",
   },
   {
     id: "integrations",

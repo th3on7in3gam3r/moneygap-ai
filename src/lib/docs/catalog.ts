@@ -72,11 +72,18 @@ export const PUBLIC_DOC_CATALOG: PublicDocEntry[] = [
     order: 7,
   },
   {
+    slug: "growth-badge",
+    title: "Growth Badge™",
+    summary: "Create, embed, and verify a branded Growth Badge™ for your site.",
+    category: "grow",
+    order: 8,
+  },
+  {
     slug: "growth-academy",
     title: "Growth Academy™",
     summary: "Educational playbooks that map to Fix Paths™ and live gaps.",
     category: "grow",
-    order: 8,
+    order: 9,
   },
 ];
 

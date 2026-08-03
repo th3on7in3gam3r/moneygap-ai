@@ -4644,3 +4644,134 @@ export const privacyConsentEvents = pgTable(
 
 export type PrivacyConsentRecord = typeof privacyConsentRecords.$inferSelect;
 export type PrivacyConsentEvent = typeof privacyConsentEvents.$inferSelect;
+
+/** Phase — Growth Badge™ & Verification */
+export type GrowthBadgeStyle =
+  | "growth_optimized"
+  | "analyzed_improved"
+  | "growth_intelligence";
+
+export type GrowthBadgeStatus = "active" | "revoked";
+
+export const growthBadges = pgTable(
+  "growth_badges",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    publicId: text("public_id").notNull().unique(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    websiteId: uuid("website_id")
+      .notNull()
+      .references(() => websites.id, { onDelete: "cascade" }),
+    style: text("style").$type<GrowthBadgeStyle>().notNull(),
+    status: text("status").$type<GrowthBadgeStatus>().notNull().default("active"),
+    issuedAt: timestamp("issued_at", { withTimezone: true }).defaultNow().notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    domain: text("domain").notNull(),
+    websiteUrl: text("website_url").notNull(),
+    websiteName: text("website_name").notNull(),
+    moneyGapScore: integer("money_gap_score"),
+    reportId: uuid("report_id").references(() => reports.id, {
+      onDelete: "set null",
+    }),
+    analyzedAt: timestamp("analyzed_at", { withTimezone: true }),
+    beforeScore: integer("before_score"),
+    afterScore: integer("after_score"),
+    improvementPoints: integer("improvement_points"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("growth_badges_workspace_idx").on(t.workspaceId),
+    index("growth_badges_website_idx").on(t.websiteId),
+    index("growth_badges_public_id_idx").on(t.publicId),
+    index("growth_badges_status_idx").on(t.status),
+  ],
+);
+
+export type GrowthBadgeEventType =
+  | "issued"
+  | "verified_view"
+  | "embed_served"
+  | "journey_updated"
+  | "revoked";
+
+export const growthBadgeEvents = pgTable(
+  "growth_badge_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    badgeId: uuid("badge_id")
+      .notNull()
+      .references(() => growthBadges.id, { onDelete: "cascade" }),
+    eventType: text("event_type").$type<GrowthBadgeEventType>().notNull(),
+    meta: jsonb("meta").$type<Record<string, unknown> | null>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("growth_badge_events_badge_idx").on(t.badgeId),
+    index("growth_badge_events_created_idx").on(t.createdAt),
+  ],
+);
+
+export type GrowthBadge = typeof growthBadges.$inferSelect;
+export type GrowthBadgeEvent = typeof growthBadgeEvents.$inferSelect;
+
+/** Partner Foundation™ stubs — schema only; no full partner UI this pass */
+export type PartnerProfileStatus = "prospect" | "certified" | "suspended";
+
+export const partnerProfiles = pgTable(
+  "partner_profiles",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" })
+      .unique(),
+    status: text("status")
+      .$type<PartnerProfileStatus>()
+      .notNull()
+      .default("prospect"),
+    referralCode: text("referral_code").notNull().unique(),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("partner_profiles_workspace_idx").on(t.workspaceId),
+    index("partner_profiles_referral_idx").on(t.referralCode),
+  ],
+);
+
+export type PartnerReferralStatus =
+  | "pending"
+  | "attributed"
+  | "converted"
+  | "rejected";
+
+export const partnerReferrals = pgTable(
+  "partner_referrals",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    referrerWorkspaceId: uuid("referrer_workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    referredWorkspaceId: uuid("referred_workspace_id").references(
+      () => workspaces.id,
+      { onDelete: "set null" },
+    ),
+    referralCode: text("referral_code").notNull(),
+    status: text("status")
+      .$type<PartnerReferralStatus>()
+      .notNull()
+      .default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("partner_referrals_referrer_idx").on(t.referrerWorkspaceId),
+    index("partner_referrals_code_idx").on(t.referralCode),
+  ],
+);
+
+export type PartnerProfile = typeof partnerProfiles.$inferSelect;
+export type PartnerReferral = typeof partnerReferrals.$inferSelect;

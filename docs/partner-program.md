@@ -31,3 +31,4 @@ Install count increments on successful workspace install (free listings in Phase
 - [`marketplace.md`](./marketplace.md)
 - [`plugin-sdk.md`](./plugin-sdk.md)
 - [`monetization.md`](./monetization.md)
+- Growth Badge™ Partner Foundation stubs (`partner_profiles`, `partner_referrals`) — schema only; see [`growth-badge.md`](./growth-badge.md). Not a full certified partner / referral product yet.
