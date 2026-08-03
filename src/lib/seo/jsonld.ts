@@ -13,7 +13,7 @@ export function organizationJsonLd() {
     "@type": "Organization",
     name: "MoneyGap AI",
     url: origin,
-    logo: absoluteUrl("/opengraph-image"),
+    logo: absoluteUrl("/logo.png"),
     sameAs: [] as string[],
   };
 }

@@ -57,7 +57,7 @@ export const CONSENT_CATEGORY_DEFS: ConsentCategoryDef[] = [
     label: "Personalization",
     currentlyActive: true,
     bullets: [
-      "Remember theme preference.",
+      "Optional saved preferences (theme still works without this).",
       "Dashboard layout preferences.",
       "Language and recent context.",
       "User interface preferences.",
