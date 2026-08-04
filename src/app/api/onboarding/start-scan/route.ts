@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { websiteAnalyses, websites } from "@/db/schema";
 import { runAnalysisPipeline } from "@/lib/analysis/pipeline";
-import { validateAndNormalizeUrl } from "@/lib/analysis/url";
+import { verifyUrlReachable } from "@/lib/analysis/url";
 import { ensureUserAndWorkspace } from "@/lib/analysis/workspace";
 import {
   getOrCreateOnboarding,
@@ -37,9 +37,12 @@ export async function POST(req: Request) {
     return Response.json({ error: "Add a website URL first." }, { status: 400 });
   }
 
-  const validated = validateAndNormalizeUrl(url);
+  const validated = await verifyUrlReachable(url);
   if (!validated.ok) {
-    return Response.json({ error: validated.error }, { status: 400 });
+    return Response.json(
+      { error: validated.error, code: validated.code ?? "unreachable" },
+      { status: 400 },
+    );
   }
 
   const { requireFeatureAndUsage, upgradeResponse, recordUsage } = await import(

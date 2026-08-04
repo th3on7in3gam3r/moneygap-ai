@@ -345,6 +345,7 @@ export function OnboardingWizard() {
 
   async function startScan() {
     setBusy(true);
+    setToast(makeFlashToast("Checking that the website is reachable…", "info"));
     try {
       const res = await fetch("/api/onboarding/start-scan", {
         method: "POST",
@@ -368,7 +369,7 @@ export function OnboardingWizard() {
       }
       setAnalysisId(data.analysisId ?? null);
       setStep("scan");
-      setToast(makeFlashToast("First scan started", "success"));
+      setToast(makeFlashToast("Website verified — scan started", "success"));
     } finally {
       setBusy(false);
     }

@@ -56,8 +56,8 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
               className="mt-2 h-12 w-full rounded-xl border border-border bg-bg px-4 text-sm text-fg outline-none transition placeholder:text-fg-subtle focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
             />
             <p className="mt-2 text-xs text-fg-muted">
-              Enter a public website. We&apos;ll crawl key pages and generate a Website Intelligence
-              Report.
+              Enter a public website. We verify it&apos;s reachable first, then crawl key pages and
+              generate a Website Intelligence Report.
             </p>
           </div>
 
@@ -71,7 +71,7 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
             {submitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Starting analysis…
+                Checking website…
               </>
             ) : (
               "Analyze website"

@@ -94,3 +94,119 @@ export function validateAndNormalizeUrl(input: string): {
     },
   };
 }
+
+export type UrlReachabilityResult =
+  | {
+      ok: true;
+      value: ValidatedUrl;
+      statusCode: number;
+      finalUrl: string;
+    }
+  | {
+      ok: false;
+      error: string;
+      code?: "invalid" | "dns" | "unreachable" | "http";
+    };
+
+const PREFLIGHT_TIMEOUT_MS = 12_000;
+const PREFLIGHT_UA = "MoneyGapAI-Preflight/1.0 (+https://moneygap-ai.com)";
+
+/**
+ * Validate format, resolve DNS, then HTTP-probe the URL before starting a full scan.
+ * Rejects dead domains / connection failures / hard HTTP errors so users are not
+ * stuck on "Reading pages" for unreachable sites.
+ */
+export async function verifyUrlReachable(
+  input: string,
+): Promise<UrlReachabilityResult> {
+  const validated = validateAndNormalizeUrl(input);
+  if (!validated.ok) {
+    return { ok: false, error: validated.error, code: "invalid" };
+  }
+
+  const { value } = validated;
+
+  try {
+    const { lookup } = await import("dns/promises");
+    await lookup(value.hostname);
+  } catch {
+    return {
+      ok: false,
+      code: "dns",
+      error: `We couldn’t find DNS records for ${value.domain}. Check the domain spelling and try again.`,
+    };
+  }
+
+  try {
+    const res = await fetch(value.href, {
+      method: "GET",
+      redirect: "follow",
+      signal: AbortSignal.timeout(PREFLIGHT_TIMEOUT_MS),
+      cache: "no-store",
+      headers: {
+        "User-Agent": PREFLIGHT_UA,
+        Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+      },
+    });
+
+    // Consume a small amount so the connection completes cleanly.
+    await res.arrayBuffer().catch(() => null);
+
+    const status = res.status;
+    // Site exists but may block anonymous bots — still treat as reachable.
+    if (status === 401 || status === 403) {
+      return {
+        ok: true,
+        value,
+        statusCode: status,
+        finalUrl: res.url || value.href,
+      };
+    }
+
+    if (status >= 200 && status < 400) {
+      return {
+        ok: true,
+        value,
+        statusCode: status,
+        finalUrl: res.url || value.href,
+      };
+    }
+
+    if (status === 404 || status === 410) {
+      return {
+        ok: false,
+        code: "http",
+        error: `That URL returned ${status}. Confirm the site is public and the path is correct.`,
+      };
+    }
+
+    if (status >= 500) {
+      return {
+        ok: false,
+        code: "http",
+        error: `That site returned an error (${status}). Try again when the website is healthy.`,
+      };
+    }
+
+    return {
+      ok: false,
+      code: "http",
+      error: `That URL isn’t publicly readable (HTTP ${status}). Use a live public website.`,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const timedOut =
+      message.includes("TimeoutError") ||
+      message.includes("timed out") ||
+      message.includes("aborted") ||
+      (err instanceof Error && err.name === "TimeoutError");
+
+    return {
+      ok: false,
+      code: "unreachable",
+      error: timedOut
+        ? "That website took too long to respond. Confirm it’s online and try again."
+        : "We couldn’t reach that website. Confirm the URL is public and online, then try again.",
+    };
+  }
+}

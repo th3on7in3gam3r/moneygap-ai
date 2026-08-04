@@ -4,7 +4,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { websiteAnalyses, websites } from "@/db/schema";
 import { runAnalysisPipeline } from "@/lib/analysis/pipeline";
-import { validateAndNormalizeUrl } from "@/lib/analysis/url";
+import { verifyUrlReachable } from "@/lib/analysis/url";
 import { assertWithinLimit, recordUsage } from "@/lib/billing";
 import {
   apiError,
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const validated = validateAndNormalizeUrl(parsed.data.website_url);
+  const validated = await verifyUrlReachable(parsed.data.website_url);
   if (!validated.ok) {
     await logApiRequest({
       workspaceId: authResult.workspaceId,
@@ -70,11 +70,14 @@ export async function POST(req: Request) {
       method: "POST",
       path: "/api/v1/analyze",
       statusCode: 400,
-      errorCode: "invalid_url",
+      errorCode: validated.code ?? "unreachable_url",
       durationMs: Date.now() - started,
       req,
     });
-    return Response.json({ error: validated.error, code: "invalid_url" }, { status: 400 });
+    return Response.json(
+      { error: validated.error, code: validated.code ?? "unreachable_url" },
+      { status: 400 },
+    );
   }
 
   const analysisLimit = await assertWithinLimit({
