@@ -6,6 +6,8 @@ import {
   type DiagnosticStage,
 } from "moneygap-diagnostics";
 import { EXIT } from "../utils/constants.js";
+import { requestCliVisualReport } from "../utils/cli-report.js";
+import { askEmail, shouldSkipEmailPrompt } from "../utils/prompt.js";
 
 function sevIcon(severity: DiagnosticFinding["severity"]): string {
   switch (severity) {
@@ -26,7 +28,10 @@ function printStage(stage: DiagnosticStage): void {
   }
 }
 
-export async function runScanUrl(url: string): Promise<number> {
+export async function runScanUrl(
+  url: string,
+  opts?: { skipPrompt?: boolean },
+): Promise<number> {
   console.log();
   console.log(chalk.bold.green("MoneyGap Scan"));
   console.log(chalk.dim("Live diagnostics · crawlability · schema · performance signals"));
@@ -71,6 +76,49 @@ export async function runScanUrl(url: string): Promise<number> {
   );
   console.log(chalk.dim("Unlock Fix Paths: https://moneygap-ai.com"));
   console.log();
+
+  const skipPrompt = opts?.skipPrompt || shouldSkipEmailPrompt();
+  if (!skipPrompt) {
+    try {
+      const email = await askEmail(
+        "Enter your email to get the full visual dashboard report (or press Enter to skip): ",
+      );
+      if (email) {
+        console.log(chalk.dim("  Publishing Open Audit and sending link…"));
+        const res = await requestCliVisualReport({ email, result });
+        if (res.ok && res.href) {
+          const absolute =
+            res.href.startsWith("http")
+              ? res.href
+              : `https://www.moneygap-ai.com${res.href}`;
+          console.log(`${chalk.green("✓")} Visual report: ${chalk.cyan(absolute)}`);
+          if (res.emailed) {
+            console.log(chalk.dim(`  Check ${email} for the link.`));
+          } else {
+            console.log(
+              chalk.dim(
+                "  Link ready (email delivery soft-failed — open the URL above).",
+              ),
+            );
+          }
+        } else {
+          console.log(
+            chalk.yellow(
+              `  Could not publish report: ${res.error ?? "unknown error"}`,
+            ),
+          );
+        }
+        console.log();
+      }
+    } catch (err) {
+      console.log(
+        chalk.yellow(
+          `  Skipped report email: ${err instanceof Error ? err.message : String(err)}`,
+        ),
+      );
+      console.log();
+    }
+  }
 
   if (!outcome.ok || hasCriticalFailures(result.findings)) {
     return EXIT.FINDINGS;

@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const CLI_VERSION = "0.1.0";
+export const CLI_VERSION = "0.1.1";
 export const SCAN_SCHEMA_VERSION = "1.0.0";
 
 export function packageRoot(): string {

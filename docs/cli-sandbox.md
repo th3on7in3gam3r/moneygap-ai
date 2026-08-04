@@ -27,6 +27,7 @@ Visitor / CLI
 | CLI (`moneygap-scan` / `moneygap`) | [`packages/moneygap-cli`](../packages/moneygap-cli) |
 | App re-export | [`src/lib/public-diagnostics`](../src/lib/public-diagnostics) |
 | Public API | [`src/app/api/public/sandbox-scan/route.ts`](../src/app/api/public/sandbox-scan/route.ts) |
+| CLI → email report | [`src/app/api/public/cli-report/route.ts`](../src/app/api/public/cli-report/route.ts) → Open Audit + Resend |
 | Homepage UI | [`src/components/marketing/sandbox-terminal.tsx`](../src/components/marketing/sandbox-terminal.tsx) |
 | Progressive log helper | [`src/components/marketing/sandbox-terminal-log.ts`](../src/components/marketing/sandbox-terminal-log.ts) |
 | Handoff | [`src/lib/public-diagnostics/sandbox-storage.ts`](../src/lib/public-diagnostics/sandbox-storage.ts) |
@@ -63,14 +64,20 @@ Private / localhost targets are rejected (SSRF guard). HTML capped ~1.5MB; timeo
 # after publish
 npx moneygap-scan https://example.com
 
+# skip email prompt (CI / scripts)
+npx moneygap-scan https://example.com --yes
+CI=1 npx moneygap-scan https://example.com
+
 # monorepo
 cd packages/moneygap-diagnostics && npm run build
 cd ../moneygap-cli && npm install && npm run build
-node dist/index.js scan-url https://example.com
+node dist/index.js scan-url https://example.com --no-prompt
 # or: npm link && moneygap-scan https://example.com
 ```
 
-Offline project scan remains: `moneygap scan`.
+On an interactive TTY, after findings print, the CLI may ask for an email. That calls `POST /api/public/cli-report`, publishes an Open Audit (`source: cli`), emails a link to `/labs/audits/{slug}`, and prints the URL in the terminal. Soft-fails if mail isn’t configured; exit codes still reflect scan findings only.
+
+Offline project scan remains: `moneygap scan` (no email prompt in v1).
 
 ## npm publish checklist
 
@@ -88,6 +95,8 @@ Sandbox shows **what** is wrong. Step-by-step Fix Paths™ require **Clerk Start
 ## Manual test checklist
 
 - [ ] `moneygap-scan https://example.com` prints stages + score
+- [ ] TTY: email prompt → Open Audit URL printed (+ email when Resend configured)
+- [ ] `CI=1` or `--yes` → no email prompt
 - [ ] Homepage Run free scan → findings + Unlock Fix Paths CTA
 - [ ] Bad / private URL → clear error
 - [ ] 6th scan/hour → 429

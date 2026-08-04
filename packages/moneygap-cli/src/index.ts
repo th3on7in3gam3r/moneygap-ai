@@ -57,8 +57,12 @@ program
   .command("scan-url")
   .description("Live-scan a public URL (crawlability, schema, performance signals)")
   .argument("<url>", "Public website URL")
-  .action(async (url: string) => {
-    process.exitCode = await runScanUrl(url);
+  .option("--yes", "Skip interactive email prompt")
+  .option("--no-prompt", "Skip interactive email prompt")
+  .action(async (url: string, opts: { yes?: boolean; prompt?: boolean }) => {
+    process.exitCode = await runScanUrl(url, {
+      skipPrompt: Boolean(opts.yes) || opts.prompt === false,
+    });
   });
 
 program
@@ -177,12 +181,16 @@ async function main(): Promise<void> {
     const first = args[0];
 
     if (isScanBin && first && !first.startsWith("-") && looksLikeUrl(first)) {
-      process.exitCode = await runScanUrl(first);
+      const skipPrompt =
+        args.includes("--yes") ||
+        args.includes("-y") ||
+        args.includes("--no-prompt");
+      process.exitCode = await runScanUrl(first, { skipPrompt });
       return;
     }
 
     if (isScanBin && args.length === 0) {
-      console.log("Usage: moneygap-scan <url>");
+      console.log("Usage: moneygap-scan <url> [--yes|--no-prompt]");
       console.log("Example: npx moneygap-scan https://example.com");
       console.log();
       console.log(

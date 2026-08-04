@@ -1,6 +1,6 @@
 {
   "name": "moneygap-scan",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MoneyGap CLI — live URL diagnostics (crawlability, schema, performance signals) plus offline project scanner.",
   "type": "module",
   "bin": {

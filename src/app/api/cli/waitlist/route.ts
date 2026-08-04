@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 const bodySchema = z.object({
   email: z.string().email().max(200),
   source: z
-    .enum(["cli_page", "docs", "home", "developers"])
+    .enum(["cli_page", "docs", "home", "developers", "cli_scan"])
     .optional()
     .default("cli_page"),
 });
