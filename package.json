@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "npm run build --prefix packages/moneygap-diagnostics || true",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -24,6 +25,7 @@
     "drizzle-orm": "^0.45.2",
     "framer-motion": "^12.43.0",
     "lucide-react": "^1.28.0",
+    "moneygap-diagnostics": "file:packages/moneygap-diagnostics",
     "next": "16.2.12",
     "next-themes": "^0.4.6",
     "openai": "^7.2.0",

@@ -1,9 +1,10 @@
 {
-  "name": "@moneygap/cli",
+  "name": "moneygap-scan",
   "version": "0.1.0",
-  "description": "MoneyGap CLI — local developer growth intelligence scanner (SEO, AEO, a11y, trust, performance, revenue readiness).",
+  "description": "MoneyGap CLI — live URL diagnostics (crawlability, schema, performance signals) plus offline project scanner.",
   "type": "module",
   "bin": {
+    "moneygap-scan": "./dist/index.js",
     "moneygap": "./dist/index.js"
   },
   "main": "./dist/index.js",
@@ -29,10 +30,18 @@
     "cli",
     "seo",
     "aeo",
-    "accessibility",
+    "crawlability",
+    "schema",
     "growth"
   ],
   "license": "MIT",
+  "author": "vercelguard",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/th3on7in3gam3r/moneygap-ai.git",
+    "directory": "packages/moneygap-cli"
+  },
+  "homepage": "https://moneygap-ai.com",
   "publishConfig": {
     "access": "public"
   },
@@ -41,6 +50,7 @@
     "commander": "^13.1.0",
     "execa": "^9.5.2",
     "fast-glob": "^3.3.3",
+    "moneygap-diagnostics": "file:../moneygap-diagnostics",
     "ora": "^8.2.0",
     "zod": "^3.24.2"
   },

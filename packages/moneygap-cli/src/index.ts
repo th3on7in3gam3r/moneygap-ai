@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { Command } from "commander";
 import { runAuth } from "./commands/auth.js";
 import { runConfig } from "./commands/config.js";
@@ -8,6 +7,7 @@ import { runGenerateLlms } from "./commands/generate-llms.js";
 import { runInit } from "./commands/init.js";
 import { runReport } from "./commands/report.js";
 import { runScanCommand } from "./commands/scan.js";
+import { runScanUrl } from "./commands/scan-url.js";
 import { runUpdate } from "./commands/update.js";
 import { runValidateLlms } from "./commands/validate-llms.js";
 import { runVersion } from "./commands/version.js";
@@ -29,7 +29,7 @@ const program = new Command();
 program
   .name("moneygap")
   .description(
-    "MoneyGap CLI — offline developer growth intelligence (SEO, AEO, a11y, trust, performance, revenue).",
+    "MoneyGap CLI — live URL diagnostics + offline developer growth intelligence.",
   )
   .version(CLI_VERSION, "-V, --version")
   .option("--cwd <path>", "Project root (default: process.cwd())");
@@ -51,6 +51,14 @@ program
     const root = resolveCwd(cmd.parent?.opts()?.cwd);
     const code = await runScanCommand(root);
     process.exitCode = code;
+  });
+
+program
+  .command("scan-url")
+  .description("Live-scan a public URL (crawlability, schema, performance signals)")
+  .argument("<url>", "Public website URL")
+  .action(async (url: string) => {
+    process.exitCode = await runScanUrl(url);
   });
 
 program
@@ -103,7 +111,7 @@ program
 
 program
   .command("update")
-  .description("Check npm for @moneygap/cli updates (soft-fail offline)")
+  .description("Check npm for moneygap-scan updates (soft-fail offline)")
   .action(async () => {
     process.exitCode = await runUpdate();
   });
@@ -156,8 +164,34 @@ program
     program.outputHelp();
   });
 
+function looksLikeUrl(value: string): boolean {
+  return /^(https?:\/\/)?[a-z0-9.-]+\.[a-z]{2,}([/:?#].*)?$/i.test(value);
+}
+
 async function main(): Promise<void> {
   try {
+    const bin = process.argv[1] ?? "";
+    const isScanBin =
+      /moneygap-scan(?:\.js)?$/i.test(bin) || bin.includes("moneygap-scan");
+    const args = process.argv.slice(2);
+    const first = args[0];
+
+    if (isScanBin && first && !first.startsWith("-") && looksLikeUrl(first)) {
+      process.exitCode = await runScanUrl(first);
+      return;
+    }
+
+    if (isScanBin && args.length === 0) {
+      console.log("Usage: moneygap-scan <url>");
+      console.log("Example: npx moneygap-scan https://example.com");
+      console.log();
+      console.log(
+        "Also: moneygap scan-url <url>  |  moneygap scan  (offline project)",
+      );
+      process.exitCode = EXIT.ERROR;
+      return;
+    }
+
     await program.parseAsync(process.argv);
   } catch (err) {
     console.error(err instanceof Error ? err.message : err);

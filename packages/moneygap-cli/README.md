@@ -1,75 +1,64 @@
-# @moneygap/cli
+# moneygap-scan
 
-Offline developer CLI for Money Gaps™ detection: SEO, AI visibility (AEO), **AI Readiness** (llms.txt), performance heuristics, accessibility, trust, and revenue readiness — with a MoneyGap Score™ terminal UI.
+Live URL diagnostics + offline developer CLI for Money Gaps™.
 
-**Requires Node.js 22+.** Scans are filesystem/HTML/config heuristics only (no headless Chrome / Lighthouse).
+**Requires Node.js 22+.**
 
-## Install
+## Quickstart (live URL)
 
 ```bash
-# from monorepo
-cd packages/moneygap-cli && npm install && npm run build
-npm link   # optional global `moneygap`
-
-# or run without build
-npm run moneygap -- scan
+npx moneygap-scan https://example.com
 ```
 
-## Quickstart
+Runs lightweight checks:
+
+- Crawlability (robots.txt + sitemap)
+- Schema (JSON-LD parse / basic validation)
+- Performance **signals** (HTML heuristics — not lab Core Web Vitals)
+
+These are free diagnostics — not a full MoneyGap AI report with Fix Paths™.
+
+## Offline project scan
 
 ```bash
+npm install -g moneygap-scan   # optional
 moneygap init
 moneygap doctor
 moneygap scan
 moneygap generate llms
-moneygap validate llms
 moneygap report
-moneygap fix
+```
+
+Or from this monorepo:
+
+```bash
+cd packages/moneygap-cli && npm install && npm run build
+npm link
+moneygap-scan https://example.com
+moneygap scan
 ```
 
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
+| `moneygap-scan <url>` | Live URL diagnostics |
+| `moneygap scan-url <url>` | Same as above via `moneygap` bin |
+| `moneygap scan` | Offline filesystem analyzers → MoneyGap Score™ |
 | `moneygap init` | Write `moneygap.config.ts` + `.moneygapignore` |
-| `moneygap scan` | Detect framework → analyzers → TUI score; write `.moneygap/last-scan.json` |
-| `moneygap generate llms` | Create `public/llms.txt` (`--force` to overwrite) |
-| `moneygap validate llms` | Validate llms.txt AI Readiness quality |
-| `moneygap doctor` | Node/config/framework/plugin smoke checks |
 | `moneygap report` | JSON / Markdown / HTML under `.moneygap/reports/` |
-| `moneygap fix` | Recommendation markdown only (`--apply` refused without `--yes`; still no auto-overwrite) |
-| `moneygap auth` | Stub for future cloud login |
-| `moneygap version` | Package version |
-| `moneygap update` | Soft-check npm registry |
-| `moneygap config` | Show / `--validate` / `--path` |
+| `moneygap fix` | Recommendation markdown only |
+| … | See `moneygap --help` |
 
-Global option: `--cwd <path>`.
+## Publish
 
-### Exit codes
-
-| Code | Meaning |
-| --- | --- |
-| `0` | OK |
-| `1` | Findings at/above fail threshold (default: critical/high) |
-| `2` | Tool error |
-
-## Config
-
-`moneygap.config.ts` (Zod-validated):
-
-```ts
-export default {
-  projectName: "My App",
-  ignore: ["**/node_modules/**", "**/.next/**"],
-  weights: { seo: 1, aeo: 1, performance: 1, accessibility: 1, trust: 1, growth: 1 },
-  rules: { disable: [] },
-  failOnSeverity: ["critical", "high"],
-};
+```bash
+cd packages/moneygap-diagnostics && npm run build
+cd ../moneygap-cli && npm install && npm run build
+npm publish --access public
 ```
 
-## Docs
-
-See [`docs/`](./docs/) for architecture, commands, contributing, roadmap, and developer guide.
+Ensure `moneygap-diagnostics` is published first (or bundled) so the file: dependency resolves for consumers — for npm publish, prefer publishing `moneygap-diagnostics` to the registry and changing the dependency to a version range.
 
 ## License
 

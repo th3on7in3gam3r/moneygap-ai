@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/flash-toast";
 import { MoneyGapScore } from "@/components/money-gap";
 import { GOAL_OPTIONS, PERSONA_OPTIONS } from "@/lib/onboarding/constants";
+import { readSandboxHandoff } from "@/lib/public-diagnostics/sandbox-storage";
 import { cn } from "@/lib/utils";
 import type {
   DiscoverySignals,
@@ -115,7 +116,13 @@ export function OnboardingWizard() {
     if (data.onboarding) {
       setOnboarding(data.onboarding);
       setStep(data.onboarding.currentStep);
-      setUrl(data.onboarding.primaryWebsiteUrl ?? "");
+      const savedUrl = data.onboarding.primaryWebsiteUrl ?? "";
+      if (savedUrl) {
+        setUrl(savedUrl);
+      } else {
+        const handoff = readSandboxHandoff();
+        if (handoff?.url) setUrl(handoff.url);
+      }
       setCompanyName(data.onboarding.companyName ?? "");
       setIndustry(data.onboarding.industry ?? "");
       setBusinessModel(data.onboarding.businessModel ?? "");
@@ -534,6 +541,13 @@ export function OnboardingWizard() {
             <p className="text-xs leading-relaxed text-fg-muted">
               Full AI scans usually take a few minutes. Larger sites can take up to{" "}
               <span className="font-medium text-fg">10–15 minutes</span> to complete.
+              {url && !onboarding?.primaryWebsiteUrl ? (
+                <>
+                  {" "}
+                  Prefilling from your free sandbox scan — continue to run the full
+                  MoneyGap Engine™ for Fix Paths™.
+                </>
+              ) : null}
             </p>
             <DiscoveryChips signals={discovery} />
             <div className="flex flex-wrap justify-end gap-2">

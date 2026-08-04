@@ -8,7 +8,7 @@ export async function runUpdate(): Promise<number> {
   console.log(`Current version: ${CLI_VERSION}`);
 
   try {
-    const res = await fetch("https://registry.npmjs.org/@moneygap/cli/latest", {
+    const res = await fetch("https://registry.npmjs.org/moneygap-scan/latest", {
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) {
@@ -26,7 +26,7 @@ export async function runUpdate(): Promise<number> {
       console.log(chalk.green("You are up to date."));
     } else {
       console.log(
-        chalk.cyan(`Update with: npm install -g @moneygap/cli@${latest}`),
+        chalk.cyan(`Update with: npm install -g moneygap-scan@${latest}`),
       );
     }
   } catch {

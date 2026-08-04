@@ -4,13 +4,9 @@ import Link from "next/link";
 import { StartFreeButton } from "@/components/auth-buttons";
 import { CtaBand } from "@/components/marketing/cta-band";
 import { FaqBlock } from "@/components/marketing/faq-block";
+import { SandboxTerminal } from "@/components/marketing/sandbox-terminal";
 import { SectionHeading } from "@/components/marketing/section-heading";
-import {
-  CapturePotentialBar,
-  MoneyGapCard,
-  MoneyGapScore,
-  RevenueAtRisk,
-} from "@/components/money-gap";
+import { MoneyGapCard } from "@/components/money-gap";
 import { Button } from "@/components/ui/button";
 import { SAMPLE_GAPS } from "@/lib/sample-data";
 import {
@@ -18,7 +14,6 @@ import {
   SITE_DEFAULT_TITLE,
   buildPageMetadata,
 } from "@/lib/seo";
-import { formatCurrency } from "@/lib/utils";
 
 export const metadata: Metadata = {
   ...buildPageMetadata({
@@ -34,6 +29,11 @@ const HOME_FAQ = [
     question: "What is a Money Gap™?",
     answer:
       "A Money Gap™ is a concrete miss on your site — visibility, conversion, trust, content, or AI discovery — that leaves revenue on the table. MoneyGap AI surfaces them with an AI Estimate of impact and a Fix Path™ you can implement with human review.",
+  },
+  {
+    question: "What's the free homepage sandbox vs a full scan?",
+    answer:
+      "The free sandbox (and npx moneygap-scan) runs lightweight crawlability, schema, and performance-signal checks with no account. A full MoneyGap Engine™ scan after you Start free adds deeper scoring, Opportunity Index™, and Fix Paths™ in your dashboard.",
   },
   {
     question: "Are revenue estimates guaranteed?",
@@ -66,9 +66,8 @@ export default function HomePage() {
               Find the revenue your website is leaving on the table.
             </h1>
             <p className="animate-rise-delay-2 mt-5 max-w-lg text-base leading-relaxed text-fg-muted sm:text-lg">
-              An AI-powered Growth Operating System™ that finds Money Gaps™,
-              prioritizes Fix Paths™, and helps teams close leaks before they
-              compound.
+              Try a free live diagnostic in the terminal — then Start free to unlock
+              Fix Paths™ and the full MoneyGap Engine™.
             </p>
             <div className="animate-rise-delay-3 mt-8 flex flex-wrap items-center gap-3">
               <StartFreeButton label="Start free" size="lg" />
@@ -78,38 +77,8 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="animate-rise-delay-2 relative">
-            <div className="absolute -inset-4 rounded-[2rem] bg-accent/10 blur-2xl dark:bg-accent/5" />
-            <div className="relative overflow-hidden rounded-[1.75rem] border border-border bg-bg-elevated shadow-[var(--shadow)]">
-              <div className="flex items-center justify-between border-b border-border px-5 py-3">
-                <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-danger/80" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-gap/80" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-accent/80" />
-                </div>
-                <span className="text-xs text-fg-subtle">
-                  Product preview · example board
-                </span>
-              </div>
-              <div className="grid gap-6 p-5 sm:grid-cols-[auto_1fr] sm:p-6">
-                <MoneyGapScore score={68} size="lg" />
-                <div className="space-y-5">
-                  <RevenueAtRisk amount={47200} />
-                  <CapturePotentialBar atRisk={47200} capture={31800} />
-                </div>
-              </div>
-              <div className="border-t border-border bg-bg-muted/40 px-5 py-4">
-                <div className="flex items-center justify-between text-xs text-fg-muted">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-accent" />
-                    6 open gaps prioritized by monthly impact
-                  </span>
-                  <span className="tabular-nums text-gap">
-                    {formatCurrency(18400)} top leak
-                  </span>
-                </div>
-              </div>
-            </div>
+          <div className="animate-rise-delay-2">
+            <SandboxTerminal />
           </div>
         </div>
       </section>

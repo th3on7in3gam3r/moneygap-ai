@@ -1,16 +1,32 @@
 "use client";
 
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
+import {
+  clearSandboxHandoff,
+  readSandboxHandoff,
+} from "@/lib/public-diagnostics/sandbox-storage";
 
 export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
   const router = useRouter();
   const [url, setUrl] = useState(initialUrl);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [sandboxBanner, setSandboxBanner] = useState<{
+    url: string;
+    score: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (initialUrl) return;
+    const handoff = readSandboxHandoff();
+    if (!handoff) return;
+    setUrl(handoff.url);
+    setSandboxBanner({ url: handoff.url, score: handoff.score });
+  }, [initialUrl]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,6 +45,7 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
         setSubmitting(false);
         return;
       }
+      clearSandboxHandoff();
       router.push(`/dashboard/analyze/${data.analysisId}`);
     } catch {
       setError("We couldn't start this analysis. Please try again.");
@@ -40,6 +57,32 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
     <Card>
       <CardBody>
         <form onSubmit={onSubmit} className="space-y-4">
+          {sandboxBanner ? (
+            <div className="flex gap-3 rounded-xl border border-accent/30 bg-accent-soft/50 px-3.5 py-3">
+              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+              <div className="min-w-0 space-y-1">
+                <p className="text-sm font-medium text-fg">
+                  Continue from your free sandbox scan
+                </p>
+                <p className="text-xs leading-relaxed text-fg-muted">
+                  Sandbox score {sandboxBanner.score}/100 for{" "}
+                  <span className="font-medium text-fg">{sandboxBanner.url}</span>.
+                  Run the full MoneyGap Engine™ for Fix Paths™ and Opportunity Index™.
+                </p>
+                <button
+                  type="button"
+                  className="text-xs font-medium text-fg-subtle hover:text-fg"
+                  onClick={() => {
+                    clearSandboxHandoff();
+                    setSandboxBanner(null);
+                  }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           <div>
             <label htmlFor="website-url" className="text-sm font-medium text-fg">
               Website URL
@@ -82,6 +125,8 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Checking website…
               </>
+            ) : sandboxBanner ? (
+              "Run full AI scan"
             ) : (
               "Analyze website"
             )}
