@@ -43,6 +43,7 @@ export type TopicId =
   | "sitemap-xml"
   | "accessibility"
   | "image-optimization"
+  | "hydration"
   | "performance"
   | "caching"
   | "fonts"

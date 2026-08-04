@@ -61,6 +61,11 @@ export function SandboxTerminal({ className }: { className?: string }) {
   const [state, setState] = useState<ScanState>({ status: "idle" });
   const [copied, setCopied] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [publishState, setPublishState] = useState<
+    "idle" | "publishing" | "done" | "error"
+  >("idle");
+  const [publishHref, setPublishHref] = useState<string | null>(null);
+  const [publishError, setPublishError] = useState<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const cancelStagesRef = useRef<(() => void) | null>(null);
 
@@ -93,6 +98,9 @@ export function SandboxTerminal({ className }: { className?: string }) {
 
     const initialLines = [commandLine(target)];
     setState({ status: "running", lines: initialLines });
+    setPublishState("idle");
+    setPublishHref(null);
+    setPublishError(null);
 
     cancelStagesRef.current = runProgressiveStages((line) => {
       setState((prev) => {
@@ -175,6 +183,40 @@ export function SandboxTerminal({ className }: { className?: string }) {
       setCopied(true);
     } catch {
       /* ignore */
+    }
+  }
+
+  async function publishAudit() {
+    if (state.status !== "done") return;
+    setPublishState("publishing");
+    setPublishError(null);
+    try {
+      const res = await fetch("/api/public/audit-snapshots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: state.result.url,
+          score: state.result.score,
+          findings: state.result.findings,
+          durationMs: state.result.durationMs,
+          source: "sandbox",
+        }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        href?: string;
+        error?: string;
+      };
+      if (!res.ok || !data.href) {
+        setPublishState("error");
+        setPublishError(data.error ?? "Publish failed");
+        return;
+      }
+      setPublishHref(data.href);
+      setPublishState("done");
+    } catch {
+      setPublishState("error");
+      setPublishError("Network error publishing audit.");
     }
   }
 
@@ -358,7 +400,30 @@ export function SandboxTerminal({ className }: { className?: string }) {
                   )}
                   {copied ? "Copied" : "Copy npx moneygap-scan"}
                 </button>
+                <button
+                  type="button"
+                  disabled={publishState === "publishing" || publishState === "done"}
+                  onClick={() => void publishAudit()}
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-accent/40 px-4 text-sm text-accent transition hover:border-accent hover:bg-accent/10 disabled:opacity-50"
+                >
+                  {publishState === "publishing"
+                    ? "Publishing…"
+                    : publishState === "done"
+                      ? "Published"
+                      : "Publish to Open Audits"}
+                </button>
               </div>
+              {publishState === "done" && publishHref ? (
+                <p className="text-xs text-accent">
+                  Public snapshot:{" "}
+                  <a href={publishHref} className="underline hover:text-white">
+                    {publishHref}
+                  </a>
+                </p>
+              ) : null}
+              {publishState === "error" && publishError ? (
+                <p className="text-xs text-danger">{publishError}</p>
+              ) : null}
             </div>
           ) : (
             <p className="text-[11px] leading-relaxed text-white/40">

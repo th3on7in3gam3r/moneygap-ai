@@ -33,13 +33,27 @@ Typical loop:
 | Trust / policy pages | Trust Fix Path + Growth Academy playbooks |
 | Performance CLS / images | Developer Mode™ / IDE prompt with image dimension fixes |
 
-## 4. CI/CD (waitlist)
+## 4. CI/CD (GitHub Action)
 
-Pipeline-native scans (fail builds on critical crawl/schema regressions) are on the [CLI waitlist](/cli). Until then, run `npx moneygap-scan` in CI as a soft report step.
+Gate pull requests with live or offline MoneyGap diagnostics:
+
+```yaml
+- uses: actions/setup-node@v4
+  with:
+    node-version: "22"
+- run: npx --yes moneygap-scan@latest https://your-preview.example.com
+```
+
+Exit `1` when critical crawl/schema/perf-signal findings appear. See [/cli](/cli) for a copy-paste workflow. Managed org-policy CI remains on the waitlist.
+
+Offline: `moneygap init` then `moneygap scan` in the repo.
 
 ## 5. Related reading
 
 - [Money Gaps™ and Fix Paths™](/docs/money-gaps-and-fix-paths)
 - [Getting started](/docs/getting-started)
 - [MoneyGap Score™](/docs/moneygap-score)
+- [Guides: Next.js hydration](/guides/nextjs/hydration)
+- [Guides: Next.js metadata](/guides/nextjs/metadata)
+- [Open Audits](/labs)
 - Internal: `docs/fix-paths.md`, `docs/cli-sandbox.md`

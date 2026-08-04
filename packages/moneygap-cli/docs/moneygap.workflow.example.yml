@@ -1,22 +1,29 @@
-# Example only — not required in MoneyGap AI app CI
+# Customer-facing example — add to your app repo as .github/workflows/moneygap.yml
 name: MoneyGap CLI
+
 on:
-  push:
   pull_request:
+  push:
+    branches: [main]
+
 jobs:
   scan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - name: Install CLI
+
+      # Live gate after a preview URL is available:
+      # - uses: th3on7in3gam3r/moneygap-ai/.github/actions/moneygap-scan@main
+      #   with:
+      #     url: ${{ vars.PREVIEW_URL }}
+
+      - name: Live URL diagnostics
+        if: ${{ vars.PREVIEW_URL != '' }}
+        run: npx --yes moneygap-scan@latest "${{ vars.PREVIEW_URL }}"
+
+      - name: Offline project scan
+        if: ${{ vars.PREVIEW_URL == '' }}
         run: |
-          cd packages/moneygap-cli
-          npm ci || npm install
-          npm run build
-          npm link
-      - name: Scan
-        run: moneygap scan
-        working-directory: .
+          npx --yes moneygap-scan@latest
+          # Prefer: npm i -D moneygap-scan && npx moneygap init && npx moneygap scan
+          echo "Tip: run moneygap init then moneygap scan for filesystem analyzers."

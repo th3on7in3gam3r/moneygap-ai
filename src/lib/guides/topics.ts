@@ -137,6 +137,16 @@ export const TOPICS: TopicMeta[] = [
     summary: "Responsive images, formats, and dimensions for performance.",
   },
   {
+    id: "hydration",
+    slug: "hydration",
+    name: "Hydration Failures",
+    category: "performance",
+    difficulty: "intermediate",
+    tags: ["hydration", "ssr", "react", "mismatch"],
+    summary:
+      "Fix React/Next hydration mismatches that break interactivity, SEO trust, and Core Web Vitals.",
+  },
+  {
     id: "performance",
     slug: "performance",
     name: "Performance",

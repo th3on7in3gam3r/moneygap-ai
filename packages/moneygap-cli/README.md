@@ -50,6 +50,30 @@ moneygap scan
 | `moneygap fix` | Recommendation markdown only |
 | … | See `moneygap --help` |
 
+## GitHub Action (PR growth regressions)
+
+Add a workflow that fails (or soft-reports) when crawl/schema/performance-signal checks regress:
+
+```yaml
+# .github/workflows/moneygap.yml
+name: MoneyGap
+on:
+  pull_request:
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npx --yes moneygap-scan@latest https://your-preview.example.com
+```
+
+Offline project scan: `npx moneygap init && npx moneygap scan` (exit `1` on critical/high by default).
+
+See [`docs/moneygap.workflow.example.yml`](docs/moneygap.workflow.example.yml) and the composite action under `.github/actions/moneygap-scan` in the MoneyGap AI repo.
+
 ## Publish
 
 ```bash

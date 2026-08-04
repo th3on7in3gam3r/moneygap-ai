@@ -111,12 +111,15 @@ export default function HomePage() {
           />
           <p className="mt-6 max-w-2xl text-sm text-fg-muted">
             Teams use it as a developer-friendly conversion tool and a codebase
-            growth audit — from the free CLI sandbox to full Fix Paths™. Learn more
-            on{" "}
+            growth audit — from the free CLI sandbox to full Fix Paths™. Explore{" "}
+            <Link href="/labs" className="text-accent hover:underline">
+              Open Audits
+            </Link>
+            ,{" "}
             <Link href="/about" className="text-accent hover:underline">
               About
-            </Link>{" "}
-            and{" "}
+            </Link>
+            , and{" "}
             <Link href="/features" className="text-accent hover:underline">
               Features
             </Link>

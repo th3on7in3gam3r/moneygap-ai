@@ -1,0 +1,20 @@
+# Dogfood MoneyGap growth-regression checks on this repo.
+name: MoneyGap
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: MoneyGap offline scan
+        uses: ./.github/actions/moneygap-scan
+        with:
+          working-directory: .
+          # Soft gate until analyzers are quiet on the monorepo root
+          continue-on-error: "true"

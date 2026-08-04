@@ -9,6 +9,8 @@ import {
   frameworksWithPublished,
   listPublishedGuides,
 } from "@/lib/guides";
+import { listRecentPublicAudits } from "@/lib/labs/audits";
+import { CURATED_LAB_ARTICLES } from "@/lib/labs/curated";
 import { db } from "@/db";
 import { gaTags } from "@/db/schema";
 import { absoluteUrl } from "@/lib/seo";
@@ -35,6 +37,9 @@ const STATIC_PATHS: {
   { path: "/integrations", changeFrequency: "monthly", priority: 0.6 },
   { path: "/api", changeFrequency: "monthly", priority: 0.55 },
   { path: "/academy/rss.xml", changeFrequency: "daily", priority: 0.4 },
+  { path: "/cli", changeFrequency: "monthly", priority: 0.65 },
+  { path: "/labs", changeFrequency: "daily", priority: 0.75 },
+  { path: "/labs/compare", changeFrequency: "weekly", priority: 0.7 },
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -62,6 +67,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: "weekly" as const,
     priority: 0.65,
   }));
+
+  const curatedLabRoutes: MetadataRoute.Sitemap = CURATED_LAB_ARTICLES.map(
+    (a) => ({
+      url: absoluteUrl(`/labs/compare/${a.slug}`),
+      changeFrequency: "monthly" as const,
+      priority: 0.6,
+    }),
+  );
+
+  let auditRoutes: MetadataRoute.Sitemap = [];
+  try {
+    const audits = await listRecentPublicAudits(200);
+    auditRoutes = audits.map((row) => ({
+      url: absoluteUrl(`/labs/audits/${row.slug}`),
+      lastModified: row.createdAt,
+      changeFrequency: "weekly" as const,
+      priority: 0.55,
+    }));
+  } catch {
+    auditRoutes = [];
+  }
 
   try {
     const [articles, categories, authors, tags] = await Promise.all([
@@ -101,6 +127,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ...docRoutes,
       ...guideFrameworkRoutes,
       ...guideTopicRoutes,
+      ...curatedLabRoutes,
+      ...auditRoutes,
       ...categoryRoutes,
       ...authorRoutes,
       ...tagRoutes,
@@ -112,6 +140,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ...docRoutes,
       ...guideFrameworkRoutes,
       ...guideTopicRoutes,
+      ...curatedLabRoutes,
+      ...auditRoutes,
     ];
   }
 }

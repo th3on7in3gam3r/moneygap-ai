@@ -1,0 +1,53 @@
+name: MoneyGap Scan
+description: Gate pull requests on MoneyGap crawl/schema/performance-signal regressions via moneygap-scan.
+author: MoneyGap AI
+branding:
+  icon: activity
+  color: green
+
+inputs:
+  url:
+    description: Public URL for live diagnostics (npx moneygap-scan). Leave empty to run offline moneygap scan in working-directory.
+    required: false
+    default: ""
+  working-directory:
+    description: Directory for offline moneygap scan (repo root with moneygap.config or analyzable project).
+    required: false
+    default: "."
+  continue-on-error:
+    description: If true, scan failures do not fail the job (soft gate).
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+
+    - name: Live URL scan
+      if: ${{ inputs.url != '' }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      continue-on-error: ${{ inputs.continue-on-error == 'true' }}
+      run: npx --yes moneygap-scan@latest "${{ inputs.url }}"
+
+    - name: Offline project scan
+      if: ${{ inputs.url == '' }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      continue-on-error: ${{ inputs.continue-on-error == 'true' }}
+      run: |
+        set -euo pipefail
+        if [ -f packages/moneygap-cli/package.json ]; then
+          npm run build --prefix packages/moneygap-diagnostics
+          npm ci --prefix packages/moneygap-cli || npm install --prefix packages/moneygap-cli
+          npm run build --prefix packages/moneygap-cli
+          node packages/moneygap-cli/dist/index.js scan
+        else
+          npx --yes moneygap-scan@latest
+          # Offline bin after global-style install via package
+          npx --yes --package=moneygap-scan moneygap scan || npx --yes moneygap-scan
+        fi

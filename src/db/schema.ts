@@ -5039,3 +5039,28 @@ export const cliCicdWaitlist = pgTable(
 );
 
 export type CliCicdWaitlistEntry = typeof cliCicdWaitlist.$inferSelect;
+
+/** Opt-in public sandbox/CLI audit snapshots (Open Audits) — no PII */
+export const publicAuditSnapshots = pgTable(
+  "public_audit_snapshots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    slug: text("slug").notNull().unique(),
+    hostname: text("hostname").notNull(),
+    url: text("url"),
+    score: integer("score").notNull(),
+    findings: jsonb("findings").$type<unknown[]>().default([]).notNull(),
+    durationMs: integer("duration_ms"),
+    /** sandbox | cli | compare */
+    source: text("source").notNull().default("sandbox"),
+    comparePeerSlug: text("compare_peer_slug"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("public_audit_snapshots_slug_idx").on(t.slug),
+    index("public_audit_snapshots_created_idx").on(t.createdAt),
+    index("public_audit_snapshots_hostname_idx").on(t.hostname),
+  ],
+);
+
+export type PublicAuditSnapshot = typeof publicAuditSnapshots.$inferSelect;
