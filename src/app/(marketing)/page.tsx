@@ -86,10 +86,10 @@ export default function HomePage() {
               <code className="rounded bg-bg-muted px-1.5 py-0.5 font-mono text-sm text-fg">
                 npx moneygap-scan
               </code>
-              ) — then Start free to unlock Fix Paths™.
+              ) — then Start Free Trial to unlock Fix Paths™.
             </p>
             <div className="animate-rise-delay-3 mt-8 flex flex-wrap items-center gap-3">
-              <StartFreeButton label="Start free" size="lg" />
+              <StartFreeButton label="Start Free Trial" size="lg" />
               <Button href="/features" variant="secondary" size="lg">
                 Explore features
               </Button>
