@@ -57,8 +57,10 @@ export async function GET(
     }
   }
 
-  const stageLabels = ANALYSIS_STAGES.map((s) => s.label);
-  const currentIndex = stageLabels.findIndex((label) => label === analysis.stage);
+  const currentIndex = resolveAnalysisStageIndex(
+    analysis.stage,
+    analysis.progress ?? 0,
+  );
 
   return Response.json({
     id: analysis.id,
@@ -77,11 +79,10 @@ export async function GET(
         (currentIndex >= 0 && index < currentIndex);
       const active =
         analysis.status === "failed"
-          ? analysis.stage === s.label || (currentIndex === -1 && index === 0)
+          ? index === currentIndex
           : analysis.status === "queued"
             ? index === 0
-            : analysis.status === "running" &&
-              (analysis.stage === s.label || (currentIndex === -1 && index === 0));
+            : analysis.status === "running" && index === currentIndex;
 
       return {
         id: s.id,
@@ -91,4 +92,31 @@ export async function GET(
       };
     }),
   });
+}
+
+/**
+ * Map DB stage label → checklist index. Custom Money Gap heartbeats
+ * (e.g. "Running opportunity modules…") must not fall through to index 0
+ * ("Connecting to website").
+ */
+function resolveAnalysisStageIndex(stage: string, progress: number): number {
+  const byLabel = ANALYSIS_STAGES.findIndex((s) => s.label === stage);
+  if (byLabel >= 0) return byLabel;
+
+  const lower = stage.toLowerCase();
+  if (
+    lower.includes("opportunity module") ||
+    lower.includes("scoring growth roadmap") ||
+    lower.includes("crawlability") ||
+    lower.includes("saving growth roadmap") ||
+    lower.includes("growth roadmap")
+  ) {
+    return ANALYSIS_STAGES.findIndex((s) => s.id === "action_plans");
+  }
+
+  let best = 0;
+  for (let i = 0; i < ANALYSIS_STAGES.length; i++) {
+    if (ANALYSIS_STAGES[i]!.progress <= progress) best = i;
+  }
+  return best;
 }

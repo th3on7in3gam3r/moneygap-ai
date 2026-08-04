@@ -284,8 +284,7 @@ export async function runMoneyGapEngineOnly(analysisId: string) {
     scoreBreakdown: analysis.report.scoreBreakdown ?? null,
   });
 
-  await setStage(analysisId, "detecting_gaps");
-  await setStage(analysisId, "quantifying");
+  // Stay on Growth Roadmap when resuming — do not rewind UI to earlier stages.
   await setStage(analysisId, "action_plans");
 
   const result = await persistMoneyGapEngineResult({
