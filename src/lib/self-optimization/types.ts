@@ -50,6 +50,10 @@ export type SiteFilesResult = {
   sitemapOk: boolean;
   sitemapStatus: number | null;
   sitemapBody: string | null;
+  llmsOk: boolean;
+  llmsStatus: number | null;
+  llmsBody: string | null;
+  llmsValidationScore: number | null;
 };
 
 export type ScoreResult = {

@@ -16,6 +16,7 @@ Launch-ready public SaaS marketing for MoneyGap AI: explain the product, build t
 | `/docs` | Public Documentation hub (sidebar + categorized guides) |
 | `/docs/[slug]` | Customer-facing doc articles (`content/docs/*.md`) |
 | `/dashboard/badge` | Growth Badge™ generator, embed, journey |
+| `/dashboard/ai-readiness` | AI Readiness Engine™ — llms.txt validate/generate |
 | `/verify/[badgeId]` | Public Growth Badge™ verification (`MG-######`) |
 | `/report/ext/[shareId]` | Public browser-extension Growth Intelligence share |
 | `POST /api/extension/reports` | Extension report ingest (share + badge links) |

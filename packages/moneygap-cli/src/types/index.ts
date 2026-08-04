@@ -4,7 +4,8 @@ export type Category =
   | "performance"
   | "accessibility"
   | "trust"
-  | "growth";
+  | "growth"
+  | "aiReadiness";
 
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 

@@ -245,7 +245,12 @@ export async function probePages(
   return results;
 }
 
-export async function probeLlmsTxt(origin: string): Promise<{ ok: boolean; status: number | null }> {
+export async function probeLlmsTxt(origin: string): Promise<{
+  ok: boolean;
+  status: number | null;
+  body: string | null;
+  validationScore: number | null;
+}> {
   const base = origin.replace(/\/$/, "");
   try {
     const res = await fetch(`${base}/llms.txt`, {
@@ -255,8 +260,20 @@ export async function probeLlmsTxt(origin: string): Promise<{ ok: boolean; statu
       cache: "no-store",
     });
     const body = await res.text();
-    return { ok: res.ok && body.trim().length > 20, status: res.status };
+    const trimmed = body.trim();
+    const present = res.ok && trimmed.length > 20;
+    let validationScore: number | null = null;
+    if (present) {
+      const { validateLlmsFile } = await import("@/lib/ai-readiness");
+      validationScore = validateLlmsFile(body).score;
+    }
+    return {
+      ok: present && (validationScore == null || validationScore >= 40),
+      status: res.status,
+      body: present ? body : trimmed.length ? body : null,
+      validationScore,
+    };
   } catch {
-    return { ok: false, status: null };
+    return { ok: false, status: null, body: null, validationScore: null };
   }
 }

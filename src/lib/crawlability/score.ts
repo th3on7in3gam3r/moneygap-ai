@@ -550,21 +550,57 @@ export function scoreCrawlability(evidence: CrawlabilityEvidence): CrawlabilityR
 
   add(indexB, llmsTxt.ok, 6);
   if (!llmsTxt.ok) {
+    const thin =
+      llmsTxt.body &&
+      llmsTxt.validationScore != null &&
+      llmsTxt.validationScore < 40;
     findings.push(
       crawlFinding({
-        title: "Missing llms.txt (AI discoverability)",
-        problem: "/llms.txt is missing or too thin for AI crawlers.",
+        title: thin
+          ? "Weak llms.txt (AI Readiness)"
+          : "Missing llms.txt (AI discoverability)",
+        problem: thin
+          ? `/llms.txt exists but scored ${llmsTxt.validationScore}/100 on AI Readiness validation.`
+          : "/llms.txt is missing or too thin for AI crawlers.",
         whyItMatters:
           "AI systems increasingly use site-level guidance files to understand products.",
         businessImpact: "Weaker AI-assisted discovery of Money Gaps positioning and key URLs.",
-        estimatedOpportunity: 5000,
-        confidence: 50,
-        evidence: [`llms.txt status: ${llmsTxt.status ?? "unreachable"}`],
-        priority: "low",
-        fixPath: "Publish llms.txt summarizing the product and canonical public URLs.",
+        estimatedOpportunity: thin ? 8000 : 5000,
+        confidence: thin ? 62 : 50,
+        evidence: [
+          `llms.txt status: ${llmsTxt.status ?? "unreachable"}`,
+          ...(llmsTxt.validationScore != null
+            ? [`validationScore: ${llmsTxt.validationScore}`]
+            : []),
+        ],
+        priority: thin ? "medium" : "low",
+        fixPath: thin
+          ? "Improve llms.txt sections (Organization, Summary, Important URLs) via AI Readiness Engine™."
+          : "Publish llms.txt summarizing the product and canonical public URLs.",
         difficulty: "easy",
         estimatedTime: "30–90 min",
-        verificationSteps: ["GET /llms.txt returns useful plain text"],
+        verificationSteps: ["GET /llms.txt returns useful plain text", "moneygap validate llms"],
+        contributor: "indexability",
+      }),
+    );
+  } else if (
+    llmsTxt.validationScore != null &&
+    llmsTxt.validationScore < 75
+  ) {
+    findings.push(
+      crawlFinding({
+        title: "llms.txt can be improved",
+        problem: `llms.txt validation score is ${llmsTxt.validationScore}/100.`,
+        whyItMatters: "Richer guidance improves AI crawler and answer-engine grounding.",
+        businessImpact: "Missed clarity on products, docs, and canonical resources.",
+        estimatedOpportunity: 4000,
+        confidence: 55,
+        evidence: [`validationScore: ${llmsTxt.validationScore}`],
+        priority: "low",
+        fixPath: "Fill missing sections; regenerate from /dashboard/ai-readiness if needed.",
+        difficulty: "easy",
+        estimatedTime: "30–60 min",
+        verificationSteps: ["Re-check validation score ≥ 75"],
         contributor: "indexability",
       }),
     );

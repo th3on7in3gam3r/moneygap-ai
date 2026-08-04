@@ -1,5 +1,6 @@
 import { accessibilityAnalyzer } from "./accessibility.js";
 import { aeoAnalyzer } from "./aeo.js";
+import { aiReadinessAnalyzer } from "./ai-readiness.js";
 import { growthAnalyzer } from "./growth.js";
 import { performanceAnalyzer } from "./performance.js";
 import { seoAnalyzer } from "./seo.js";
@@ -13,4 +14,5 @@ export const builtinAnalyzers: Analyzer[] = [
   accessibilityAnalyzer,
   trustAnalyzer,
   growthAnalyzer,
+  aiReadinessAnalyzer,
 ];

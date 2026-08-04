@@ -15,6 +15,7 @@ const DEFAULT_WEIGHTS: Record<Category, number> = {
   accessibility: 1,
   trust: 1,
   growth: 1,
+  aiReadiness: 1,
 };
 
 export function computeCategoryScores(

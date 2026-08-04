@@ -94,6 +94,8 @@ export type RedirectHop = {
 export type LlmsTxtProbe = {
   ok: boolean;
   status: number | null;
+  body: string | null;
+  validationScore: number | null;
 };
 
 export type CrawlabilityEvidence = {

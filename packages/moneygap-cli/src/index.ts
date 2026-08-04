@@ -4,10 +4,12 @@ import { runAuth } from "./commands/auth.js";
 import { runConfig } from "./commands/config.js";
 import { runDoctor } from "./commands/doctor.js";
 import { runFix } from "./commands/fix.js";
+import { runGenerateLlms } from "./commands/generate-llms.js";
 import { runInit } from "./commands/init.js";
 import { runReport } from "./commands/report.js";
 import { runScanCommand } from "./commands/scan.js";
 import { runUpdate } from "./commands/update.js";
+import { runValidateLlms } from "./commands/validate-llms.js";
 import { runVersion } from "./commands/version.js";
 import { CLI_VERSION, EXIT } from "./utils/constants.js";
 import { resolveCwd } from "./utils/exit.js";
@@ -15,6 +17,12 @@ import { resolveCwd } from "./utils/exit.js";
 export type { MoneyGapConfig, Finding, ScanResult, Analyzer } from "./types/index.js";
 export { registerAnalyzer, registerReporter } from "./plugins/api.js";
 export { providers } from "./providers/ai.js";
+export {
+  generateLlmsFile,
+  validateLlmsFile,
+  calculateAIReadiness,
+  detectKnowledgeResources,
+} from "./ai-readiness/index.js";
 
 const program = new Command();
 
@@ -111,6 +119,34 @@ program
       validate: opts.validate,
       pathOnly: opts.path,
     });
+  });
+
+const generate = program
+  .command("generate")
+  .description("Generate project artifacts");
+generate
+  .command("llms")
+  .description("Generate public/llms.txt AI guidance file")
+  .option("--force", "Overwrite existing llms.txt")
+  .option("--out <path>", "Output path", "public/llms.txt")
+  .action(async (opts, cmd) => {
+    const root = resolveCwd(cmd.parent?.parent?.opts()?.cwd);
+    process.exitCode = await runGenerateLlms(root, {
+      force: opts.force,
+      out: opts.out,
+    });
+  });
+
+const validate = program
+  .command("validate")
+  .description("Validate project artifacts");
+validate
+  .command("llms")
+  .description("Validate llms.txt structure and quality")
+  .option("--path <file>", "Path to llms.txt")
+  .action(async (opts, cmd) => {
+    const root = resolveCwd(cmd.parent?.parent?.opts()?.cwd);
+    process.exitCode = await runValidateLlms(root, { path: opts.path });
   });
 
 program

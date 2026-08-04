@@ -44,6 +44,7 @@ export async function writeMarkdownReport(
     `| Accessibility | ${result.categoryScores.accessibility} |`,
     `| Trust | ${result.categoryScores.trust} |`,
     `| Revenue Readiness | ${result.categoryScores.growth} |`,
+    `| AI Readiness | ${result.categoryScores.aiReadiness} |`,
     ``,
     `## Findings`,
     ``,

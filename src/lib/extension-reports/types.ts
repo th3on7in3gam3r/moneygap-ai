@@ -7,6 +7,8 @@ export type ExtensionReportScores = {
   aeo?: number;
   trust?: number;
   conversion?: number;
+  /** AI Readiness health score (higher = better); optional wire field */
+  aiReadiness?: number;
 };
 
 export type ExtensionFixPathItem = {

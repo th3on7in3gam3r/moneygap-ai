@@ -12,6 +12,8 @@ Local offline scanner package: [`packages/moneygap-cli`](../packages/moneygap-cl
 
 Does **not** require the Next.js SaaS runtime, cloud login, or AI API keys for core scans.
 
+Includes **AI Readiness** (`aiReadiness` category) plus `generate llms` / `validate llms` for offline llms.txt guidance. See also [`docs/ai-readiness.md`](./ai-readiness.md).
+
 ## Quick link
 
 See package [README](../packages/moneygap-cli/README.md) and [architecture](../packages/moneygap-cli/docs/architecture.md).

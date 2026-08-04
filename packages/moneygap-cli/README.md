@@ -1,6 +1,6 @@
 # @moneygap/cli
 
-Offline developer CLI for Money Gaps™ detection: SEO, AI visibility (AEO), performance heuristics, accessibility, trust, and revenue readiness — with a MoneyGap Score™ terminal UI.
+Offline developer CLI for Money Gaps™ detection: SEO, AI visibility (AEO), **AI Readiness** (llms.txt), performance heuristics, accessibility, trust, and revenue readiness — with a MoneyGap Score™ terminal UI.
 
 **Requires Node.js 22+.** Scans are filesystem/HTML/config heuristics only (no headless Chrome / Lighthouse).
 
@@ -21,6 +21,8 @@ npm run moneygap -- scan
 moneygap init
 moneygap doctor
 moneygap scan
+moneygap generate llms
+moneygap validate llms
 moneygap report
 moneygap fix
 ```
@@ -31,6 +33,8 @@ moneygap fix
 | --- | --- |
 | `moneygap init` | Write `moneygap.config.ts` + `.moneygapignore` |
 | `moneygap scan` | Detect framework → analyzers → TUI score; write `.moneygap/last-scan.json` |
+| `moneygap generate llms` | Create `public/llms.txt` (`--force` to overwrite) |
+| `moneygap validate llms` | Validate llms.txt AI Readiness quality |
 | `moneygap doctor` | Node/config/framework/plugin smoke checks |
 | `moneygap report` | JSON / Markdown / HTML under `.moneygap/reports/` |
 | `moneygap fix` | Recommendation markdown only (`--apply` refused without `--yes`; still no auto-overwrite) |

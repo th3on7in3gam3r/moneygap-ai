@@ -39,6 +39,14 @@ Fetches npm `latest` for `@moneygap/cli`; soft-fails offline.
 
 Shows resolved config JSON, validates schema, or prints config file path.
 
+## `moneygap generate llms [--force] [--out <path>]`
+
+Writes an AI guidance `llms.txt` (default `public/llms.txt`). Refuses overwrite without `--force`.
+
+## `moneygap validate llms [--path <file>]`
+
+Validates llms.txt structure/quality (AI Readiness ruleset). Exit `1` when errors exist.
+
 ## Future (documented no-ops)
 
 `login`, `upload`, `dashboard`, `sync` — not implemented in v1.

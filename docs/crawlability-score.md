@@ -31,6 +31,8 @@ Do not mix these polarities in UX copy.
 - Redirects
 - Indexability (meta robots, X-Robots-Tag, HTTPS, AI signals, breadcrumbs)
 
+**llms.txt:** Presence and AI Readiness validation feed indexability. See [`docs/ai-readiness.md`](./ai-readiness.md).
+
 ## Surfaces
 
 1. **Self Optimization™ / Technical SEO Intelligence™** — score card on `/dashboard/self-optimization`; detailed report at `/dashboard/self-optimization/crawlability` (executive summary, breakdown, issues, trend).

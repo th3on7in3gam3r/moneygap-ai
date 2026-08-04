@@ -8,6 +8,7 @@ const CATEGORY_LABEL: Record<Category, string> = {
   accessibility: "Accessibility",
   trust: "Trust",
   growth: "Revenue",
+  aiReadiness: "AI Readiness",
 };
 
 function bar(score: number, width = 16): string {

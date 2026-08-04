@@ -7,6 +7,7 @@ export const DOCS = {
   accessibility: "https://www.moneygap-ai.com/docs",
   trust: "https://www.moneygap-ai.com/docs",
   growth: "https://www.moneygap-ai.com/docs",
+  aiReadiness: "https://www.moneygap-ai.com/docs",
 };
 
 export function finding(

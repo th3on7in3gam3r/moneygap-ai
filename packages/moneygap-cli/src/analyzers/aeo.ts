@@ -1,5 +1,3 @@
-import path from "node:path";
-import { pathExists } from "../utils/fs.js";
 import { finding } from "../rules/registry.js";
 import type { Analyzer, Finding } from "../types/index.js";
 
@@ -82,31 +80,7 @@ export const aeoAnalyzer: Analyzer = {
       );
     }
 
-    const llms = [
-      path.join(ctx.projectRoot, "public", "llms.txt"),
-      path.join(ctx.projectRoot, "llms.txt"),
-    ];
-    let hasLlms = false;
-    for (const p of llms) {
-      if (await pathExists(p)) {
-        hasLlms = true;
-        break;
-      }
-    }
-    if (!hasLlms) {
-      findings.push(
-        finding({
-          ruleId: "aeo/missing-llms-txt",
-          title: "Missing llms.txt",
-          severity: "low",
-          category: "aeo",
-          explanation: "No llms.txt guidance file for AI crawlers.",
-          recommendation: "Add public/llms.txt describing key product URLs.",
-          estimatedImpact: "Missed AI-readable site guidance.",
-        }),
-      );
-    }
-
+    // llms.txt presence/quality lives in the AI Readiness analyzer (avoid double-count)
     return findings;
   },
 };

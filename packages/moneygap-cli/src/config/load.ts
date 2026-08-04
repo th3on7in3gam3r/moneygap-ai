@@ -11,6 +11,7 @@ const categorySchema = z.enum([
   "accessibility",
   "trust",
   "growth",
+  "aiReadiness",
 ]);
 
 export const moneyGapConfigSchema = z.object({
@@ -31,6 +32,7 @@ export const moneyGapConfigSchema = z.object({
       accessibility: z.number().optional(),
       trust: z.number().optional(),
       growth: z.number().optional(),
+      aiReadiness: z.number().optional(),
     })
     .optional(),
   rules: z
@@ -120,7 +122,7 @@ const config = {
     "**/coverage/**",
     "**/.moneygap/**",
   ],
-  // weights: { seo: 1, aeo: 1, performance: 1, accessibility: 1, trust: 1, growth: 1 },
+  // weights: { seo: 1, aeo: 1, performance: 1, accessibility: 1, trust: 1, growth: 1, aiReadiness: 1 },
   // rules: { disable: [] },
 };
 

@@ -4801,3 +4801,28 @@ export const extensionReports = pgTable(
 );
 
 export type ExtensionReport = typeof extensionReports.$inferSelect;
+
+/** AI Readiness Engine™ — llms.txt version history (health guidance, not Engine scores) */
+export const aiReadinessLlmsVersions = pgTable(
+  "ai_readiness_llms_versions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    websiteId: uuid("website_id")
+      .notNull()
+      .references(() => websites.id, { onDelete: "cascade" }),
+    content: text("content").notNull(),
+    score: integer("score"),
+    rulesetVersion: text("ruleset_version"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("ai_readiness_llms_versions_workspace_idx").on(t.workspaceId),
+    index("ai_readiness_llms_versions_website_idx").on(t.websiteId),
+    index("ai_readiness_llms_versions_created_idx").on(t.createdAt),
+  ],
+);
+
+export type AiReadinessLlmsVersion = typeof aiReadinessLlmsVersions.$inferSelect;

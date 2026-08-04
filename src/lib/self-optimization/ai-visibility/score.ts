@@ -23,6 +23,50 @@ export function scoreAiVisibility(
 
   add(site.robotsOk, 10);
   add(site.sitemapOk, 12);
+  // AI Readiness — llms.txt quality (weighted into AI Visibility health)
+  const llmsQuality =
+    site.llmsOk &&
+    site.llmsValidationScore != null &&
+    site.llmsValidationScore >= 70;
+  const llmsPartial = site.llmsOk || (site.llmsValidationScore != null && site.llmsValidationScore >= 40);
+  add(llmsQuality || llmsPartial, 10);
+  if (!site.llmsOk && site.llmsValidationScore == null) {
+    findings.push({
+      category: "ai_visibility",
+      title: "Missing llms.txt guidance file",
+      problem: "No usable /llms.txt for AI crawlers and answer engines.",
+      businessImpact:
+        "Assistants lack a dedicated guidance document for organization and canonical URLs.",
+      whyItMatters:
+        "AI Readiness Engine™ treats llms.txt as a first-class discoverability signal.",
+      estimatedOpportunity: 9000,
+      estimateLabeled: "AI Estimate",
+      confidence: 68,
+      evidence: [`llms status: ${site.llmsStatus ?? "unreachable"}`],
+      fixPath:
+        "Generate llms.txt from /dashboard/ai-readiness or `moneygap generate llms`.",
+      difficulty: "easy",
+      estimatedTime: "30–90 min",
+      verificationSteps: ["GET /llms.txt", "Validation score ≥ 70"],
+    });
+  } else if (site.llmsValidationScore != null && site.llmsValidationScore < 70) {
+    findings.push({
+      category: "ai_visibility",
+      title: "Improve llms.txt quality",
+      problem: `llms.txt validation score is ${site.llmsValidationScore}/100.`,
+      businessImpact: "Incomplete AI crawler guidance reduces entity clarity.",
+      whyItMatters: "Required sections (Organization, Summary, Important URLs) improve grounding.",
+      estimatedOpportunity: 5000,
+      estimateLabeled: "AI Estimate",
+      confidence: 60,
+      evidence: [`validationScore: ${site.llmsValidationScore}`],
+      fixPath: "Fill missing sections; regenerate via AI Readiness dashboard.",
+      difficulty: "easy",
+      estimatedTime: "30–60 min",
+      verificationSteps: ["Re-validate llms.txt"],
+    });
+  }
+
   const withCanonical = pages.filter((p) => p.canonical).length;
   add(withCanonical >= Math.ceil(pages.length / 2), 10);
   const withJsonLd = pages.filter((p) => p.jsonLdTypes.length > 0);

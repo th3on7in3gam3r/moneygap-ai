@@ -1,3 +1,4 @@
+import { validateLlmsFile } from "@/lib/ai-readiness";
 import type { SiteFilesResult } from "../types";
 
 async function fetchText(
@@ -19,9 +20,10 @@ async function fetchText(
 
 export async function fetchSiteFiles(origin: string): Promise<SiteFilesResult> {
   const base = origin.replace(/\/$/, "");
-  const [robots, sitemap] = await Promise.all([
+  const [robots, sitemap, llms] = await Promise.all([
     fetchText(`${base}/robots.txt`),
     fetchText(`${base}/sitemap.xml`),
+    fetchText(`${base}/llms.txt`),
   ]);
   const sitemapAlt =
     !sitemap.ok ? await fetchText(`${base}/sitemap_index.xml`) : null;
@@ -32,6 +34,12 @@ export async function fetchSiteFiles(origin: string): Promise<SiteFilesResult> {
       ? sitemapAlt
       : sitemap;
 
+  const llmsPresent =
+    llms.ok && Boolean(llms.body?.trim()) && (llms.body?.trim().length ?? 0) > 20;
+  const llmsValidationScore = llmsPresent
+    ? validateLlmsFile(llms.body).score
+    : null;
+
   return {
     robotsOk: robots.ok && Boolean(robots.body?.trim()),
     robotsStatus: robots.status,
@@ -39,5 +47,11 @@ export async function fetchSiteFiles(origin: string): Promise<SiteFilesResult> {
     sitemapOk: sitemapFinal.ok && Boolean(sitemapFinal.body?.trim()),
     sitemapStatus: sitemapFinal.status,
     sitemapBody: sitemapFinal.body,
+    llmsOk:
+      llmsPresent &&
+      (llmsValidationScore == null || llmsValidationScore >= 40),
+    llmsStatus: llms.status,
+    llmsBody: llms.body,
+    llmsValidationScore,
   };
 }
