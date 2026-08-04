@@ -43,6 +43,22 @@ async function setStage(analysisId: string, stageId: AnalysisStageId | "complete
     .where(eq(websiteAnalyses.id, analysisId));
 }
 
+/** Heartbeat label during long Money Gap work — keeps poll UI honest without new stage ids. */
+export async function updateAnalysisStageLabel(
+  analysisId: string,
+  label: string,
+  progress?: number,
+) {
+  await db
+    .update(websiteAnalyses)
+    .set({
+      status: "running",
+      stage: label,
+      ...(progress != null ? { progress } : {}),
+    })
+    .where(eq(websiteAnalyses.id, analysisId));
+}
+
 async function failAnalysis(analysisId: string, websiteId: string, message: string) {
   const row = await db.query.websiteAnalyses.findFirst({
     where: eq(websiteAnalyses.id, analysisId),
@@ -300,6 +316,8 @@ export async function runMoneyGapEngineOnly(analysisId: string) {
 }
 
 const STALE_RUNNING_MS = 8 * 60 * 1000;
+/** Terminal fail if still not done this long after analysis creation (resume loops). */
+const RESUME_WALL_CLOCK_MS = 25 * 60 * 1000;
 
 /**
  * Resume an analysis that died after the intelligence report was saved
@@ -313,6 +331,7 @@ export async function resumeStuckAnalysis(analysisId: string) {
       status: true,
       reportId: true,
       startedAt: true,
+      createdAt: true,
       websiteId: true,
     },
   });
@@ -323,41 +342,99 @@ export async function resumeStuckAnalysis(analysisId: string) {
   if (analysis.status === "completed") {
     return { ok: true as const, reason: "already_complete" as const };
   }
+  if (analysis.status === "failed") {
+    return { ok: false as const, reason: "already_failed" as const };
+  }
+
+  const wallAge = Date.now() - analysis.createdAt.getTime();
+  if (wallAge >= RESUME_WALL_CLOCK_MS) {
+    log("warn", "analysis_resume_wall_clock_fail", {
+      analysisId,
+      wallAgeMs: wallAge,
+    });
+    await failAnalysis(
+      analysisId,
+      analysis.websiteId,
+      "Analysis timed out while building the Growth Roadmap. Retry the scan — your business intelligence draft may already be saved.",
+    );
+    return { ok: false as const, reason: "wall_clock" as const };
+  }
+
+  const report = await db.query.reports.findFirst({
+    where: eq(reports.id, analysis.reportId),
+    columns: {
+      moneyGapEngineStatus: true,
+      competitiveEngineStatus: true,
+    },
+  });
+
+  const moneyGapDone = report?.moneyGapEngineStatus === "completed";
+  const competitiveDone = report?.competitiveEngineStatus === "completed";
+
+  if (moneyGapDone && competitiveDone) {
+    log("info", "analysis_resume_engines_already_done", { analysisId });
+    await setStage(analysisId, "complete");
+    await db
+      .update(websites)
+      .set({ status: "active", updatedAt: new Date() })
+      .where(eq(websites.id, analysis.websiteId));
+    return { ok: true as const, reason: "already_engines_done" as const };
+  }
 
   log("info", "analysis_resume_stuck", {
     analysisId,
     status: analysis.status,
     reportId: analysis.reportId,
+    moneyGapDone,
+    competitiveDone,
   });
 
-  // Reset the stale clock so concurrent status polls don't spawn duplicate resumes.
-  await db
-    .update(websiteAnalyses)
-    .set({
-      status: "running",
-      stage: "Building Growth Roadmap & scoring…",
-      progress: 88,
-      startedAt: new Date(),
-      error: null,
-    })
-    .where(eq(websiteAnalyses.id, analysisId));
-
   try {
-    const moneyGap = await runMoneyGapEngineOnly(analysisId);
-    if (!moneyGap.ok) {
-      log("warn", "analysis_resume_money_gap_soft_fail", {
-        analysisId,
-        error: moneyGap.error,
-      });
+    if (!moneyGapDone) {
+      // Lease only when re-entering Money Gap Engine (heavy work).
+      await db
+        .update(websiteAnalyses)
+        .set({
+          status: "running",
+          stage: "Building Growth Roadmap & scoring…",
+          progress: 88,
+          startedAt: new Date(),
+          error: null,
+        })
+        .where(eq(websiteAnalyses.id, analysisId));
+
+      const moneyGap = await runMoneyGapEngineOnly(analysisId);
+      if (!moneyGap.ok) {
+        log("warn", "analysis_resume_money_gap_soft_fail", {
+          analysisId,
+          error: moneyGap.error,
+        });
+      }
+    } else {
+      // Money Gap finished — skip engine; take a short lease for competitive only.
+      await db
+        .update(websiteAnalyses)
+        .set({
+          status: "running",
+          stage: "Discovering competitors…",
+          progress: 91,
+          startedAt: new Date(),
+          error: null,
+        })
+        .where(eq(websiteAnalyses.id, analysisId));
     }
 
-    try {
-      await runCompetitiveIntelligenceOnly(analysisId);
-    } catch (err) {
-      log("warn", "analysis_resume_competitive_soft_fail", {
-        analysisId,
-        error: err instanceof Error ? err.message : String(err),
-      });
+    if (!competitiveDone) {
+      try {
+        await runCompetitiveIntelligenceOnly(analysisId);
+      } catch (err) {
+        log("warn", "analysis_resume_competitive_soft_fail", {
+          analysisId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        await setStage(analysisId, "complete");
+      }
+    } else if (moneyGapDone) {
       await setStage(analysisId, "complete");
     }
 

@@ -12,6 +12,9 @@ import {
   logApiRequest,
 } from "@/lib/platform";
 
+/** Match /api/analysis — pipeline continues in after() for Money Gap Engine. */
+export const maxDuration = 300;
+
 const bodySchema = z.object({
   website_url: z.string().min(1),
   industry: z.string().max(200).optional(),

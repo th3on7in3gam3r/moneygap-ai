@@ -13,6 +13,9 @@ import {
   updateOnboarding,
 } from "@/lib/onboarding";
 
+/** Match /api/analysis — Money Gap Engine often needs the full after() budget. */
+export const maxDuration = 300;
+
 const schema = z.object({
   url: z.string().min(1).optional(),
 });

@@ -1,5 +1,6 @@
 /**
  * One-off: resume a website analysis stuck after the intelligence report was saved.
+ * Skips Money Gap Engine when moneyGapEngineStatus is already completed; fails after ~25m wall clock.
  * Usage: npx tsx --env-file=.env.local scripts/resume-stuck-analysis.ts <analysisId>
  */
 import { resumeStuckAnalysis } from "../src/lib/analysis/pipeline";

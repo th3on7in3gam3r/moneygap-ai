@@ -67,27 +67,34 @@ export async function runIntelligenceModule(
   client: OpenAI,
   model: string,
 ): Promise<MoneyGapFinding[]> {
+  const MODULE_TIMEOUT_MS = 90_000;
   const response = await withRetry(
     () =>
-      client.responses.create({
-        model,
-        instructions: buildModuleInstructions(def, ctx.kgContext),
-        input: `Website: ${ctx.url} (${ctx.domain})
+      client.responses.create(
+        {
+          model,
+          instructions: buildModuleInstructions(def, ctx.kgContext),
+          input: `Website: ${ctx.url} (${ctx.domain})
 
 Business intelligence JSON:
 ${JSON.stringify(ctx.intelligence)}
 
 Crawled website content (excerpt):
 ${ctx.corpus.slice(0, 45000)}`,
-        text: {
-          format: {
-            type: "json_schema",
-            name: `moneygap_${def.id}_module`,
-            strict: true,
-            schema: moduleOutputSchema,
+          text: {
+            format: {
+              type: "json_schema",
+              name: `moneygap_${def.id}_module`,
+              strict: true,
+              schema: moduleOutputSchema,
+            },
           },
         },
-      }),
+        {
+          timeout: MODULE_TIMEOUT_MS,
+          signal: AbortSignal.timeout(MODULE_TIMEOUT_MS),
+        },
+      ),
     { attempts: 3, label: `openai_module_${def.id}` },
   );
 

@@ -22,7 +22,7 @@ When a founder sees a MoneyGap problem and asks **how to fix it**, present clear
 | --- | --- | --- |
 | `action_assets` | Build with Action Center | Build This For Me / asset drafts |
 | `checklist` | Manual checklist / project | Checklist drawer + Action Project |
-| `developer_ai` | Code + AI (Cursor / Claude / …) | IDE Prompt page (`/dashboard/ide-prompt`) — copy prompts; Developer Mode secondary |
+| `developer_ai` | Code + AI (Cursor / Claude / …) | IDE Prompt (`/dashboard/ide-prompt`) — prompts + FixFlow™ proposals; Developer Mode secondary |
 | `automation` | Automation workflow | Automation Studio workflow generate |
 | `integrations` | Connect tools (Hub) | Integration Hub |
 | `advisor` | Ask Growth Advisor | Report Advisor handoff |
@@ -32,13 +32,14 @@ When a founder sees a MoneyGap problem and asks **how to fix it**, present clear
 - `src/lib/fix-paths/` — catalog + recommend
 - UI: `opportunity-action-center.tsx` How to fix section
 - Automation page reads `?opportunityId=` for generate CTA
-- Code + AI → `/dashboard/ide-prompt` (IDE prompts); Developer Mode remains for plans / draft PRs
+- Code + AI → `/dashboard/ide-prompt` (IDE prompts + FixFlow™ proposals); Developer Mode remains for plans / draft PRs
 
 ## Related
 
 - [`growth-advisor.md`](./growth-advisor.md)
 - [`growth-copilot.md`](./growth-copilot.md) — Phase 19 may hint Fix Paths from Copilot replies
 - [`developer-mode.md`](./developer-mode.md)
+- [`fixflow.md`](./fixflow.md) — FixFlow™ turns opportunities into approved fix proposals (not Action Center assets; not Developer Hub™ API keys)
 - [`automation-engine.md`](./automation-engine.md)
 - [`integration-hub.md`](./integration-hub.md)
 

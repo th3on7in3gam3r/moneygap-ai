@@ -3,6 +3,7 @@ import { db } from "@/db";
 import {
   moneyGapOpportunities,
   reports,
+  websiteAnalyses,
   websiteClassifications,
   type ConfidenceIntelJson,
   type CrawlabilityReportSnapshot,
@@ -71,7 +72,24 @@ export async function persistMoneyGapEngineResult(input: {
   intelligence: IntelligenceResult;
   corpus: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
+  const heartbeat = async (label: string, progress?: number) => {
+    try {
+      await db
+        .update(websiteAnalyses)
+        .set({
+          status: "running",
+          stage: label,
+          ...(progress != null ? { progress } : {}),
+        })
+        .where(eq(websiteAnalyses.id, input.analysisId));
+    } catch {
+      /* soft-fail heartbeat */
+    }
+  };
+
   try {
+    await heartbeat("Running opportunity modules…", 88);
+
     let kgContext: string | undefined;
     try {
       await ensureKnowledgeCatalog();
@@ -107,9 +125,12 @@ export async function persistMoneyGapEngineResult(input: {
       kgContext,
     });
 
+    await heartbeat("Scoring Growth Roadmap…", 89);
+
     let crawlabilitySnapshot: CrawlabilityReportSnapshot | null = null;
     let crawlabilityGaps: ReturnType<typeof crawlabilityFindingsToMoneyGaps> = [];
     try {
+      await heartbeat("Checking crawlability & privacy…", 90);
       const reportMeta = await db.query.reports.findFirst({
         where: eq(reports.id, input.reportId),
         columns: { workspaceId: true, websiteId: true },
@@ -376,6 +397,8 @@ export async function persistMoneyGapEngineResult(input: {
         });
       }
     }
+
+    await heartbeat("Saving Growth Roadmap & opportunities…", 90);
 
     await db
       .update(reports)

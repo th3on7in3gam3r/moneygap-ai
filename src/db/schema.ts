@@ -2885,6 +2885,101 @@ export type DeveloperBlueprint = typeof developerBlueprints.$inferSelect;
 export type DeveloperPrDraft = typeof developerPrDrafts.$inferSelect;
 export type DeveloperAuditLog = typeof developerAuditLogs.$inferSelect;
 
+/** MoneyGap FixFlow™ — reviewable fix proposals (Phase 1 foundation). */
+export type FixflowProposalStatus =
+  | "draft"
+  | "approved"
+  | "rejected"
+  | "ready_for_pr";
+
+export type FixflowProposalJson = {
+  issue: string;
+  issueDetail: string;
+  impact: string;
+  framework: string;
+  filesAffected: string[];
+  recommendedChange: string;
+  codeExample: string;
+  expectedImprovement: string;
+  change: {
+    summary: string;
+    filesCreate: string[];
+    filesUpdate: string[];
+    riskLevel: "low" | "medium" | "high";
+    riskSummary: string;
+    validationChecklist: string[];
+    testingSteps: string[];
+    rollbackSteps: string[];
+  };
+  explanation: string;
+  moduleId?: string | null;
+  category?: string | null;
+};
+
+export const fixflowProposals = pgTable(
+  "fixflow_proposals",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    opportunityId: uuid("opportunity_id").references(() => moneyGapOpportunities.id, {
+      onDelete: "set null",
+    }),
+    reportId: uuid("report_id").references(() => reports.id, {
+      onDelete: "set null",
+    }),
+    repoId: uuid("repo_id").references(() => developerRepos.id, {
+      onDelete: "set null",
+    }),
+    planId: uuid("plan_id").references(() => developerImplementationPlans.id, {
+      onDelete: "set null",
+    }),
+    title: text("title").notNull(),
+    status: text("status")
+      .$type<FixflowProposalStatus>()
+      .notNull()
+      .default("draft"),
+    proposal: jsonb("proposal").$type<FixflowProposalJson>().notNull(),
+    diffPreview: jsonb("diff_preview").$type<Record<string, unknown> | null>(),
+    approvedByUserId: text("approved_by_user_id"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    createdByUserId: text("created_by_user_id"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("fixflow_proposals_workspace_idx").on(t.workspaceId),
+    index("fixflow_proposals_opportunity_idx").on(t.opportunityId),
+    index("fixflow_proposals_status_idx").on(t.status),
+  ],
+);
+
+export type FixflowProposal = typeof fixflowProposals.$inferSelect;
+
+export const fixflowProposalsRelations = relations(fixflowProposals, ({ one }) => ({
+  workspace: one(workspaces, {
+    fields: [fixflowProposals.workspaceId],
+    references: [workspaces.id],
+  }),
+  opportunity: one(moneyGapOpportunities, {
+    fields: [fixflowProposals.opportunityId],
+    references: [moneyGapOpportunities.id],
+  }),
+  report: one(reports, {
+    fields: [fixflowProposals.reportId],
+    references: [reports.id],
+  }),
+  repo: one(developerRepos, {
+    fields: [fixflowProposals.repoId],
+    references: [developerRepos.id],
+  }),
+  plan: one(developerImplementationPlans, {
+    fields: [fixflowProposals.planId],
+    references: [developerImplementationPlans.id],
+  }),
+}));
+
 export const developerReposRelations = relations(developerRepos, ({ one }) => ({
   workspace: one(workspaces, {
     fields: [developerRepos.workspaceId],

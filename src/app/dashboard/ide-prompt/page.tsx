@@ -8,6 +8,7 @@ import {
   EstimateBadge,
   FixPlan,
 } from "@/components/money-gap/opportunity-card";
+import { FixflowProposalPanel } from "@/components/fixflow/fixflow-proposal-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -314,6 +315,8 @@ export default function IdePromptPage() {
               ) : null}
             </CardBody>
           </Card>
+
+          <FixflowProposalPanel opportunityId={data.opportunity.id} />
 
           <div className="grid items-start gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
             <Card>
