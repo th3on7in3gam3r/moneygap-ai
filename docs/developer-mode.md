@@ -58,6 +58,7 @@ MoneyGap AI becomes an **AI Engineering Partner**: understand the user’s techn
 - [`project-memory.md`](./project-memory.md)
 - [`integration-hub.md`](./integration-hub.md)
 - [`fix-paths.md`](./fix-paths.md) — Phase 18 “Code + AI” → IDE Prompt page; Developer Mode for plans / PRs
+- [`moneygap-cli.md`](./moneygap-cli.md) — offline `@moneygap/cli` local scanner (separate from in-app Developer Mode™)
 
 ## Future expansion
 

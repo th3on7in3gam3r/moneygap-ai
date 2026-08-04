@@ -55,3 +55,4 @@ Public guides live in `content/docs/` and are cataloged in `src/lib/docs/catalog
 ## Related
 
 - `docs/seo-intelligence.md`, `docs/crawlability-score.md`, `docs/scoring-system.md`
+- `docs/moneygap-cli.md` — offline `@moneygap/cli` developer scanner (not a public marketing route)
