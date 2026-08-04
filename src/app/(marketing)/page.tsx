@@ -72,16 +72,7 @@ export default function HomePage() {
   return (
     <>
       <section className="relative overflow-hidden bg-hero">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url(/hero-ribbons-bg.webp)" }}
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-bg/55 via-bg/35 to-bg/70"
-        />
-        <div className="pointer-events-none absolute inset-0 bg-grid opacity-40" />
+        <div className="pointer-events-none absolute inset-0 bg-grid" />
         <div className="relative mx-auto grid max-w-6xl gap-12 px-5 pb-20 pt-16 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:pb-28 lg:pt-24">
           <div>
             <p className="animate-rise font-display text-5xl font-semibold tracking-tight text-fg sm:text-6xl lg:text-[4.25rem] lg:leading-[1.02]">
