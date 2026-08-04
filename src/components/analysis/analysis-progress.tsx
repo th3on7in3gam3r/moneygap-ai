@@ -1,7 +1,14 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { AlertCircle, CheckCircle2, Loader2, RotateCcw } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
+  RotateCcw,
+  Square,
+  Trash2,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -37,6 +44,7 @@ export function AnalysisProgress({
   eyebrow = "Website intelligence",
   onTryAnotherUrl,
   onRetry,
+  onStopped,
 }: {
   analysisId: string;
   onComplete?: (reportId: string) => void;
@@ -46,10 +54,13 @@ export function AnalysisProgress({
   /** When set (e.g. onboarding), stays in-flow instead of navigating to /dashboard/analyze */
   onTryAnotherUrl?: () => void;
   onRetry?: () => void;
+  /** Called after a successful Stop (analysis marked failed). */
+  onStopped?: () => void;
 }) {
   const router = useRouter();
   const [data, setData] = useState<StatusPayload | null>(null);
   const [pollError, setPollError] = useState<string | null>(null);
+  const [stopping, setStopping] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,6 +118,37 @@ export function AnalysisProgress({
 
   const progress = data?.progress ?? 4;
   const failed = data?.status === "failed";
+  const running =
+    data?.status === "running" || data?.status === "queued" || !data;
+
+  async function stopScan() {
+    setStopping(true);
+    setPollError(null);
+    try {
+      const res = await fetch(`/api/analysis/${analysisId}/cancel`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setPollError(body.error ?? "Could not stop scan.");
+        return;
+      }
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "failed",
+              stage: "Failed",
+              error:
+                "Scan stopped. You can retry this site or enter a different URL.",
+            }
+          : prev,
+      );
+      onStopped?.();
+    } finally {
+      setStopping(false);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -172,6 +214,63 @@ export function AnalysisProgress({
           {pollError && !failed && (
             <p className="text-sm text-fg-muted">{pollError}</p>
           )}
+
+          {running && !failed ? (
+            <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={stopping}
+                onClick={() => void stopScan()}
+              >
+                <Square className="h-3.5 w-3.5" />
+                {stopping ? "Stopping…" : "Stop scan"}
+              </Button>
+              {onTryAnotherUrl ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={stopping}
+                  onClick={() => {
+                    void (async () => {
+                      await stopScan();
+                      onTryAnotherUrl();
+                    })();
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Change URL
+                </Button>
+              ) : (
+                <Button
+                  href="/dashboard/analyze"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void stopScan()}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Change URL
+                </Button>
+              )}
+              {onRetry ? (
+                <button
+                  type="button"
+                  disabled={stopping}
+                  onClick={() => {
+                    void (async () => {
+                      await stopScan();
+                      onRetry();
+                    })();
+                  }}
+                  className="inline-flex h-9 items-center rounded-xl px-3.5 text-sm text-fg-muted hover:text-fg disabled:opacity-50"
+                >
+                  Reset &amp; retry
+                </button>
+              ) : null}
+            </div>
+          ) : null}
 
           {failed && (
             <div className="space-y-4 rounded-xl border border-danger/30 bg-danger-soft px-4 py-4">

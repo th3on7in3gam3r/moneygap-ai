@@ -45,15 +45,20 @@ export async function GET(
         console.error("Stuck analysis resume failed:", err);
       });
     });
-  } else if (stale && !analysis.reportId) {
-    // Hung during crawl / early pipeline with no report to resume — fail so UI can retry.
-    await failStalePreReportAnalysis(id);
-    analysis = await db.query.websiteAnalyses.findFirst({
-      where: and(eq(websiteAnalyses.id, id), eq(websiteAnalyses.userId, userId)),
-      with: { website: true },
-    });
-    if (!analysis) {
-      return Response.json({ error: "Analysis not found." }, { status: 404 });
+  } else if (
+    !analysis.reportId &&
+    (analysis.status === "running" || analysis.status === "queued")
+  ) {
+    // Hung during crawl / Reading pages — fail after ~3m so UI unlocks.
+    const failedStale = await failStalePreReportAnalysis(id);
+    if (failedStale.ok) {
+      analysis = await db.query.websiteAnalyses.findFirst({
+        where: and(eq(websiteAnalyses.id, id), eq(websiteAnalyses.userId, userId)),
+        with: { website: true },
+      });
+      if (!analysis) {
+        return Response.json({ error: "Analysis not found." }, { status: 404 });
+      }
     }
   }
 

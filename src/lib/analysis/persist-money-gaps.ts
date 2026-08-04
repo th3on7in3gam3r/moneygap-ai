@@ -74,6 +74,13 @@ export async function persistMoneyGapEngineResult(input: {
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const heartbeat = async (label: string, progress?: number) => {
     try {
+      const current = await db.query.websiteAnalyses.findFirst({
+        where: eq(websiteAnalyses.id, input.analysisId),
+        columns: { status: true },
+      });
+      if (current?.status === "failed" || current?.status === "completed") {
+        return;
+      }
       await db
         .update(websiteAnalyses)
         .set({

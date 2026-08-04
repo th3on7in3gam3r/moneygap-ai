@@ -27,6 +27,15 @@ import { trackProductMetric } from "@/lib/observability/metrics";
 import { MONEYGAP_ENGINE_VERSION, TRUST_ENGINE_VERSION } from "@/lib/trust";
 
 async function setStage(analysisId: string, stageId: AnalysisStageId | "complete") {
+  const current = await db.query.websiteAnalyses.findFirst({
+    where: eq(websiteAnalyses.id, analysisId),
+    columns: { status: true },
+  });
+  // Do not revive a user-stopped or failed analysis.
+  if (current?.status === "failed" || current?.status === "completed") {
+    return;
+  }
+
   const stage =
     stageId === "complete"
       ? { id: "complete", label: "Complete", progress: 100 }
@@ -49,6 +58,14 @@ export async function updateAnalysisStageLabel(
   label: string,
   progress?: number,
 ) {
+  const current = await db.query.websiteAnalyses.findFirst({
+    where: eq(websiteAnalyses.id, analysisId),
+    columns: { status: true },
+  });
+  if (current?.status === "failed" || current?.status === "completed") {
+    return;
+  }
+
   await db
     .update(websiteAnalyses)
     .set({
@@ -85,6 +102,42 @@ async function failAnalysis(analysisId: string, websiteId: string, message: stri
     .where(eq(websites.id, websiteId));
 }
 
+export const ANALYSIS_CANCELLED_ERROR =
+  "Scan stopped. You can retry this site or enter a different URL.";
+
+/** User-initiated stop — marks failed so the UI unlocks (pipeline setStage will no-op). */
+export async function cancelRunningAnalysis(input: {
+  analysisId: string;
+  userId: string;
+}) {
+  const analysis = await db.query.websiteAnalyses.findFirst({
+    where: eq(websiteAnalyses.id, input.analysisId),
+    columns: {
+      id: true,
+      userId: true,
+      websiteId: true,
+      status: true,
+    },
+  });
+  if (!analysis || analysis.userId !== input.userId) {
+    return { ok: false as const, reason: "not_found" as const };
+  }
+  if (analysis.status === "completed") {
+    return { ok: false as const, reason: "already_complete" as const };
+  }
+  if (analysis.status === "failed") {
+    return { ok: true as const, reason: "already_failed" as const };
+  }
+
+  await failAnalysis(
+    analysis.id,
+    analysis.websiteId,
+    ANALYSIS_CANCELLED_ERROR,
+  );
+  log("info", "analysis_cancelled_by_user", { analysisId: analysis.id });
+  return { ok: true as const, reason: "cancelled" as const };
+}
+
 /** Fail a stale run that never produced a report (hung crawl / killed serverless). */
 export async function failStalePreReportAnalysis(analysisId: string) {
   const analysis = await db.query.websiteAnalyses.findFirst({
@@ -106,7 +159,7 @@ export async function failStalePreReportAnalysis(analysisId: string) {
   }
 
   const clock = analysis.startedAt ?? analysis.createdAt;
-  if (Date.now() - clock.getTime() < STALE_RUNNING_MS) {
+  if (Date.now() - clock.getTime() < PRE_REPORT_STALE_MS) {
     return { ok: false as const, reason: "too_fresh" as const };
   }
 
@@ -315,6 +368,8 @@ export async function runMoneyGapEngineOnly(analysisId: string) {
 }
 
 const STALE_RUNNING_MS = 8 * 60 * 1000;
+/** Pre-report crawl (Reading pages) should fail sooner than full engine stale. */
+const PRE_REPORT_STALE_MS = 3 * 60 * 1000;
 /** Terminal fail if still not done this long after analysis creation (resume loops). */
 const RESUME_WALL_CLOCK_MS = 25 * 60 * 1000;
 
@@ -609,6 +664,15 @@ export async function runAnalysisPipeline(analysisId: string) {
 
     await setStage(analysisId, "reading");
     const pages = await crawlWebsite(analysis.url);
+
+    const afterCrawl = await db.query.websiteAnalyses.findFirst({
+      where: eq(websiteAnalyses.id, analysisId),
+      columns: { status: true },
+    });
+    if (afterCrawl?.status === "failed") {
+      log("info", "analysis_aborted_after_crawl", { analysisId });
+      return;
+    }
 
     await db.delete(websitePages).where(eq(websitePages.analysisId, analysisId));
     await db.insert(websitePages).values(
