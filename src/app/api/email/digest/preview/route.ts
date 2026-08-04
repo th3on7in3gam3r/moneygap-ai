@@ -45,6 +45,19 @@ export async function POST(req: Request) {
         forceUserId: userId,
         forceWorkspaceId: workspace.id,
       });
+      const failed = result.results.find((r) => r.status === "failed");
+      if (failed) {
+        return Response.json(
+          {
+            ok: false,
+            sent: false,
+            error: failed.reason ?? "Email send failed.",
+            subject: rendered.subject,
+            result,
+          },
+          { status: 502 },
+        );
+      }
       return Response.json({
         ok: true,
         sent: true,

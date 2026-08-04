@@ -26,6 +26,16 @@ services:
         value: gpt-4o
       - key: CRON_SECRET
         generateValue: true
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: CONTACT_FROM_EMAIL
+        sync: false
+      - key: EMAIL_PROVIDER
+        value: resend
+      - key: RESEND_WEBHOOK_SECRET
+        sync: false
 
   - type: cron
     name: moneygap-monitor

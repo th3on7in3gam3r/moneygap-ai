@@ -61,10 +61,15 @@ Optional: `RESEND_WEBHOOK_SECRET`.
 
 ## Env
 
-- `RESEND_API_KEY`
-- `EMAIL_FROM` or `CONTACT_FROM_EMAIL`
+- `RESEND_API_KEY` — **required** for sends (host Dashboard → Environment on the MoneyGap web service). Without it, deliveries are logged as `failed` with `RESEND_API_KEY is not configured.`
+- `EMAIL_FROM` or `CONTACT_FROM_EMAIL` — verified domain From, e.g. `MoneyGap AI <hello@moneygap-ai.com>`
 - `EMAIL_PROVIDER=resend` (default)
 - `CRON_SECRET`, `APP_URL` / `NEXT_PUBLIC_APP_URL`
+- Optional: `RESEND_WEBHOOK_SECRET` — Svix signing secret from Resend webhooks (**not** the `re_…` API key)
+
+Blueprint (`render.yaml`) declares `RESEND_API_KEY`, `EMAIL_FROM`, and related keys as `sync: false` so they can be filled in the dashboard.
+
+After setting keys on the production host, redeploy/restart the web service, then use Email Center → **Send test to me**.
 
 ## Extension points
 

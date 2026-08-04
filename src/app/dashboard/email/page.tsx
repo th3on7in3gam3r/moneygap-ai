@@ -25,6 +25,7 @@ type Delivery = {
   status: string;
   sentAt: string | null;
   createdAt: string;
+  meta?: { error?: string } | null;
 };
 
 export default function EmailCenterPage() {
@@ -87,12 +88,12 @@ export default function EmailCenterPage() {
     });
     setBusy(false);
     const data = (await res.json()) as { ok?: boolean; error?: string };
+    void refresh();
     if (!res.ok || !data.ok) {
       setToast(makeFlashToast(data.error ?? "Send failed", "error"));
       return;
     }
     setToast(makeFlashToast("Test digest sent to your email", "success"));
-    void refresh();
   }
 
   return (
@@ -183,19 +184,41 @@ export default function EmailCenterPage() {
             <p className="text-sm text-fg-muted">No emails sent yet.</p>
           ) : (
             <ul className="divide-y divide-border">
-              {deliveries.map((d) => (
-                <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
-                  <div>
-                    <p className="font-medium text-fg">{d.subject}</p>
-                    <p className="text-xs text-fg-muted">
-                      {d.channel} · {d.templateKey}
-                    </p>
-                  </div>
-                  <span className="rounded-lg bg-bg-muted px-2 py-1 text-xs text-fg-muted">
-                    {d.status}
-                  </span>
-                </li>
-              ))}
+              {deliveries.map((d) => {
+                const errorMsg =
+                  typeof d.meta?.error === "string" ? d.meta.error : null;
+                return (
+                  <li
+                    key={d.id}
+                    className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-fg">{d.subject}</p>
+                      <p className="text-xs text-fg-muted">
+                        {d.channel} · {d.templateKey}
+                      </p>
+                      {d.status === "failed" && errorMsg ? (
+                        <p className="mt-1 text-xs text-danger" title={errorMsg}>
+                          {errorMsg.length > 120
+                            ? `${errorMsg.slice(0, 120)}…`
+                            : errorMsg}
+                        </p>
+                      ) : null}
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-lg px-2 py-1 text-xs ${
+                        d.status === "failed"
+                          ? "bg-danger-soft text-danger"
+                          : d.status === "sent"
+                            ? "bg-accent-soft text-accent"
+                            : "bg-bg-muted text-fg-muted"
+                      }`}
+                    >
+                      {d.status}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </CardBody>
