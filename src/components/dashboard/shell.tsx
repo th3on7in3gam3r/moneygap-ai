@@ -9,6 +9,7 @@ import {
   Gauge,
   Globe2,
   LayoutDashboard,
+  Mail,
   Menu,
   ScanSearch,
   Settings,
@@ -54,6 +55,7 @@ function buildNav(isAgency: boolean, isClient: boolean) {
     { href: "/dashboard/badge", label: "Growth Badge", icon: Award },
     { href: "/dashboard/ai-readiness", label: "AI Readiness", icon: Bot },
     { href: "/dashboard/academy", label: "Growth Academy", icon: BookOpen },
+    { href: "/dashboard/email", label: "Email Center", icon: Mail },
   ];
   if (isAgency) {
     items.push({ href: "/dashboard/clients", label: "Clients", icon: Users });

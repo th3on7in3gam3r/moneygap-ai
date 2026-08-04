@@ -655,6 +655,25 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <div>
+            <h2 className="font-display text-lg font-semibold">Email &amp; Growth Digest™</h2>
+            <p className="mt-1 text-sm text-fg-muted">
+              Weekly digest frequency, channel opt-ins, and Email Center.
+            </p>
+          </div>
+        </CardHeader>
+        <CardBody className="flex flex-wrap gap-2">
+          <Button type="button" size="sm" href="/dashboard/settings/email">
+            Email preferences
+          </Button>
+          <Button type="button" size="sm" variant="secondary" href="/dashboard/email">
+            Email Center
+          </Button>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div>
             <h2 className="font-display text-lg font-semibold">Account</h2>
             <p className="mt-1 text-xs text-fg-muted">
               Profile, email, connected accounts, and security.

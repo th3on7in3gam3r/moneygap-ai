@@ -92,6 +92,13 @@ export const PUBLIC_DOC_CATALOG: PublicDocEntry[] = [
     category: "grow",
     order: 10,
   },
+  {
+    slug: "programmatic-fix-paths",
+    title: "Programmatic Fix Paths™",
+    summary: "CLI, API, and CI-oriented ways to close top Money Gaps™.",
+    category: "platform",
+    order: 11,
+  },
 ];
 
 export function listPublicDocs(category?: string | null): PublicDocEntry[] {

@@ -4938,3 +4938,104 @@ export const extensionWaitlist = pgTable(
 );
 
 export type ExtensionWaitlistEntry = typeof extensionWaitlist.$inferSelect;
+
+/** MoneyGap Growth Digest™ + email channel preferences (per user) */
+export const emailPreferences = pgTable(
+  "email_preferences",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" })
+      .unique(),
+    email: text("email").notNull(),
+    timezone: text("timezone").notNull().default("UTC"),
+    weeklyGrowthDigest: boolean("weekly_growth_digest").notNull().default(true),
+    aiReadinessUpdates: boolean("ai_readiness_updates").notNull().default(false),
+    developerTips: boolean("developer_tips").notNull().default(false),
+    productUpdates: boolean("product_updates").notNull().default(false),
+    securityNotifications: boolean("security_notifications").notNull().default(true),
+    monthlyProductSummary: boolean("monthly_product_summary").notNull().default(false),
+    /** weekly | biweekly | monthly | off */
+    digestFrequency: text("digest_frequency").notNull().default("weekly"),
+    unsubscribeToken: text("unsubscribe_token").notNull().unique(),
+    lastDigestSentAt: timestamp("last_digest_sent_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("email_preferences_user_idx").on(t.userId),
+    index("email_preferences_token_idx").on(t.unsubscribeToken),
+  ],
+);
+
+export type EmailPreference = typeof emailPreferences.$inferSelect;
+
+export const emailDeliveries = pgTable(
+  "email_deliveries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    workspaceId: uuid("workspace_id").references(() => workspaces.id, {
+      onDelete: "set null",
+    }),
+    channel: text("channel").notNull(),
+    templateKey: text("template_key").notNull(),
+    toEmail: text("to_email").notNull(),
+    provider: text("provider").notNull().default("resend"),
+    providerMessageId: text("provider_message_id"),
+    /** queued | sent | failed | bounced | complained */
+    status: text("status").notNull().default("queued"),
+    idempotencyKey: text("idempotency_key").notNull().unique(),
+    subject: text("subject").notNull(),
+    meta: jsonb("meta").$type<Record<string, unknown>>().default({}).notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("email_deliveries_user_idx").on(t.userId),
+    index("email_deliveries_status_idx").on(t.status),
+    index("email_deliveries_created_idx").on(t.createdAt),
+    index("email_deliveries_provider_msg_idx").on(t.providerMessageId),
+  ],
+);
+
+export type EmailDelivery = typeof emailDeliveries.$inferSelect;
+
+export const emailEvents = pgTable(
+  "email_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    deliveryId: uuid("delivery_id")
+      .notNull()
+      .references(() => emailDeliveries.id, { onDelete: "cascade" }),
+    /** delivered | opened | clicked | bounced | unsubscribed | complained */
+    type: text("type").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().default({}).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("email_events_delivery_idx").on(t.deliveryId),
+    index("email_events_type_idx").on(t.type),
+    index("email_events_created_idx").on(t.createdAt),
+  ],
+);
+
+export type EmailEvent = typeof emailEvents.$inferSelect;
+
+/** Waitlist for MoneyGap CLI CI/CD pipeline integration */
+export const cliCicdWaitlist = pgTable(
+  "cli_cicd_waitlist",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    email: text("email").notNull().unique(),
+    source: text("source").notNull().default("cli_page"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("cli_cicd_waitlist_email_idx").on(t.email),
+    index("cli_cicd_waitlist_created_idx").on(t.createdAt),
+  ],
+);
+
+export type CliCicdWaitlistEntry = typeof cliCicdWaitlist.$inferSelect;

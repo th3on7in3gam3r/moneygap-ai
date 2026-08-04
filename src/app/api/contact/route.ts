@@ -1,4 +1,5 @@
 import { log } from "@/lib/observability/logger";
+import { sendEmail } from "@/lib/email/services/send";
 
 export const runtime = "nodejs";
 
@@ -54,34 +55,17 @@ export async function POST(req: Request) {
     message,
   ].join("\n");
 
-  const apiKey = process.env.RESEND_API_KEY?.trim();
   let emailed = false;
-
-  if (apiKey) {
-    try {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: process.env.CONTACT_FROM_EMAIL?.trim() || "MoneyGap AI <onboarding@resend.dev>",
-          to: [to],
-          reply_to: email,
-          subject,
-          text,
-        }),
-      });
-      emailed = res.ok;
-      if (!res.ok) {
-        const detail = await res.text();
-        log("warn", "contact_email_failed", { status: res.status, detail: detail.slice(0, 200) });
-      }
-    } catch (err) {
-      log("warn", "contact_email_error", {
-        error: err instanceof Error ? err.message : String(err),
-      });
+  if (process.env.RESEND_API_KEY?.trim()) {
+    const result = await sendEmail({
+      to,
+      replyTo: email,
+      subject,
+      text,
+    });
+    emailed = result.ok;
+    if (!result.ok) {
+      log("warn", "contact_email_failed", { error: result.error?.slice(0, 200) });
     }
   }
 

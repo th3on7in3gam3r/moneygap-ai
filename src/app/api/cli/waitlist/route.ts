@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { db } from "@/db";
-import { extensionWaitlist } from "@/db/schema";
+import { cliCicdWaitlist } from "@/db/schema";
 import { sendEmail } from "@/lib/email/services/send";
+import { renderCliWaitlistConfirm } from "@/lib/email/templates/cli-waitlist";
 import { log } from "@/lib/observability/logger";
 
 export const runtime = "nodejs";
@@ -9,9 +10,9 @@ export const runtime = "nodejs";
 const bodySchema = z.object({
   email: z.string().email().max(200),
   source: z
-    .enum(["extension_page", "share", "features", "home", "docs"])
+    .enum(["cli_page", "docs", "home", "developers"])
     .optional()
-    .default("extension_page"),
+    .default("cli_page"),
 });
 
 export async function POST(req: Request) {
@@ -24,40 +25,41 @@ export async function POST(req: Request) {
   const source = parsed.data.source;
 
   try {
-    await db.insert(extensionWaitlist).values({ email, source });
+    await db.insert(cliCicdWaitlist).values({ email, source });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    // Unique violation → soft-success (already on list)
     if (/unique|duplicate/i.test(msg)) {
-      log("info", "extension_waitlist_duplicate", { email, source });
       return Response.json({
         ok: true,
         alreadySubscribed: true,
-        message: "You’re already on the list — we’ll email you when the extension ships.",
+        message: "You’re already on the CLI CI/CD waitlist.",
       });
     }
-    log("warn", "extension_waitlist_insert_failed", { error: msg.slice(0, 200) });
+    log("warn", "cli_waitlist_insert_failed", { error: msg.slice(0, 200) });
     return Response.json(
       { ok: false, error: "Could not join the waitlist. Try again shortly." },
       { status: 500 },
     );
   }
 
-  const notify = await sendEmail({
-    to: "support@moneygap-ai.com",
-    subject: `[Extension waitlist] ${email}`,
-    text: `New browser extension waitlist signup\nEmail: ${email}\nSource: ${source}`,
+  const confirm = renderCliWaitlistConfirm(email);
+  await sendEmail({
+    to: email,
+    subject: confirm.subject,
+    html: confirm.html,
+    text: confirm.text,
   });
-  if (!notify.ok) {
-    log("warn", "extension_waitlist_notify_failed", {
-      error: notify.error?.slice(0, 200) ?? "send_failed",
-    });
-  }
 
-  log("info", "extension_waitlist_joined", { email, source });
+  await sendEmail({
+    to: "support@moneygap-ai.com",
+    subject: `[CLI CI waitlist] ${email}`,
+    text: `New CLI CI/CD waitlist signup\nEmail: ${email}\nSource: ${source}`,
+  });
+
+  log("info", "cli_waitlist_joined", { email, source });
   return Response.json({
     ok: true,
     alreadySubscribed: false,
-    message: "You’re on the list. We’ll notify you when the Chrome extension is ready.",
+    message: "You’re on the list — check your inbox for a confirmation.",
   });
 }

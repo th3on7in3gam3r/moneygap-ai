@@ -89,3 +89,24 @@ services:
           name: moneygap-ai
           type: web
           envVarKey: RENDER_EXTERNAL_URL
+
+  - type: cron
+    name: moneygap-growth-digest
+    runtime: node
+    plan: starter
+    schedule: "0 14 * * *" # daily 14:00 UTC — evaluates weekly/biweekly/monthly prefs
+    buildCommand: npm install
+    startCommand: node -e "const s=process.env.CRON_SECRET;const u=process.env.APP_URL||process.env.RENDER_EXTERNAL_URL;if(!s||!u){console.error('Missing CRON_SECRET or APP_URL');process.exit(1)}fetch(u.replace(/\\/$/,'')+'/api/cron/growth-digest',{method:'POST',headers:{Authorization:'Bearer '+s,'Content-Type':'application/json'}}).then(async r=>{const t=await r.text();console.log(r.status,t);if(!r.ok)process.exit(1)}).catch(e=>{console.error(e);process.exit(1)})"
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: CRON_SECRET
+        fromService:
+          name: moneygap-ai
+          type: web
+          envVarKey: CRON_SECRET
+      - key: APP_URL
+        fromService:
+          name: moneygap-ai
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
