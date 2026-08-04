@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import {
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
   Loader2,
   RotateCcw,
@@ -178,6 +179,18 @@ export function AnalysisProgress({
               />
             </div>
           </div>
+
+          {running && !failed ? (
+            <div className="flex gap-3 rounded-xl border border-border bg-bg-muted/60 px-3.5 py-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-fg-muted" />
+              <p className="text-xs leading-relaxed text-fg-muted">
+                <span className="font-semibold text-fg">Heads up:</span> full scans usually take a
+                few minutes. Larger sites can take{" "}
+                <span className="font-medium text-fg">10–15 minutes</span> — leave this tab open
+                while we crawl pages, score gaps, and build your report.
+              </p>
+            </div>
+          ) : null}
 
           <ul className="space-y-3">
             {stages.map((stage, index) => (

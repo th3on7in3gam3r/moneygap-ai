@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -58,6 +58,15 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
             <p className="mt-2 text-xs text-fg-muted">
               Enter a public website. We verify it&apos;s reachable first, then crawl key pages and
               generate a Website Intelligence Report.
+            </p>
+          </div>
+
+          <div className="flex gap-3 rounded-xl border border-border bg-bg-muted/60 px-3.5 py-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-fg-muted" />
+            <p className="text-xs leading-relaxed text-fg-muted">
+              <span className="font-semibold text-fg">Scan time:</span> most sites finish in a few
+              minutes. Depending on site size, a full scan can take{" "}
+              <span className="font-medium text-fg">up to 10–15 minutes</span>.
             </p>
           </div>
 

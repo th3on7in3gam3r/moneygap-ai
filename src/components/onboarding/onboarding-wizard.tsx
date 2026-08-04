@@ -531,6 +531,10 @@ export function OnboardingWizard() {
                 }}
               />
             </label>
+            <p className="text-xs leading-relaxed text-fg-muted">
+              Full AI scans usually take a few minutes. Larger sites can take up to{" "}
+              <span className="font-medium text-fg">10–15 minutes</span> to complete.
+            </p>
             <DiscoveryChips signals={discovery} />
             <div className="flex flex-wrap justify-end gap-2">
               <Button variant="ghost" disabled={busy} onClick={() => void go("welcome")}>
