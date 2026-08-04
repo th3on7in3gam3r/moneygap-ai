@@ -90,14 +90,25 @@ export async function POST(req: Request) {
       }
     }
 
-    const pdf = await buildOpenAuditPdf({
-      hostname,
-      url: parsed.data.url,
-      score,
-      findings,
-      source,
-      createdAt: row.createdAt,
-    });
+    let pdf: Buffer | null = null;
+    try {
+      pdf = await buildOpenAuditPdf({
+        hostname,
+        url: parsed.data.url,
+        score,
+        findings,
+        source,
+        createdAt: row.createdAt,
+      });
+    } catch (pdfErr) {
+      log("warn", "cli_report_pdf_soft_fail", {
+        slug: row.slug,
+        error:
+          pdfErr instanceof Error
+            ? pdfErr.message.slice(0, 200)
+            : String(pdfErr),
+      });
+    }
     const filename = auditPdfFilename(hostname, row.slug);
 
     const tpl = renderCliVisualReport({
@@ -112,13 +123,17 @@ export async function POST(req: Request) {
       subject: tpl.subject,
       html: tpl.html,
       text: tpl.text,
-      attachments: [
-        {
-          filename,
-          content: pdf,
-          contentType: "application/pdf",
-        },
-      ],
+      ...(pdf
+        ? {
+            attachments: [
+              {
+                filename,
+                content: pdf,
+                contentType: "application/pdf",
+              },
+            ],
+          }
+        : {}),
     });
 
     const emailed = sendResult.ok === true;
@@ -135,6 +150,7 @@ export async function POST(req: Request) {
         slug: row.slug,
         score,
         source,
+        pdfAttached: Boolean(pdf),
       });
     }
 
@@ -144,6 +160,7 @@ export async function POST(req: Request) {
       href,
       pdfHref,
       emailed,
+      pdfAttached: Boolean(pdf),
     });
   } catch (err) {
     log("warn", "cli_report_failed", {

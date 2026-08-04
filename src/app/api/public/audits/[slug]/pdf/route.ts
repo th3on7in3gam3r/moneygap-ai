@@ -38,22 +38,35 @@ export async function GET(req: Request, { params }: Params) {
     return NextResponse.json({ ok: false, error: "Not found." }, { status: 404 });
   }
 
-  const pdf = await buildOpenAuditPdf({
-    hostname: row.hostname,
-    url: row.url,
-    score: row.score,
-    findings: (row.findings as DiagnosticFinding[]) ?? [],
-    source: row.source,
-    createdAt: row.createdAt,
-  });
+  try {
+    const pdf = await buildOpenAuditPdf({
+      hostname: row.hostname,
+      url: row.url,
+      score: row.score,
+      findings: (row.findings as DiagnosticFinding[]) ?? [],
+      source: row.source,
+      createdAt: row.createdAt,
+    });
 
-  const filename = auditPdfFilename(row.hostname, row.slug);
-  return new NextResponse(new Uint8Array(pdf), {
-    status: 200,
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-      "Cache-Control": "public, max-age=300",
-    },
-  });
+    const filename = auditPdfFilename(row.hostname, row.slug);
+    return new NextResponse(new Uint8Array(pdf), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Cache-Control": "public, max-age=300",
+      },
+    });
+  } catch (err) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          err instanceof Error
+            ? err.message
+            : "Could not generate PDF. Try again shortly.",
+      },
+      { status: 500 },
+    );
+  }
 }
