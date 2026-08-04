@@ -1,8 +1,10 @@
 "use client";
 
 import { Show, UserButton } from "@clerk/nextjs";
+import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { SignInLink, StartFreeButton } from "@/components/auth-buttons";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -20,12 +22,31 @@ const links = [
 
 export function MarketingHeader() {
   const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [menuOpen]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-bg/80 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-5 sm:px-8">
         <Logo />
-        <nav className="hidden items-center gap-7 md:flex">
+        <nav className="hidden items-center gap-7 md:flex" aria-label="Primary">
           {links.map((link) => (
             <Link
               key={link.href}
@@ -42,11 +63,11 @@ export function MarketingHeader() {
         <div className="flex items-center gap-2">
           <ThemeToggle />
           <Show when="signed-out">
-            <SignInLink />
+            <SignInLink className="hidden sm:inline-flex" />
             <StartFreeButton />
           </Show>
           <Show when="signed-in">
-            <Button href="/dashboard" variant="secondary" size="sm" className="hidden sm:inline-flex">
+            <Button href="/dashboard" variant="secondary" size="sm">
               Dashboard
             </Button>
             <UserButton
@@ -57,8 +78,74 @@ export function MarketingHeader() {
               }}
             />
           </Show>
+          <button
+            type="button"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border text-fg-muted transition hover:bg-bg-muted hover:text-fg md:hidden"
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
+            aria-controls="marketing-mobile-menu"
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </button>
         </div>
       </div>
+
+      {menuOpen ? (
+        <div
+          id="marketing-mobile-menu"
+          className="fixed inset-0 top-16 z-50 md:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Site menu"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-bg/70 backdrop-blur-[2px]"
+            aria-label="Close menu"
+            onClick={() => setMenuOpen(false)}
+          />
+          <nav
+            className="relative mx-auto flex max-h-[calc(100dvh-4rem)] w-full max-w-6xl flex-col gap-1 overflow-y-auto border-b border-border bg-bg-elevated px-5 py-4 shadow-[var(--shadow)] sm:px-8"
+            aria-label="Mobile"
+          >
+            {links.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setMenuOpen(false)}
+                className={cn(
+                  "rounded-xl px-3 py-3 text-base font-medium text-fg-muted transition hover:bg-bg-muted hover:text-fg",
+                  pathname === link.href && "bg-bg-muted text-fg",
+                )}
+              >
+                {link.label}
+              </Link>
+            ))}
+            <div className="mt-2 space-y-2 border-t border-border pt-4 sm:hidden">
+              <Show when="signed-out">
+                <div className="flex flex-col gap-2">
+                  <SignInLink className="inline-flex h-11 w-full justify-center rounded-xl border border-border bg-bg-elevated text-fg" />
+                  <div className="[&_button]:h-11 [&_button]:w-full [&_button]:justify-center">
+                    <StartFreeButton />
+                  </div>
+                </div>
+              </Show>
+              <Show when="signed-in">
+                <Button
+                  href="/dashboard"
+                  variant="secondary"
+                  size="md"
+                  className="w-full"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Open Dashboard
+                </Button>
+              </Show>
+            </div>
+          </nav>
+        </div>
+      ) : null}
     </header>
   );
 }

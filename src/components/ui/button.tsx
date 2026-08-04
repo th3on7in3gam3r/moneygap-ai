@@ -32,16 +32,22 @@ type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> &
     href?: string;
   };
 
-export function Button({ className, variant, size, href, type, ...props }: ButtonProps) {
+export function Button({ className, variant, size, href, type, onClick, ...props }: ButtonProps) {
   const classes = cn(buttonVariants({ variant, size }), className);
   if (href) {
     return (
-      <Link href={href} className={classes}>
+      <Link
+        href={href}
+        className={classes}
+        onClick={onClick as React.MouseEventHandler<HTMLAnchorElement> | undefined}
+      >
         {props.children}
       </Link>
     );
   }
-  return <button type={type ?? "button"} className={classes} {...props} />;
+  return (
+    <button type={type ?? "button"} className={classes} onClick={onClick} {...props} />
+  );
 }
 
 export { buttonVariants };

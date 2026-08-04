@@ -100,7 +100,13 @@ export function SmartConsent({
         error?: string;
       };
       if (!res.ok || !data.ok) {
-        setError(data.error ?? "Could not save preferences.");
+        // Still dismiss locally so a flaky API can't permanently block the UI
+        // (especially mobile taps on Start Free / nav).
+        persistConsentClient(cats);
+        setCategories(cats);
+        setMode("hidden");
+        onClose?.();
+        setError(null);
         setSaving(false);
         return;
       }
@@ -110,7 +116,10 @@ export function SmartConsent({
       setMode("hidden");
       onClose?.();
     } catch {
-      setError("Network error — try again.");
+      persistConsentClient(cats);
+      setCategories(cats);
+      setMode("hidden");
+      onClose?.();
     } finally {
       setSaving(false);
     }
@@ -196,12 +205,13 @@ export function SmartConsent({
   const actions = (
     <>
       {error ? <p className="text-sm text-danger">{error}</p> : null}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         {mode === "welcome" && !embedded ? (
           <>
             <Button
               size="md"
               disabled={saving}
+              className="w-full sm:w-auto"
               onClick={() => void save("accept_all")}
             >
               Accept All
@@ -210,6 +220,7 @@ export function SmartConsent({
               size="md"
               variant="secondary"
               disabled={saving}
+              className="w-full sm:w-auto"
               onClick={() => void save("reject_optional")}
             >
               Reject Optional
@@ -218,6 +229,7 @@ export function SmartConsent({
               size="md"
               variant="ghost"
               disabled={saving}
+              className="w-full sm:w-auto"
               onClick={() => setMode("customize")}
             >
               Customize
@@ -228,6 +240,7 @@ export function SmartConsent({
             <Button
               size="md"
               disabled={saving}
+              className="w-full sm:w-auto"
               onClick={() => void save("customize", categories)}
             >
               Save preferences
@@ -236,6 +249,7 @@ export function SmartConsent({
               size="md"
               variant="secondary"
               disabled={saving}
+              className="w-full sm:w-auto"
               onClick={() => void save("accept_all")}
             >
               Accept All
@@ -244,6 +258,7 @@ export function SmartConsent({
               size="md"
               variant="ghost"
               disabled={saving}
+              className="w-full sm:w-auto"
               onClick={() => void save("reject_optional")}
             >
               Reject Optional
@@ -280,7 +295,7 @@ export function SmartConsent({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end justify-center p-4 sm:items-center sm:justify-end sm:p-6"
+      className="fixed inset-0 z-[80] flex items-end justify-center p-4 sm:items-center sm:justify-end sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="smart-consent-title"
@@ -288,7 +303,7 @@ export function SmartConsent({
       <div className="absolute inset-0 bg-bg/50 backdrop-blur-[2px]" aria-hidden />
       <div
         className={cn(
-          "relative flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border bg-bg-elevated shadow-[var(--shadow)]",
+          "relative z-10 flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border bg-bg-elevated shadow-[var(--shadow)]",
           "max-h-[min(100dvh-2rem,40rem)]",
         )}
       >
