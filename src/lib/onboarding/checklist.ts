@@ -4,7 +4,6 @@ import {
   businessMemoryEntries,
   integrationConnections,
   reports,
-  websites,
   workspaceMembers,
   workspaceOnboarding,
 } from "@/db/schema";
@@ -45,10 +44,6 @@ export async function getIntelligentChecklist(input: {
   const row = await getOrCreateOnboarding(input.workspaceId);
   const dismissed = new Set(row?.checklistDismissed ?? []);
 
-  const [siteRow] = await db
-    .select({ value: count() })
-    .from(websites)
-    .where(eq(websites.workspaceId, input.workspaceId));
   const [reportRow] = await db
     .select({ value: count() })
     .from(reports)
@@ -82,8 +77,8 @@ export async function getIntelligentChecklist(input: {
   const hasProfile =
     Number(memRow?.value ?? 0) > 0 ||
     !!(row?.companyName || row?.industry || (row?.primaryGoals?.length ?? 0) > 0);
-  const hasScan = Number(siteRow?.value ?? 0) > 0 || !!row?.analysisId;
-  const hasReport = Number(reportRow?.value ?? 0) > 0 || !!row?.reportId;
+  const hasScan = Number(reportRow?.value ?? 0) > 0 || !!row?.reportId;
+  const hasReport = hasScan;
   const hasGa = slugs.has("google_analytics");
   const hasGsc = slugs.has("google_search_console");
   const hasTeam = Number(memberRow?.value ?? 0) > 1;

@@ -136,6 +136,10 @@ export async function PATCH(req: Request) {
     const updated = await updateOnboarding(workspace.id, {
       status: row.status === "not_started" ? "in_progress" : row.status,
       currentStep: step,
+      // Returning to website clears a failed/in-progress scan so refresh cannot revive it
+      ...(step === "website"
+        ? { analysisId: null, reportId: null }
+        : {}),
     });
     return Response.json({ onboarding: updated });
   }

@@ -118,7 +118,7 @@ function toUserSafeError(err: unknown): string {
       return err.message;
     }
   }
-  return PUBLIC_CRAWL_ERROR;
+  return "Analysis failed unexpectedly. Please try again in a moment.";
 }
 
 function reconstructIntelligence(input: {

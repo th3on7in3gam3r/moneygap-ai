@@ -35,12 +35,17 @@ export function AnalysisProgress({
   stayOnComplete = false,
   title = "Analyzing Website",
   eyebrow = "Website intelligence",
+  onTryAnotherUrl,
+  onRetry,
 }: {
   analysisId: string;
   onComplete?: (reportId: string) => void;
   stayOnComplete?: boolean;
   title?: string;
   eyebrow?: string;
+  /** When set (e.g. onboarding), stays in-flow instead of navigating to /dashboard/analyze */
+  onTryAnotherUrl?: () => void;
+  onRetry?: () => void;
 }) {
   const router = useRouter();
   const [data, setData] = useState<StatusPayload | null>(null);
@@ -175,16 +180,38 @@ export function AnalysisProgress({
                   "We couldn't analyze this website. Please confirm the URL is publicly accessible."}
               </p>
               <div className="flex flex-wrap gap-2">
-                <Button href="/dashboard/analyze" variant="secondary" size="sm">
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  Try another URL
-                </Button>
-                <Link
-                  href={`/dashboard/analyze?url=${encodeURIComponent(data?.url ?? "")}`}
-                  className="inline-flex h-9 items-center rounded-xl px-3.5 text-sm text-fg-muted hover:text-fg"
-                >
-                  Retry this site
-                </Link>
+                {onTryAnotherUrl ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={onTryAnotherUrl}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Try another URL
+                  </Button>
+                ) : (
+                  <Button href="/dashboard/analyze" variant="secondary" size="sm">
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Try another URL
+                  </Button>
+                )}
+                {onRetry ? (
+                  <button
+                    type="button"
+                    onClick={onRetry}
+                    className="inline-flex h-9 items-center rounded-xl px-3.5 text-sm text-fg-muted hover:text-fg"
+                  >
+                    Retry this site
+                  </button>
+                ) : (
+                  <Link
+                    href={`/dashboard/analyze?url=${encodeURIComponent(data?.url ?? "")}`}
+                    className="inline-flex h-9 items-center rounded-xl px-3.5 text-sm text-fg-muted hover:text-fg"
+                  >
+                    Retry this site
+                  </Link>
+                )}
               </div>
             </div>
           )}

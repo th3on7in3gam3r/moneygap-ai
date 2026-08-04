@@ -374,6 +374,22 @@ export function OnboardingWizard() {
     }
   }
 
+  async function tryAnotherUrlFromScan() {
+    setBusy(true);
+    try {
+      await patch("set_step", { step: "website" });
+      setAnalysisId(null);
+      setStep("website");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function retryScanFromFailure() {
+    setAnalysisId(null);
+    await startScan();
+  }
+
   const onScanComplete = useCallback(
     async (reportId: string) => {
       setToast(makeFlashToast("First scan completed!", "success"));
@@ -706,11 +722,31 @@ export function OnboardingWizard() {
             title="AI initial scan"
             eyebrow="MoneyGap Engine™"
             onComplete={(reportId) => void onScanComplete(reportId)}
+            onTryAnotherUrl={() => void tryAnotherUrlFromScan()}
+            onRetry={() => void retryScanFromFailure()}
           />
           <p className="text-center text-xs text-fg-subtle">
             Missing integrations are skipped — we continue with available checks.
           </p>
         </div>
+      )}
+
+      {step === "scan" && !analysisId && (
+        <Card>
+          <CardBody className="space-y-4 py-10 text-center">
+            <p className="text-sm text-fg-muted">Starting a new scan…</p>
+            <Button disabled={busy} onClick={() => void startScan()}>
+              Start AI scan
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={busy}
+              onClick={() => void tryAnotherUrlFromScan()}
+            >
+              Enter a different URL
+            </Button>
+          </CardBody>
+        </Card>
       )}
 
       {(step === "results" || step === "complete") && (
