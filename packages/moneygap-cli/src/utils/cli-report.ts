@@ -13,6 +13,7 @@ export type CliReportResponse = {
   ok?: boolean;
   slug?: string;
   href?: string;
+  pdfHref?: string;
   emailed?: boolean;
   error?: string;
 };

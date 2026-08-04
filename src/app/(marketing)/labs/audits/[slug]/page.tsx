@@ -96,6 +96,12 @@ export default async function OpenAuditPage({ params }: Props) {
         </ul>
 
         <div className="mt-10 flex flex-wrap gap-3">
+          <a
+            href={`/api/public/audits/${row.slug}/pdf`}
+            className="inline-flex h-12 items-center justify-center rounded-xl bg-accent px-6 text-[0.95rem] font-medium text-accent-fg transition hover:brightness-110"
+          >
+            Download PDF
+          </a>
           <StartFreeButton label="Start Free Trial" size="lg" />
           <Link
             href="/labs"

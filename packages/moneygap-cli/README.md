@@ -16,7 +16,7 @@ Runs lightweight checks:
 - Schema (JSON-LD parse / basic validation)
 - Performance **signals** (HTML heuristics — not lab Core Web Vitals)
 
-After findings print, an **interactive TTY prompt** asks for email to publish an [Open Audit](https://www.moneygap-ai.com/labs) and email the visual report link. Skipped automatically in CI, non-TTY pipes, or with `--yes` / `--no-prompt` / `MONEYGAP_NO_PROMPT=1`. Override API host with `MONEYGAP_API_ORIGIN` (default `https://www.moneygap-ai.com`).
+After findings print, an **interactive TTY prompt** asks for email to publish an [Open Audit](https://www.moneygap-ai.com/labs), email a **PDF attachment**, and share download + online links. Skipped automatically in CI, non-TTY pipes, or with `--yes` / `--no-prompt` / `MONEYGAP_NO_PROMPT=1`. Override API host with `MONEYGAP_API_ORIGIN` (default `https://www.moneygap-ai.com`).
 
 These are free diagnostics — not a full MoneyGap AI report with Fix Paths™.
 

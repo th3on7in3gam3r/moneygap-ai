@@ -75,7 +75,7 @@ node dist/index.js scan-url https://example.com --no-prompt
 # or: npm link && moneygap-scan https://example.com
 ```
 
-On an interactive TTY, after findings print, the CLI may ask for an email. That calls `POST /api/public/cli-report`, publishes an Open Audit (`source: cli`), emails a link to `/labs/audits/{slug}`, and prints the URL in the terminal. Soft-fails if mail isn’t configured; exit codes still reflect scan findings only.
+On an interactive TTY, after findings print, the CLI may ask for an email. That calls `POST /api/public/cli-report`, publishes an Open Audit (`source: cli`), generates a PDF dashboard report (attached + `GET /api/public/audits/{slug}/pdf`), emails download/view links, and prints the URLs in the terminal. Soft-fails if mail isn’t configured; exit codes still reflect scan findings only.
 
 Offline project scan remains: `moneygap scan` (no email prompt in v1).
 
@@ -95,7 +95,7 @@ Sandbox shows **what** is wrong. Step-by-step Fix Paths™ require **Clerk Start
 ## Manual test checklist
 
 - [ ] `moneygap-scan https://example.com` prints stages + score
-- [ ] TTY: email prompt → Open Audit URL printed (+ email when Resend configured)
+- [ ] TTY: email prompt → Open Audit URL + PDF download printed (+ email/PDF when Resend configured)
 - [ ] `CI=1` or `--yes` → no email prompt
 - [ ] Homepage Run free scan → findings + Unlock Fix Paths CTA
 - [ ] Bad / private URL → clear error

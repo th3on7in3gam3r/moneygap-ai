@@ -81,23 +81,32 @@ export async function runScanUrl(
   if (!skipPrompt) {
     try {
       const email = await askEmail(
-        "Enter your email to get the full visual dashboard report (or press Enter to skip): ",
+        "Enter your email to download the visual dashboard PDF report (or press Enter to skip): ",
       );
       if (email) {
-        console.log(chalk.dim("  Publishing Open Audit and sending link…"));
+        console.log(chalk.dim("  Publishing Open Audit and sending PDF…"));
         const res = await requestCliVisualReport({ email, result });
         if (res.ok && res.href) {
-          const absolute =
-            res.href.startsWith("http")
-              ? res.href
-              : `https://www.moneygap-ai.com${res.href}`;
-          console.log(`${chalk.green("✓")} Visual report: ${chalk.cyan(absolute)}`);
+          const absolute = (path: string) =>
+            path.startsWith("http")
+              ? path
+              : `https://www.moneygap-ai.com${path}`;
+          console.log(
+            `${chalk.green("✓")} Visual report: ${chalk.cyan(absolute(res.href))}`,
+          );
+          if (res.pdfHref) {
+            console.log(
+              `${chalk.green("✓")} PDF download: ${chalk.cyan(absolute(res.pdfHref))}`,
+            );
+          }
           if (res.emailed) {
-            console.log(chalk.dim(`  Check ${email} for the link.`));
+            console.log(
+              chalk.dim(`  Check ${email} for the PDF attachment and link.`),
+            );
           } else {
             console.log(
               chalk.dim(
-                "  Link ready (email delivery soft-failed — open the URL above).",
+                "  Link ready (email delivery soft-failed — open the URLs above).",
               ),
             );
           }

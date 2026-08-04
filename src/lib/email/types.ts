@@ -32,6 +32,12 @@ export const EMAIL_EVENT_TYPES = [
 ] as const;
 export type EmailEventType = (typeof EMAIL_EVENT_TYPES)[number];
 
+export type EmailAttachment = {
+  filename: string;
+  content: Buffer | string;
+  contentType?: string;
+};
+
 export type EmailMessage = {
   to: string | string[];
   subject: string;
@@ -40,6 +46,7 @@ export type EmailMessage = {
   replyTo?: string;
   headers?: Record<string, string>;
   tags?: { name: string; value: string }[];
+  attachments?: EmailAttachment[];
 };
 
 export type EmailSendResult = {

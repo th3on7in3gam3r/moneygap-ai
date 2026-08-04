@@ -24,6 +24,14 @@ export function createResendProvider(): EmailProvider {
       }
 
       const to = Array.isArray(message.to) ? message.to : [message.to];
+      const attachments = message.attachments?.map((a) => ({
+        filename: a.filename,
+        content:
+          typeof a.content === "string"
+            ? a.content
+            : a.content.toString("base64"),
+        content_type: a.contentType,
+      }));
       try {
         const res = await fetch("https://api.resend.com/emails", {
           method: "POST",
@@ -40,6 +48,7 @@ export function createResendProvider(): EmailProvider {
             reply_to: message.replyTo,
             headers: message.headers,
             tags: message.tags,
+            ...(attachments?.length ? { attachments } : {}),
           }),
         });
 

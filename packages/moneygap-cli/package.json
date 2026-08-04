@@ -4,12 +4,13 @@
   "description": "MoneyGap CLI — live URL diagnostics (crawlability, schema, performance signals) plus offline project scanner.",
   "type": "module",
   "bin": {
-    "moneygap-scan": "./dist/index.js",
-    "moneygap": "./dist/index.js"
+    "moneygap-scan": "bin/moneygap-scan.js",
+    "moneygap": "bin/moneygap.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
+    "bin",
     "dist",
     "README.md",
     "docs"
@@ -38,7 +39,7 @@
   "author": "vercelguard",
   "repository": {
     "type": "git",
-    "url": "https://github.com/th3on7in3gam3r/moneygap-ai.git",
+    "url": "git+https://github.com/th3on7in3gam3r/moneygap-ai.git",
     "directory": "packages/moneygap-cli"
   },
   "homepage": "https://moneygap-ai.com",
@@ -50,12 +51,12 @@
     "commander": "^13.1.0",
     "execa": "^9.5.2",
     "fast-glob": "^3.3.3",
-    "moneygap-diagnostics": "file:../moneygap-diagnostics",
     "ora": "^8.2.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",
+    "moneygap-diagnostics": "file:../moneygap-diagnostics",
     "tsup": "^8.4.0",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2",
