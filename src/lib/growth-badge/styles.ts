@@ -27,10 +27,10 @@ export function badgeStyleLabel(style: GrowthBadgeStyle): string {
 }
 
 export const BADGE_SVG_THEME = {
-  bg: "#0c1210",
-  fg: "#f4f7f5",
-  muted: "#a7b5ad",
-  accent: "#3d9b6e",
-  accentSoft: "#1a2e24",
-  border: "#2a3d34",
+  bg: "#0f1c2e",
+  fg: "#f8fafc",
+  muted: "#94a3b8",
+  accent: "#0d9488",
+  accentSoft: "#16324f",
+  border: "#2a3f55",
 };

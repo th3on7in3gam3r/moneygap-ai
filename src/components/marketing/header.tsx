@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SignInLink, StartFreeButton } from "@/components/auth-buttons";
+import { FooterGrowthBadge } from "@/components/growth-badge/footer-badge";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -208,8 +209,11 @@ export function MarketingFooter() {
         </div>
       </div>
       <div className="border-t border-border">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 text-xs text-fg-subtle sm:px-8">
-          <span>© {new Date().getFullYear()} MoneyGap AI</span>
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-5 py-4 text-xs text-fg-subtle sm:flex-row sm:items-center sm:justify-between sm:px-8">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
+            <span>© {new Date().getFullYear()} MoneyGap AI</span>
+            <FooterGrowthBadge href="/dashboard/badge" />
+          </div>
           <span>AI Business Growth OS</span>
         </div>
       </div>
