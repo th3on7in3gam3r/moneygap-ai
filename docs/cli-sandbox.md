@@ -28,7 +28,14 @@ Visitor / CLI
 | App re-export | [`src/lib/public-diagnostics`](../src/lib/public-diagnostics) |
 | Public API | [`src/app/api/public/sandbox-scan/route.ts`](../src/app/api/public/sandbox-scan/route.ts) |
 | Homepage UI | [`src/components/marketing/sandbox-terminal.tsx`](../src/components/marketing/sandbox-terminal.tsx) |
+| Progressive log helper | [`src/components/marketing/sandbox-terminal-log.ts`](../src/components/marketing/sandbox-terminal-log.ts) |
 | Handoff | [`src/lib/public-diagnostics/sandbox-storage.ts`](../src/lib/public-diagnostics/sandbox-storage.ts) |
+
+## Homepage progressive log
+
+The sandbox UI times stage lines client-side while awaiting `POST /api/public/sandbox-scan` (fetch → crawlability → schema → perf → summarize). The final score and findings come from the real API payload — not simulated.
+
+CLI already receives live `onStage` callbacks from `moneygap-diagnostics`. Streaming those stages to the browser (SSE) is a future extension; homepage v1 stays client-timed log + real final JSON.
 
 ## What the free scan checks
 

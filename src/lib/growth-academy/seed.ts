@@ -268,6 +268,94 @@ Pair trust work with Money Gaps on your live site for prioritized Fix Paths™. 
 [Analyze your site](/sign-up) to see which trust and conversion gaps sit on your highest-value URLs.
 `,
   },
+  {
+    title:
+      "Post-Mortem: Broken Mobile Guest Checkout Routing Cost ~$18k/Month",
+    slug: "mobile-guest-checkout-routing-18k",
+    excerpt:
+      "How a desktop-only guest checkout path looked like a traffic problem — and a reconstructed Estimated Opportunity of about $18k monthly.",
+    categorySlug: "conversion-optimization",
+    featured: true,
+    tags: ["post-mortem", "mobile", "checkout", "conversion"],
+    faq: [
+      {
+        question: "Is the $18k figure a guaranteed revenue loss?",
+        answer:
+          "No. It is a reconstructed Estimated Opportunity from session, funnel, and average-order assumptions in a composite scenario — a decision aid, not audited finance or a guarantee of results.",
+      },
+      {
+        question: "What was the root cause?",
+        answer:
+          "Guest checkout deep-links resolved correctly on desktop but hit a mobile routing/redirect mismatch (viewport and auth-gate path divergence), so shoppers landed on a dead or login-forced step instead of guest checkout.",
+      },
+      {
+        question: "How do Money Gaps™ help catch this class of issue?",
+        answer:
+          "Conversion Money Gaps™ surface friction on money paths. Pair a full scan and Fix Path™ with device-specific QA of guest vs authenticated flows — then re-scan after the routing fix ships.",
+      },
+    ],
+    body: `## Disclaimer
+
+This post-mortem is a **composite / illustrative engineering narrative**. Figures are a reconstructed **Estimated Opportunity** (AI Estimate-style decision aid), not a named customer claim and not audited financial results. Use it as a pattern guide — always validate against your own analytics.
+
+## Incident summary
+
+A mid-market commerce site saw mobile “add to cart → pay” completions collapse while desktop held steady. Paid traffic and product pages looked healthy. Leadership blamed “mobile traffic quality.”
+
+Reconstructed funnel math (sessions × guest-checkout attempt rate × completion drop × AOV) pointed to roughly **~$18k/month** left on the table while the broken path stayed live — an Estimated Opportunity, not a guarantee of recovery.
+
+> Desktop worked. Mobile looked like churn. The bug was routing.
+
+## Timeline
+
+1. **Detect** — Mobile conversion rate for guest checkout fell sharply week-over-week; desktop unchanged. Support tickets mentioned “keeps asking me to log in on my phone.”
+2. **Triage** — Analytics showed carts created, then exits on a transitional URL that only mobile hit.
+3. **Root cause** — Guest checkout deep-link / redirect chain branched by user-agent and viewport. Desktop resolved to \`/checkout/guest\`. Mobile hit an auth middleware path that assumed account sessions, then bounced to login with a broken \`returnUrl\` encoding.
+4. **Fix** — Unify guest routing: same destination for guest intent regardless of device; preserve \`returnUrl\`; add an explicit “Continue as guest” control above the fold on mobile.
+5. **Verify** — Device matrix QA (iOS Safari, Chrome Android) + funnel monitor for 14 days; mobile guest completion recovered toward the prior baseline.
+
+## Engineering breakdown
+
+### Path divergence
+
+| Step | Desktop | Mobile (broken) |
+| --- | --- | --- |
+| Cart CTA | \`/checkout/guest\` | Soft-nav to \`/checkout\` then client redirect |
+| Auth gate | Skipped for \`guest=1\` | Middleware treated missing session as force-login |
+| Return URL | Intact | Truncated / double-encoded → login loop |
+
+The desktop path never exercised the soft-nav + middleware combo. Mobile webviews and in-app browsers made the failure louder.
+
+### Why it looked like a “traffic” problem
+
+- Session counts still rose (ads worked).
+- Product engagement looked fine.
+- Only the **last mile** — guest pay — failed, and only on mobile.
+- Aggregate conversion charts diluted the signal until the funnel was sliced by device + checkout mode.
+
+## What to watch for on your site
+
+- Separate guest vs authenticated checkout URLs that diverge by breakpoint or user-agent
+- Auth middleware that runs before “guest allowed” flags are parsed
+- \`returnUrl\` / deep-link encoding differences between soft navigation and full page loads
+- CTAs that open login-first sheets on mobile while desktop keeps guest inline
+
+## Money Gaps™ and Fix Path™ takeaway
+
+This class of leak is a **conversion Money Gap™**: the offer and traffic were fine; the path to pay was not. A codebase growth audit mindset — treat routing and middleware as revenue surface area — beats another homepage redesign.
+
+Practical loop:
+
+1. Run a free live diagnostic ([homepage sandbox](/) or \`npx moneygap-scan\`) for crawl/schema/perf signals
+2. Start free and run a full MoneyGap Engine™ scan on money URLs
+3. Open the top conversion Fix Path™ and add **device-specific guest checkout QA** as an explicit step
+4. Ship the routing fix with human review, then re-scan
+
+## What to do next
+
+If mobile conversions slipped while desktop held, inspect guest checkout routing before you cut ad spend. Read more conversion playbooks in [Growth Academy™](/academy), or [analyze your site](/sign-up) to prioritize Fix Paths™.
+`,
+  },
 ];
 
 export async function seedGrowthAcademyContent() {

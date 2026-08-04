@@ -31,6 +31,16 @@ const HOME_FAQ = [
       "A Money Gap™ is a concrete miss on your site — visibility, conversion, trust, content, or AI discovery — that leaves revenue on the table. MoneyGap AI surfaces them with an AI Estimate of impact and a Fix Path™ you can implement with human review.",
   },
   {
+    question: "Is MoneyGap AI a developer-friendly conversion tool?",
+    answer:
+      "Yes. MoneyGap AI is built as a developer-friendly conversion tool: run a free live diagnostic in the homepage terminal or via npx moneygap-scan, then unlock Fix Paths™ and the MoneyGap Engine™ to close conversion and growth leaks with human review.",
+  },
+  {
+    question: "What is a codebase growth audit?",
+    answer:
+      "A codebase growth audit looks at how your site’s technical surface — crawlability, schema, performance signals, routing, and conversion paths — quietly caps revenue. MoneyGap AI pairs that audit with Opportunity Index™ scoring and Fix Paths™ so engineering and growth share one backlog.",
+  },
+  {
     question: "What's the free homepage sandbox vs a full scan?",
     answer:
       "The free sandbox (and npx moneygap-scan) runs lightweight crawlability, schema, and performance-signal checks with no account. A full MoneyGap Engine™ scan after you Start free adds deeper scoring, Opportunity Index™, and Fix Paths™ in your dashboard.",
@@ -49,6 +59,12 @@ const HOME_FAQ = [
     question: "Who is MoneyGap AI for?",
     answer:
       "Founders, growth teams, agencies, and operators who want a Growth Operating System™ — not a one-off audit PDF.",
+  },
+  {
+    question:
+      "How can a mobile checkout bug cost thousands per month?",
+    answer:
+      "When guest checkout routing breaks on mobile only, traffic can look fine while completions collapse. See our composite engineering post-mortem on a reconstructed ~$18k/month Estimated Opportunity: /academy/mobile-guest-checkout-routing-18k — figures are decision aids, not guarantees.",
   },
 ];
 
@@ -75,8 +91,11 @@ export default function HomePage() {
               Find the revenue your website is leaving on the table.
             </h1>
             <p className="animate-rise-delay-2 mt-5 max-w-lg text-base leading-relaxed text-fg-muted sm:text-lg">
-              Try a free live diagnostic in the terminal — then Start free to unlock
-              Fix Paths™ and the full MoneyGap Engine™.
+              Run a free live diagnostic in the terminal (same engine as{" "}
+              <code className="rounded bg-bg-muted px-1.5 py-0.5 font-mono text-sm text-fg">
+                npx moneygap-scan
+              </code>
+              ) — then Start free to unlock Fix Paths™.
             </p>
             <div className="animate-rise-delay-3 mt-8 flex flex-wrap items-center gap-3">
               <StartFreeButton label="Start free" size="lg" />
@@ -100,11 +119,13 @@ export default function HomePage() {
             description="MoneyGap AI analyzes public websites, surfaces Money Gaps™ across SEO, conversion, trust, content, and AI visibility, then helps you prioritize and execute with Fix Paths™, Copilot, and Growth Academy™."
           />
           <p className="mt-6 max-w-2xl text-sm text-fg-muted">
-            Learn more on{" "}
+            Teams use it as a developer-friendly conversion tool and a codebase
+            growth audit — from the free CLI sandbox to full Fix Paths™. Learn more
+            on{" "}
             <Link href="/about" className="text-accent hover:underline">
               About
             </Link>{" "}
-            and see the full capability map on{" "}
+            and{" "}
             <Link href="/features" className="text-accent hover:underline">
               Features
             </Link>

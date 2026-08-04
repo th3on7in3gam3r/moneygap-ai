@@ -44,4 +44,4 @@ export function buildPageMetadata(input: BuildPageMetadataInput): Metadata {
 export const SITE_DEFAULT_TITLE =
   "MoneyGap AI — Find the revenue you're leaving behind";
 export const SITE_DEFAULT_DESCRIPTION =
-  "MoneyGap AI reveals where your website leaks revenue — and shows exactly how to close the gap with Fix Paths™.";
+  "MoneyGap AI is a developer-friendly conversion tool and codebase growth audit — find where your site leaks revenue, then close gaps with Fix Paths™ and a free CLI sandbox.";

@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle2, Copy, Loader2, Terminal, XCircle } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { StartFreeButton } from "@/components/auth-buttons";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,13 +10,24 @@ import {
   type LiveDiagnosticsResult,
   type SandboxStoragePayload,
 } from "@/lib/public-diagnostics";
+import {
+  commandLine,
+  findingSummaryLines,
+  runProgressiveStages,
+  severityMark,
+} from "@/components/marketing/sandbox-terminal-log";
 import { cn } from "@/lib/utils";
 
 type ScanState =
   | { status: "idle" }
   | { status: "running"; lines: string[] }
-  | { status: "done"; result: LiveDiagnosticsResult }
-  | { status: "error"; message: string; result?: LiveDiagnosticsResult | null };
+  | { status: "done"; result: LiveDiagnosticsResult; logLines: string[] }
+  | {
+      status: "error";
+      message: string;
+      result?: LiveDiagnosticsResult | null;
+      logLines?: string[];
+    };
 
 function severityClass(severity: DiagnosticFinding["severity"]): string {
   switch (severity) {
@@ -28,19 +39,6 @@ function severityClass(severity: DiagnosticFinding["severity"]): string {
       return "text-danger";
     default:
       return "text-fg-muted";
-  }
-}
-
-function severityMark(severity: DiagnosticFinding["severity"]): string {
-  switch (severity) {
-    case "pass":
-      return "✓";
-    case "warn":
-      return "!";
-    case "fail":
-      return "✗";
-    default:
-      return "·";
   }
 }
 
@@ -63,12 +61,26 @@ export function SandboxTerminal({ className }: { className?: string }) {
   const [state, setState] = useState<ScanState>({ status: "idle" });
   const [copied, setCopied] = useState(false);
   const [pending, startTransition] = useTransition();
+  const logRef = useRef<HTMLDivElement>(null);
+  const cancelStagesRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!copied) return;
     const t = window.setTimeout(() => setCopied(false), 2000);
     return () => window.clearTimeout(t);
   }, [copied]);
+
+  useEffect(() => {
+    const el = logRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [state]);
+
+  useEffect(() => {
+    return () => {
+      cancelStagesRef.current?.();
+    };
+  }, []);
 
   function runScan() {
     const target = url.trim();
@@ -77,18 +89,23 @@ export function SandboxTerminal({ className }: { className?: string }) {
       return;
     }
 
-    startTransition(async () => {
-      setState({
-        status: "running",
-        lines: [
-          `$ moneygap-scan ${target}`,
-          "› Fetching page…",
-          "› Checking crawlability…",
-          "› Validating schema…",
-          "› Performance signals…",
-        ],
-      });
+    cancelStagesRef.current?.();
 
+    const initialLines = [commandLine(target)];
+    setState({ status: "running", lines: initialLines });
+
+    cancelStagesRef.current = runProgressiveStages((line) => {
+      setState((prev) => {
+        if (prev.status !== "running") return prev;
+        // Avoid duplicating the same “Working…” line
+        if (line === "› Working…" && prev.lines[prev.lines.length - 1] === line) {
+          return prev;
+        }
+        return { status: "running", lines: [...prev.lines, line] };
+      });
+    });
+
+    startTransition(async () => {
       try {
         const res = await fetch("/api/public/sandbox-scan", {
           method: "POST",
@@ -101,23 +118,49 @@ export function SandboxTerminal({ className }: { className?: string }) {
           result?: LiveDiagnosticsResult | null;
         };
 
+        cancelStagesRef.current?.();
+        cancelStagesRef.current = null;
+
         if (!res.ok || !data.result) {
-          setState({
-            status: "error",
-            message: data.error ?? "Scan failed. Try another public URL.",
-            result: data.result ?? null,
+          setState((prev) => {
+            const baseLines =
+              prev.status === "running" ? prev.lines : initialLines;
+            const cleaned = baseLines.filter((l) => l !== "› Working…");
+            return {
+              status: "error",
+              message: data.error ?? "Scan failed. Try another public URL.",
+              result: data.result ?? null,
+              logLines: [...cleaned, `✗ ${data.error ?? "Scan failed"}`],
+            };
           });
           return;
         }
 
         persistSandbox(data.result);
-        setState({ status: "done", result: data.result });
         setUrl(data.result.url);
+        const summaries = findingSummaryLines(data.result.findings);
+        const scoreLine = `✓ Done — score ${data.result.score}/100 (${data.result.durationMs}ms)`;
+        setState((prev) => {
+          const baseLines =
+            prev.status === "running" ? prev.lines : initialLines;
+          const cleaned = baseLines.filter((l) => l !== "› Working…");
+          return {
+            status: "done",
+            result: data.result!,
+            logLines: [...cleaned, scoreLine, ...summaries],
+          };
+        });
       } catch {
-        setState({
+        cancelStagesRef.current?.();
+        cancelStagesRef.current = null;
+        setState((prev) => ({
           status: "error",
           message: "Network error — check your connection and try again.",
-        });
+          logLines:
+            prev.status === "running"
+              ? [...prev.lines.filter((l) => l !== "› Working…"), "✗ Network error"]
+              : undefined,
+        }));
       }
     });
   }
@@ -144,6 +187,15 @@ export function SandboxTerminal({ className }: { className?: string }) {
 
   const findings =
     result?.findings.filter((f) => f.id !== "perf.disclaimer").slice(0, 8) ?? [];
+
+  const logLines =
+    state.status === "running"
+      ? state.lines
+      : state.status === "done"
+        ? state.logLines
+        : state.status === "error"
+          ? state.logLines
+          : null;
 
   return (
     <div className={cn("relative", className)}>
@@ -200,26 +252,43 @@ export function SandboxTerminal({ className }: { className?: string }) {
           </label>
 
           <div
-            className="min-h-[11rem] rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 font-mono text-xs leading-relaxed sm:min-h-[13rem]"
+            ref={logRef}
+            className="max-h-[14rem] min-h-[11rem] overflow-y-auto rounded-xl border border-white/10 bg-black/35 px-3.5 py-3 font-mono text-xs leading-relaxed sm:min-h-[13rem]"
             aria-live="polite"
           >
             {state.status === "idle" ? (
-              <p className="text-white/45">
-                Paste a public URL. We check crawlability, schema, and performance
-                signals — then unlock Fix Paths™ with a free account.
-              </p>
+              <div className="space-y-2 text-white/45">
+                <p>
+                  <span className="text-accent/80">$</span> Enter a URL and press
+                  Run
+                  <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-accent/70 align-middle" />
+                </p>
+                <p>
+                  Live crawlability, schema, and performance signals — same engine
+                  as{" "}
+                  <code className="rounded bg-white/10 px-1 py-0.5 text-white/60">
+                    npx moneygap-scan
+                  </code>
+                  .
+                </p>
+              </div>
             ) : null}
 
-            {state.status === "running" ? (
+            {logLines ? (
               <ul className="space-y-1 text-white/70">
-                {state.lines.map((line) => (
-                  <li key={line}>{line}</li>
+                {logLines.map((line, i) => (
+                  <li key={`${i}-${line.slice(0, 24)}`}>{line}</li>
                 ))}
+                {state.status === "running" ? (
+                  <li className="text-accent/80" aria-hidden>
+                    <span className="inline-block h-3 w-1.5 animate-pulse bg-accent/70" />
+                  </li>
+                ) : null}
               </ul>
             ) : null}
 
-            {state.status === "error" ? (
-              <div className="space-y-2 text-danger">
+            {state.status === "error" && !result ? (
+              <div className="mt-2 space-y-2 text-danger">
                 <p className="inline-flex items-start gap-2">
                   <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>{state.message}</span>
@@ -228,7 +297,13 @@ export function SandboxTerminal({ className }: { className?: string }) {
             ) : null}
 
             {result && (state.status === "done" || state.status === "error") ? (
-              <div className="space-y-3">
+              <div className="mt-3 space-y-3 border-t border-white/10 pt-3">
+                {state.status === "error" ? (
+                  <p className="inline-flex items-start gap-2 text-danger">
+                    <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>{state.message}</span>
+                  </p>
+                ) : null}
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <p className="text-sm font-semibold text-white">
                     Score{" "}
