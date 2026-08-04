@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { GuideSearchHit } from "@/lib/guides";
-import { CATEGORY_LABELS } from "@/lib/guides";
 import { FRAMEWORKS } from "@/lib/guides/frameworks";
+import { CATEGORY_LABELS } from "@/lib/guides/topics";
+import type { GuideSearchHit } from "@/lib/guides/types";
 
 export function GuidesSearchClient({ index }: { index: GuideSearchHit[] }) {
   const [q, setQ] = useState("");

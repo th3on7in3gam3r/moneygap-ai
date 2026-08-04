@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { getTopic } from "@/lib/guides";
-import type { FrameworkId, TopicId } from "@/lib/guides";
+import { getTopic } from "@/lib/guides/topics";
+import type { FrameworkId, TopicId } from "@/lib/guides/types";
 import { cn } from "@/lib/utils";
 
 export function GuideSidebar({

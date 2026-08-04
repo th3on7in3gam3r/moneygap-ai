@@ -2,8 +2,8 @@ import Link from "next/link";
 import { MarkdownBody } from "@/components/growth-academy/markdown-body";
 import { GuideProductRail } from "@/components/guides/guide-product-rail";
 import { markdownToHtml } from "@/lib/growth-academy/markdown";
-import type { GuideModel } from "@/lib/guides";
-import { CATEGORY_LABELS } from "@/lib/guides";
+import { CATEGORY_LABELS } from "@/lib/guides/topics";
+import type { GuideModel } from "@/lib/guides/types";
 
 function Section({
   title,
