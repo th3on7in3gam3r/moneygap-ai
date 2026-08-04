@@ -25,13 +25,45 @@ async function attachScores(scans: ScanRow[]): Promise<ScanWithScores[]> {
   return scans.map((s) => ({ ...s, scores: byScan.get(s.id) ?? null }));
 }
 
-export async function getScanSummaries(workspaceId: string) {
-  const scanRows = await db
+export async function getScanSummaries(
+  workspaceId: string,
+  opts?: { websiteId?: string | null; targetUrl?: string | null },
+) {
+  const conditions = [eq(selfOptimizationScans.workspaceId, workspaceId)];
+  if (opts?.websiteId) {
+    conditions.push(eq(selfOptimizationScans.websiteId, opts.websiteId));
+  }
+
+  let scanRows = await db
     .select()
     .from(selfOptimizationScans)
-    .where(eq(selfOptimizationScans.workspaceId, workspaceId))
+    .where(and(...conditions))
     .orderBy(desc(selfOptimizationScans.createdAt))
     .limit(90);
+
+  // Fallback: older scans may lack websiteId — match by target URL origin.
+  if (opts?.websiteId && scanRows.length === 0 && opts.targetUrl) {
+    const origin = (() => {
+      try {
+        return new URL(opts.targetUrl!).origin;
+      } catch {
+        return opts.targetUrl!;
+      }
+    })();
+    const all = await db
+      .select()
+      .from(selfOptimizationScans)
+      .where(eq(selfOptimizationScans.workspaceId, workspaceId))
+      .orderBy(desc(selfOptimizationScans.createdAt))
+      .limit(90);
+    scanRows = all.filter((s) => {
+      try {
+        return new URL(s.targetUrl).origin === origin;
+      } catch {
+        return s.targetUrl.includes(origin.replace(/^https?:\/\//, ""));
+      }
+    });
+  }
 
   const scans = await attachScores(scanRows);
 

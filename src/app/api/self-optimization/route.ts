@@ -5,7 +5,6 @@ import { db } from "@/db";
 import {
   selfOptimizationFindings,
   selfOptimizationMetadataDrafts,
-  selfOptimizationScans,
 } from "@/db/schema";
 import { ensureUserAndWorkspace } from "@/lib/analysis/workspace";
 import {
@@ -15,11 +14,42 @@ import {
   resolveSelfScanTarget,
   runSelfOptimizationScan,
   upsertSelfOptSettings,
+  validateSelfOptimizationUrl,
 } from "@/lib/self-optimization";
+import {
+  listWorkspaceWebsites,
+  type WorkspaceWebsite,
+} from "@/lib/websites/workspace";
 
 export const maxDuration = 60;
 
-export async function GET() {
+function websiteMatchesUrl(site: WorkspaceWebsite, url: string): boolean {
+  try {
+    const a = new URL(site.url).hostname.replace(/^www\./, "").toLowerCase();
+    const b = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+    return a === b || site.domain.replace(/^www\./, "").toLowerCase() === b;
+  } catch {
+    return (
+      site.url.includes(url) ||
+      url.includes(site.domain) ||
+      site.domain.includes(url)
+    );
+  }
+}
+
+function resolveSelectedWebsite(
+  sites: WorkspaceWebsite[],
+  preferredId: string | null,
+  targetUrl: string,
+): WorkspaceWebsite | null {
+  if (preferredId) {
+    const match = sites.find((s) => s.id === preferredId);
+    if (match) return match;
+  }
+  return sites.find((s) => websiteMatchesUrl(s, targetUrl)) ?? null;
+}
+
+export async function GET(req: Request) {
   const { isAuthenticated } = await auth();
   if (!isAuthenticated) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -30,7 +60,27 @@ export async function GET() {
     await markStaleRunningFailed(workspace.id);
     const enabled = isSelfOptimizationEnabled();
     const target = await resolveSelfScanTarget(workspace.id);
-    const summaries = await getScanSummaries(workspace.id);
+    const websites = await listWorkspaceWebsites(workspace.id);
+
+    const requestedId =
+      new URL(req.url).searchParams.get("websiteId")?.trim() || null;
+    const selected = resolveSelectedWebsite(
+      websites,
+      requestedId,
+      target.url,
+    );
+    const selectedWebsiteId = selected?.id ?? null;
+    const displayUrl = selected?.url
+      ? (() => {
+          const v = validateSelfOptimizationUrl(selected.url);
+          return v.ok ? v.value.origin : selected.url;
+        })()
+      : target.url;
+
+    const summaries = await getScanSummaries(workspace.id, {
+      websiteId: selectedWebsiteId,
+      targetUrl: displayUrl,
+    });
 
     const latestFindings = summaries.latest
       ? await db
@@ -55,8 +105,10 @@ export async function GET() {
       message: !enabled
         ? "Self Optimization™ is disabled (FEATURE_SELF_OPTIMIZATION)."
         : target.message,
-      targetUrl: target.url,
-      targetSource: target.source,
+      targetUrl: displayUrl,
+      targetSource: selected ? "workspace" : target.source,
+      websites,
+      selectedWebsiteId,
       scores: scores
         ? {
             overall: scores.overall,
@@ -159,7 +211,12 @@ export async function POST(req: Request) {
 
   try {
     const { workspace } = await ensureUserAndWorkspace();
-    let body: { action?: string; targetUrl?: string; enabled?: boolean } = {};
+    let body: {
+      action?: string;
+      targetUrl?: string;
+      websiteId?: string;
+      enabled?: boolean;
+    } = {};
     try {
       body = (await req.json()) as typeof body;
     } catch {
@@ -167,11 +224,30 @@ export async function POST(req: Request) {
     }
 
     if (body.action === "settings") {
+      let targetUrl = body.targetUrl;
+      if (body.websiteId) {
+        const websites = await listWorkspaceWebsites(workspace.id);
+        const site = websites.find((s) => s.id === body.websiteId);
+        if (!site) {
+          return Response.json(
+            { ok: false, error: "Website not found in this workspace." },
+            { status: 404 },
+          );
+        }
+        const v = validateSelfOptimizationUrl(site.url);
+        targetUrl = v.ok ? v.value.origin : site.url;
+      }
+
       const row = await upsertSelfOptSettings(workspace.id, {
-        targetUrl: body.targetUrl,
+        targetUrl,
         enabled: body.enabled,
       });
-      return Response.json({ ok: true, settings: row });
+      return Response.json({
+        ok: true,
+        settings: row,
+        selectedWebsiteId: body.websiteId ?? null,
+        targetUrl: row.targetUrl,
+      });
     }
 
     if (!isSelfOptimizationEnabled()) {
@@ -182,6 +258,22 @@ export async function POST(req: Request) {
         },
         { status: 200 },
       );
+    }
+
+    // Optional: switch target before running scan
+    if (body.websiteId || body.targetUrl) {
+      let targetUrl = body.targetUrl;
+      if (body.websiteId) {
+        const websites = await listWorkspaceWebsites(workspace.id);
+        const site = websites.find((s) => s.id === body.websiteId);
+        if (site) {
+          const v = validateSelfOptimizationUrl(site.url);
+          targetUrl = v.ok ? v.value.origin : site.url;
+        }
+      }
+      if (targetUrl) {
+        await upsertSelfOptSettings(workspace.id, { targetUrl });
+      }
     }
 
     // Run after the response so local self-scans can fetch this same server

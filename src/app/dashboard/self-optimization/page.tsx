@@ -51,6 +51,8 @@ type Overview = {
   message: string | null;
   targetUrl: string;
   targetSource: string;
+  websites?: { id: string; name: string; domain: string; url: string }[];
+  selectedWebsiteId?: string | null;
   scores: {
     overall: number | null;
     seo: number | null;
@@ -140,19 +142,27 @@ export default function SelfOptimizationPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [promptTab, setPromptTab] = useState<keyof Prompts>("cursor");
   const [copied, setCopied] = useState<string | null>(null);
+  const [selectedWebsiteId, setSelectedWebsiteId] = useState<string | null>(
+    null,
+  );
   const [pending, startTransition] = useTransition();
 
-  function load() {
+  function load(websiteId?: string | null) {
     startTransition(() => {
       void (async () => {
         try {
-          const res = await fetch("/api/self-optimization");
+          const id = websiteId ?? selectedWebsiteId;
+          const qs = id ? `?websiteId=${encodeURIComponent(id)}` : "";
+          const res = await fetch(`/api/self-optimization${qs}`);
           const body = (await res.json()) as Overview & { error?: string };
           if (!res.ok) {
             setError(body.error ?? "Could not load Self Optimization™");
             return;
           }
           setData(body);
+          if (body.selectedWebsiteId !== undefined) {
+            setSelectedWebsiteId(body.selectedWebsiteId);
+          }
           if (body.latestScan?.status === "failed" && body.latestScan.error) {
             setError(body.latestScan.error);
           } else if (body.latestScan?.status === "running") {
@@ -170,30 +180,57 @@ export default function SelfOptimizationPage() {
   useEffect(() => {
     const t = setTimeout(() => load(), 0);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initial load only
   }, []);
 
   // Poll while a scan is running (server also auto-fails stale "running" rows ~90s)
   useEffect(() => {
     if (data?.latestScan?.status !== "running") return;
-    const id = setInterval(() => load(), 2500);
+    const id = setInterval(() => load(selectedWebsiteId), 2500);
     const giveUp = setTimeout(() => {
       setError(
         "Scan is taking longer than expected. Refresh and try again — a stuck run will auto-clear shortly.",
       );
-      load();
+      load(selectedWebsiteId);
     }, 100_000);
     return () => {
       clearInterval(id);
       clearTimeout(giveUp);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- poll on running status
-  }, [data?.latestScan?.status, data?.latestScan?.id]);
+  }, [data?.latestScan?.status, data?.latestScan?.id, selectedWebsiteId]);
+
+  function selectWebsite(websiteId: string) {
+    startTransition(() => {
+      void (async () => {
+        setError(null);
+        setSelectedWebsiteId(websiteId);
+        const res = await fetch("/api/self-optimization", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "settings", websiteId }),
+        });
+        const body = (await res.json()) as { ok?: boolean; error?: string };
+        if (!res.ok || body.ok === false) {
+          setError(body.error ?? "Could not switch website");
+          return;
+        }
+        load(websiteId);
+      })();
+    });
+  }
 
   function runScan() {
     startTransition(() => {
       void (async () => {
         setError(null);
-        const res = await fetch("/api/self-optimization", { method: "POST" });
+        const res = await fetch("/api/self-optimization", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            selectedWebsiteId ? { websiteId: selectedWebsiteId } : {},
+          ),
+        });
         const body = (await res.json()) as {
           ok?: boolean;
           started?: boolean;
@@ -204,7 +241,7 @@ export default function SelfOptimizationPage() {
           setError(body.message ?? body.error ?? "Scan failed");
           return;
         }
-        load();
+        load(selectedWebsiteId);
       })();
     });
   }
@@ -217,7 +254,7 @@ export default function SelfOptimizationPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ draftId, action: "apply" }),
         });
-        load();
+        load(selectedWebsiteId);
       })();
     });
   }
@@ -292,16 +329,52 @@ export default function SelfOptimizationPage() {
       {data?.enabled && (
         <>
           <Card>
-            <CardBody className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
+            <CardBody className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 flex-1 space-y-2">
                 <p className="text-xs uppercase tracking-[0.08em] text-fg-subtle">
                   Scan target
                 </p>
+                {(data.websites?.length ?? 0) > 0 ? (
+                  <label className="block space-y-1.5">
+                    <span className="sr-only">Choose website</span>
+                    <select
+                      className="h-11 w-full max-w-md rounded-xl border border-border bg-bg px-3 text-sm text-fg"
+                      value={selectedWebsiteId ?? data.selectedWebsiteId ?? ""}
+                      disabled={pending || data.latestScan?.status === "running"}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        if (id) selectWebsite(id);
+                      }}
+                    >
+                      {!selectedWebsiteId && !data.selectedWebsiteId ? (
+                        <option value="" disabled>
+                          Select a website…
+                        </option>
+                      ) : null}
+                      {(data.websites ?? []).map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name || w.domain} ({w.domain})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <p className="text-sm text-fg-muted">
+                    No workspace websites yet.{" "}
+                    <a
+                      href="/dashboard/websites"
+                      className="font-medium text-accent hover:underline"
+                    >
+                      Add a website
+                    </a>{" "}
+                    to switch Growth Score targets from a dropdown.
+                  </p>
+                )}
                 <a
                   href={data.targetUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="font-medium text-accent hover:underline"
+                  className="inline-block break-all font-medium text-accent hover:underline"
                 >
                   {data.targetUrl}
                 </a>
@@ -309,7 +382,7 @@ export default function SelfOptimizationPage() {
                   Source: {data.targetSource}
                   {data.latestScan
                     ? ` · Last scan ${data.latestScan.status} · ${data.latestScan.summary ?? ""}`
-                    : " · No scans yet — run a self scan to populate scores"}
+                    : " · No scans yet for this site — run a self scan to populate scores"}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">

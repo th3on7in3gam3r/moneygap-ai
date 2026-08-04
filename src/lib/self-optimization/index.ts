@@ -1,5 +1,10 @@
 export { isSelfOptimizationEnabled } from "./flag";
-export { resolveSelfScanTarget, upsertSelfOptSettings, resolveDefaultSelfUrl } from "./config";
+export {
+  resolveSelfScanTarget,
+  upsertSelfOptSettings,
+  resolveDefaultSelfUrl,
+  validateSelfOptimizationUrl,
+} from "./config";
 export { runSelfOptimizationScan, runDailySelfScan } from "./scan";
 export { getScanSummaries, getLatestScores } from "./reports/daily";
 export { markStaleRunningFailed } from "./scan";
