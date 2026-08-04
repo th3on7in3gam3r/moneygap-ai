@@ -90,3 +90,35 @@ export async function findDeliveryByProviderMessageId(providerMessageId: string)
     })) ?? null
   );
 }
+
+export async function findDeliveryById(id: string) {
+  return (
+    (await db.query.emailDeliveries.findFirst({
+      where: eq(emailDeliveries.id, id),
+    })) ?? null
+  );
+}
+
+export async function updateDelivery(input: {
+  id: string;
+  status?: DeliveryStatus;
+  provider?: string;
+  providerMessageId?: string | null;
+  meta?: Record<string, unknown>;
+  sentAt?: Date | null;
+}) {
+  const [row] = await db
+    .update(emailDeliveries)
+    .set({
+      ...(input.status !== undefined ? { status: input.status } : {}),
+      ...(input.provider !== undefined ? { provider: input.provider } : {}),
+      ...(input.providerMessageId !== undefined
+        ? { providerMessageId: input.providerMessageId }
+        : {}),
+      ...(input.meta !== undefined ? { meta: input.meta } : {}),
+      ...(input.sentAt !== undefined ? { sentAt: input.sentAt } : {}),
+    })
+    .where(eq(emailDeliveries.id, input.id))
+    .returning();
+  return row ?? null;
+}

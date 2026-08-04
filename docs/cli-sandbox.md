@@ -38,6 +38,8 @@ The sandbox UI times stage lines client-side while awaiting `POST /api/public/sa
 
 CLI already receives live `onStage` callbacks from `moneygap-diagnostics`. Streaming those stages to the browser (SSE) is a future extension; homepage v1 stays client-timed log + real final JSON.
 
+After a successful free scan, the sandbox can **email a PDF report** (`POST /api/public/cli-report` with `source: "sandbox"`) and expose **Download PDF** once an Open Audit slug exists (email send or Publish to Open Audits).
+
 ## What the free scan checks
 
 - **Crawlability** — robots.txt reachability + Disallow:/ rules; sitemap.xml presence
@@ -98,6 +100,7 @@ Sandbox shows **what** is wrong. Step-by-step Fix Paths™ require **Clerk Start
 - [ ] TTY: email prompt → Open Audit URL + PDF download printed (+ email/PDF when Resend configured)
 - [ ] `CI=1` or `--yes` → no email prompt
 - [ ] Homepage Run free scan → findings + Unlock Fix Paths CTA
+- [ ] Homepage: Send PDF report + Download PDF after email or Publish
 - [ ] Bad / private URL → clear error
 - [ ] 6th scan/hour → 429
 - [ ] Start free → `/dashboard/analyze` shows sandbox banner + prefilled URL

@@ -2,6 +2,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users, workspaceMembers, workspaces } from "@/db/schema";
+import { enrollWelcomeSequence } from "@/lib/email/sequences/enroll-welcome";
 
 function slugify(input: string) {
   return input
@@ -88,6 +89,12 @@ export async function ensureUserAndWorkspace() {
     workspaceId: workspace.id,
     userId: clerkUser.id,
     role: "owner",
+  });
+
+  // Draft-only welcome/nurture queue — never sends email here.
+  void enrollWelcomeSequence({
+    userId: clerkUser.id,
+    workspaceId: workspace.id,
   });
 
   return { userId: clerkUser.id, workspace };

@@ -66,6 +66,12 @@ export function SandboxTerminal({ className }: { className?: string }) {
   >("idle");
   const [publishHref, setPublishHref] = useState<string | null>(null);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [pdfHref, setPdfHref] = useState<string | null>(null);
+  const [reportEmail, setReportEmail] = useState("");
+  const [emailState, setEmailState] = useState<
+    "idle" | "sending" | "done" | "error"
+  >("idle");
+  const [emailMessage, setEmailMessage] = useState<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const cancelStagesRef = useRef<(() => void) | null>(null);
 
@@ -101,6 +107,9 @@ export function SandboxTerminal({ className }: { className?: string }) {
     setPublishState("idle");
     setPublishHref(null);
     setPublishError(null);
+    setPdfHref(null);
+    setEmailState("idle");
+    setEmailMessage(null);
 
     cancelStagesRef.current = runProgressiveStages((line) => {
       setState((prev) => {
@@ -205,6 +214,7 @@ export function SandboxTerminal({ className }: { className?: string }) {
       const data = (await res.json()) as {
         ok?: boolean;
         href?: string;
+        slug?: string;
         error?: string;
       };
       if (!res.ok || !data.href) {
@@ -213,10 +223,63 @@ export function SandboxTerminal({ className }: { className?: string }) {
         return;
       }
       setPublishHref(data.href);
+      if (data.slug) {
+        setPdfHref(`/api/public/audits/${data.slug}/pdf`);
+      }
       setPublishState("done");
     } catch {
       setPublishState("error");
       setPublishError("Network error publishing audit.");
+    }
+  }
+
+  async function sendPdfReport() {
+    if (state.status !== "done") return;
+    const email = reportEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailState("error");
+      setEmailMessage("Enter a valid email address.");
+      return;
+    }
+    setEmailState("sending");
+    setEmailMessage(null);
+    try {
+      const res = await fetch("/api/public/cli-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          url: state.result.url,
+          score: state.result.score,
+          findings: state.result.findings,
+          durationMs: state.result.durationMs,
+          source: "sandbox",
+        }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        href?: string;
+        pdfHref?: string;
+        emailed?: boolean;
+        error?: string;
+      };
+      if (!res.ok || !data.ok || !data.href) {
+        setEmailState("error");
+        setEmailMessage(data.error ?? "Could not send report.");
+        return;
+      }
+      setPublishHref(data.href);
+      setPdfHref(data.pdfHref ?? null);
+      setPublishState("done");
+      setEmailState("done");
+      setEmailMessage(
+        data.emailed
+          ? `Check ${email} for the PDF attachment.`
+          : "Report published — email delivery soft-failed; use Download PDF below.",
+      );
+    } catch {
+      setEmailState("error");
+      setEmailMessage("Network error sending report.");
     }
   }
 
@@ -412,7 +475,60 @@ export function SandboxTerminal({ className }: { className?: string }) {
                       ? "Published"
                       : "Publish to Open Audits"}
                 </button>
+                {pdfHref ? (
+                  <a
+                    href={pdfHref}
+                    className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-white/15 px-4 text-sm text-white/80 transition hover:border-white/30 hover:text-white"
+                  >
+                    Download PDF
+                  </a>
+                ) : null}
               </div>
+
+              <div className="space-y-2 rounded-xl border border-white/10 bg-black/20 p-3">
+                <p className="text-xs text-white/55">
+                  Email yourself the visual PDF report (Open Audit + attachment).
+                </p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <input
+                    type="email"
+                    value={reportEmail}
+                    onChange={(e) => setReportEmail(e.target.value)}
+                    placeholder="you@company.com"
+                    autoComplete="email"
+                    className="h-11 flex-1 rounded-xl border border-white/15 bg-black/30 px-3 text-sm text-white placeholder:text-white/35 outline-none focus:border-accent/50"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void sendPdfReport();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    disabled={emailState === "sending" || emailState === "done"}
+                    onClick={() => void sendPdfReport()}
+                    className="inline-flex h-11 shrink-0 items-center justify-center rounded-xl bg-accent px-4 text-sm font-medium text-accent-fg transition hover:brightness-110 disabled:opacity-50"
+                  >
+                    {emailState === "sending"
+                      ? "Sending…"
+                      : emailState === "done"
+                        ? "Sent"
+                        : "Send PDF report"}
+                  </button>
+                </div>
+                {emailMessage ? (
+                  <p
+                    className={cn(
+                      "text-xs",
+                      emailState === "error" ? "text-danger" : "text-accent",
+                    )}
+                  >
+                    {emailMessage}
+                  </p>
+                ) : null}
+              </div>
+
               {publishState === "done" && publishHref ? (
                 <p className="text-xs text-accent">
                   Public snapshot:{" "}

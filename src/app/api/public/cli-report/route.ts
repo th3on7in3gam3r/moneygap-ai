@@ -33,6 +33,7 @@ const bodySchema = z.object({
   score: z.number().min(0).max(100),
   findings: z.array(findingSchema).max(50),
   durationMs: z.number().int().nonnegative().optional(),
+  source: z.enum(["cli", "sandbox"]).optional().default("cli"),
 });
 
 export async function POST(req: Request) {
@@ -60,6 +61,7 @@ export async function POST(req: Request) {
   const email = parsed.data.email.trim().toLowerCase();
   const score = Math.round(parsed.data.score);
   const findings = parsed.data.findings as DiagnosticFinding[];
+  const source = parsed.data.source;
 
   try {
     const row = await createPublicAuditSnapshot({
@@ -67,7 +69,7 @@ export async function POST(req: Request) {
       score,
       findings,
       durationMs: parsed.data.durationMs,
-      source: "cli",
+      source,
     });
 
     const href = `/labs/audits/${row.slug}`;
@@ -75,7 +77,10 @@ export async function POST(req: Request) {
     const hostname = hostnameFromUrl(parsed.data.url);
 
     try {
-      await db.insert(cliCicdWaitlist).values({ email, source: "cli_scan" });
+      await db.insert(cliCicdWaitlist).values({
+        email,
+        source: source === "sandbox" ? "sandbox" : "cli_scan",
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (!/unique|duplicate/i.test(msg)) {
@@ -90,7 +95,7 @@ export async function POST(req: Request) {
       url: parsed.data.url,
       score,
       findings,
-      source: "cli",
+      source,
       createdAt: row.createdAt,
     });
     const filename = auditPdfFilename(hostname, row.slug);
@@ -121,10 +126,16 @@ export async function POST(req: Request) {
       log("warn", "cli_report_email_soft_fail", {
         email,
         slug: row.slug,
+        source,
         error: "error" in sendResult ? sendResult.error : "send_failed",
       });
     } else {
-      log("info", "cli_report_emailed", { email, slug: row.slug, score });
+      log("info", "cli_report_emailed", {
+        email,
+        slug: row.slug,
+        score,
+        source,
+      });
     }
 
     return NextResponse.json({

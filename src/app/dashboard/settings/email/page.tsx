@@ -42,7 +42,7 @@ const CHANNELS: { key: keyof Prefs; label: string; hint: string }[] = [
   {
     key: "productUpdates",
     label: "Product Updates",
-    hint: "New MoneyGap features and launches",
+    hint: "New MoneyGap features, launches, and welcome nurture day-2/day-7 (when live)",
   },
   {
     key: "securityNotifications",
@@ -109,7 +109,9 @@ export default function EmailPreferencesPage() {
         </h1>
         <p className="mt-2 text-sm text-fg-muted">
           Personalized growth insights — not generic marketing. Delivered to{" "}
-          <span className="font-medium text-fg">{prefs.email}</span>.
+          <span className="font-medium text-fg">{prefs.email}</span>. Day-0 welcome
+          is transactional; day-2/7 nurture respects <strong className="font-medium text-fg">Product updates</strong> when live.
+          Review drafts in Email Center (AI Estimate impact claims are not guarantees).
         </p>
       </div>
 

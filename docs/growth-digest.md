@@ -77,3 +77,4 @@ After setting keys on the production host, redeploy/restart the web service, the
 2. New template keys under `templates/`
 3. New cron channels calling the same `sendEmail` + `recordDelivery`
 4. AI digest: implement `DigestContentProvider` and inject in `scheduler/run.ts`
+5. Welcome / nurture drafts: see [welcome-nurture.md](./welcome-nurture.md) (`EMAIL_WELCOME_LIVE`)
