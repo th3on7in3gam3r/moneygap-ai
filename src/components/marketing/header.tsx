@@ -91,6 +91,9 @@ export function MarketingFooter() {
           <Link href="/docs" className="hover:text-fg">
             Docs
           </Link>
+          <Link href="/extension" className="hover:text-fg">
+            Extension
+          </Link>
           <Link href="/security" className="hover:text-fg">
             Security
           </Link>

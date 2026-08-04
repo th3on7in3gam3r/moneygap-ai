@@ -199,14 +199,21 @@ export default async function ExtensionPublicReportPage({
             </ol>
           )}
 
-          <div className="pt-6">
+          <div className="pt-6 space-y-4">
             <Button href="/features" variant="secondary" size="sm">
               Explore MoneyGap AI
             </Button>
-            <p className="mt-3 text-xs text-fg-subtle">
+            <p className="text-xs text-fg-subtle">
               Want deeper analysis, monitoring, and Growth Badge™ verification?{" "}
               <Link href="/sign-up" className="text-accent underline-offset-2 hover:underline">
                 Create a free account
+              </Link>
+              .
+            </p>
+            <p className="text-xs text-fg-subtle">
+              Get the MoneyGap AI browser extension —{" "}
+              <Link href="/extension" className="text-accent underline-offset-2 hover:underline">
+                Coming Soon
               </Link>
               .
             </p>

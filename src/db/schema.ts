@@ -4826,3 +4826,20 @@ export const aiReadinessLlmsVersions = pgTable(
 );
 
 export type AiReadinessLlmsVersion = typeof aiReadinessLlmsVersions.$inferSelect;
+
+/** Browser extension Coming Soon waitlist */
+export const extensionWaitlist = pgTable(
+  "extension_waitlist",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    email: text("email").notNull().unique(),
+    source: text("source").notNull().default("extension_page"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("extension_waitlist_email_idx").on(t.email),
+    index("extension_waitlist_created_idx").on(t.createdAt),
+  ],
+);
+
+export type ExtensionWaitlistEntry = typeof extensionWaitlist.$inferSelect;

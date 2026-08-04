@@ -296,6 +296,13 @@ export default function HomePage() {
               </li>
             ))}
           </ul>
+          <p className="mt-10 text-sm text-fg-muted">
+            Prefer a quick scan in the browser? The{" "}
+            <Link href="/extension" className="font-medium text-accent underline-offset-2 hover:underline">
+              MoneyGap AI Chrome extension
+            </Link>{" "}
+            is Coming Soon — join the waitlist.
+          </p>
         </div>
       </section>
 

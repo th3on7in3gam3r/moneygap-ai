@@ -79,11 +79,18 @@ export const PUBLIC_DOC_CATALOG: PublicDocEntry[] = [
     order: 8,
   },
   {
+    slug: "browser-extension",
+    title: "Browser Extension (Coming Soon)",
+    summary: "Waitlist for the Chrome extension — live-page scans and Fix Path™ shares.",
+    category: "grow",
+    order: 9,
+  },
+  {
     slug: "growth-academy",
     title: "Growth Academy™",
     summary: "Educational playbooks that map to Fix Paths™ and live gaps.",
     category: "grow",
-    order: 9,
+    order: 10,
   },
 ];
 

@@ -9,7 +9,7 @@ import { buildPageMetadata, breadcrumbJsonLd, jsonLdScript } from "@/lib/seo";
 export const metadata = buildPageMetadata({
   title: "Features — Growth Operating System™",
   description:
-    "MoneyGap Engine™, Crawlability Score™, Fix Path™, Copilot, Growth Badge™, Trust Engine™, Growth Academy™, and more — the full MoneyGap AI capability map.",
+    "MoneyGap Engine™, Crawlability Score™, Fix Path™, Copilot, Growth Badge™, browser extension (Coming Soon), Trust Engine™, Growth Academy™, and more — the full MoneyGap AI capability map.",
   path: "/features",
 });
 
@@ -144,6 +144,14 @@ const FEATURES: FeatureBlock[] = [
     useCase: "An agency embeds Growth Optimized by MoneyGap AI™ in a client footer after shipping Fix Paths™.",
   },
   {
+    id: "extension",
+    title: "Browser Extension (Coming Soon)",
+    does: "Scan any live page from Chrome for MoneyGap Score™ signals and share Fix Path™ report links — without opening the full dashboard first.",
+    why: "Growth checks should meet the page you’re already evaluating in the browser.",
+    impact: "Faster spot-checks and shareable reports for teammates and clients.",
+    useCase: "A marketer opens a competitor pricing page, runs a quick extension scan, and shares the Fix Path™ link.",
+  },
+  {
     id: "integrations",
     title: "Integrations",
     does: "Integration Hub connects analysis and Fix Paths™ to the rest of the stack (GitHub, Stripe, HubSpot, and expanding catalog).",
@@ -233,7 +241,13 @@ export default function FeaturesPage() {
                   <span className="font-medium text-fg">Example. </span>
                   {f.useCase}
                 </p>
-                <StartFreeButton label="Try this in MoneyGap" size="md" />
+                {f.id === "extension" ? (
+                  <Button href="/extension" size="md">
+                    Extension waitlist
+                  </Button>
+                ) : (
+                  <StartFreeButton label="Try this in MoneyGap" size="md" />
+                )}
               </div>
             </div>
           </div>
