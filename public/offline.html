@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0f7a56" />
+    <title>Offline · MoneyGap AI</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f4f6f4;
+        --fg: #121816;
+        --muted: #5a6b62;
+        --accent: #0f7a56;
+        --border: #d5ddd8;
+        --card: #ffffff;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0a0e0c;
+          --fg: #eef3f0;
+          --muted: #9aaca2;
+          --accent: #2ee6a6;
+          --border: #24302a;
+          --card: #121916;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 1.5rem;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      main {
+        width: min(28rem, 100%);
+        border: 1px solid var(--border);
+        border-radius: 1.25rem;
+        background: var(--card);
+        padding: 1.75rem 1.5rem;
+        text-align: center;
+      }
+      img {
+        width: 64px;
+        height: 64px;
+        border-radius: 1rem;
+        margin: 0 auto 1rem;
+        display: block;
+      }
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: 1.35rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      p {
+        margin: 0 0 1.25rem;
+        color: var(--muted);
+        font-size: 0.95rem;
+        line-height: 1.5;
+      }
+      button {
+        appearance: none;
+        border: 0;
+        border-radius: 0.85rem;
+        background: var(--accent);
+        color: #04140e;
+        font: inherit;
+        font-weight: 600;
+        font-size: 0.9rem;
+        padding: 0.7rem 1.1rem;
+        cursor: pointer;
+      }
+      button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <main role="status" aria-live="polite">
+      <img src="/icon-192.png" alt="MoneyGap AI" width="64" height="64" />
+      <h1>You’re offline</h1>
+      <p>
+        MoneyGap AI can’t reach the network right now. Cached branding still
+        loads, but dashboards and scans need a connection.
+      </p>
+      <button type="button" onclick="location.reload()">Try again</button>
+    </main>
+  </body>
+</html>

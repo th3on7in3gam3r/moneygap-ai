@@ -2,6 +2,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { DM_Sans, Geist_Mono, Space_Grotesk } from "next/font/google";
 import { SmartConsentHost } from "@/components/privacy/smart-consent-host";
+import { PwaRegister } from "@/components/pwa/pwa-register";
 import { ThemeProvider } from "@/components/theme-provider";
 import {
   SITE_DEFAULT_DESCRIPTION,
@@ -42,6 +43,20 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   alternates: {
     canonical: "/",
+  },
+  applicationName: "MoneyGap AI",
+  manifest: "/manifest.webmanifest",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f4f6f4" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0e0c" },
+  ],
+  appleWebApp: {
+    capable: true,
+    title: "MoneyGap AI",
+    statusBarStyle: "default",
+  },
+  formatDetection: {
+    telephone: false,
   },
   icons: {
     icon: [
@@ -86,6 +101,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ThemeProvider>
             {children}
             <SmartConsentHost />
+            <PwaRegister />
           </ThemeProvider>
         </ClerkProvider>
       </body>
