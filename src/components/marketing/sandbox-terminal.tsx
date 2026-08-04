@@ -269,6 +269,7 @@ export function SandboxTerminal({ className }: { className?: string }) {
                   label="Unlock Fix Paths™"
                   size="lg"
                   className="w-full justify-center sm:w-auto"
+                  forceRedirectUrl="/dashboard/analyze"
                 />
                 <button
                   type="button"
