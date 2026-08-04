@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/features", label: "Features" },
+  { href: "/guides", label: "Guides" },
   { href: "/academy", label: "Growth Academy" },
   { href: "/docs", label: "Docs" },
   { href: "/pricing", label: "Pricing" },
@@ -75,6 +76,9 @@ export function MarketingFooter() {
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-fg-muted">
           <Link href="/features" className="hover:text-fg">
             Features
+          </Link>
+          <Link href="/guides" className="hover:text-fg">
+            Guides
           </Link>
           <Link href="/academy" className="hover:text-fg">
             Growth Academy

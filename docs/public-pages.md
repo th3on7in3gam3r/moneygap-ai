@@ -15,6 +15,10 @@ Launch-ready public SaaS marketing for MoneyGap AI: explain the product, build t
 | `/contact` | Form + support/sales/partnership emails |
 | `/docs` | Public Documentation hub (sidebar + categorized guides) |
 | `/docs/[slug]` | Customer-facing doc articles (`content/docs/*.md`) |
+| `/guides` | MoneyGap Guides hub (framework-aware developer knowledge) |
+| `/guides/[framework]` | Published topics for a framework |
+| `/guides/[framework]/[topic]` | Merged concept + framework overlay guide |
+| `/guides/search` | Client search + filters over published guides |
 | `/extension` | Browser extension Coming Soon + waitlist |
 | `/dashboard/badge` | Growth Badge™ generator, embed, journey |
 | `/dashboard/ai-readiness` | AI Readiness Engine™ — llms.txt validate/generate |
@@ -47,14 +51,17 @@ Privacy and Terms are professional scaffolds with an explicit review banner. Fin
 
 ## Nav
 
-- Header: Features, Growth Academy, Docs, Pricing, About
-- Footer: Features, Academy, Pricing, About, Contact, Docs, Security, Privacy, Terms
+- Header: Features, Guides, Growth Academy, Docs, Pricing, About
+- Footer: Features, Guides, Academy, Pricing, About, Contact, Docs, Extension, Security, Privacy, Terms
 
 ## Documentation
 
-Public guides live in `content/docs/` and are cataloged in `src/lib/docs/catalog.ts`. Do not publish repo-root `docs/*.md` engineering specs on the public site. Signed-in Documentation Center™ (`/dashboard/docs`) lists the same public catalog and links to `/docs/[slug]`.
+Public product docs live in `content/docs/` and are cataloged in `src/lib/docs/catalog.ts`. Do not publish repo-root `docs/*.md` engineering specs on the public site. Signed-in Documentation Center™ (`/dashboard/docs`) lists the same public catalog and links to `/docs/[slug]`.
+
+MoneyGap Guides (developer framework knowledge) live in `content/guides/` — see `docs/guides/`. Not the same as product `/docs` or Developer Hub™ (`/dashboard/developers`).
 
 ## Related
 
 - `docs/seo-intelligence.md`, `docs/crawlability-score.md`, `docs/scoring-system.md`
 - `docs/moneygap-cli.md` — offline `@moneygap/cli` developer scanner (not a public marketing route)
+- `docs/guides/` — Developer Guides Hub architecture and authoring

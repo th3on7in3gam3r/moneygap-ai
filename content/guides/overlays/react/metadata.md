@@ -1,0 +1,41 @@
+---
+title: "Metadata in React"
+description: "Titles, descriptions, and document head tags that shape SERP and social quality. Framework notes for React."
+difficulty: beginner
+tags:
+  - title
+  - description
+cliCommands:
+  - "moneygap scan"
+updated: "2026-08-04"
+---
+
+## Framework-Specific Explanation
+
+**React** should emit titles and descriptions in the initial HTML. Prefer SSR/SSG head managers (or a meta-framework) — client-only `document.title` is not enough for crawlers so crawlers never depend on client hydration for head tags.
+
+## Step-by-Step Solution
+
+1. Define a default site title template.
+2. Override per route with unique titles and descriptions.
+3. Ensure canonical and social tags align with the primary URL.
+4. Spot-check View Source (not only the DOM after hydration).
+
+## Code Examples
+
+```html
+<title>Pricing — Acme Analytics</title>
+<meta name="description" content="Simple plans for teams closing growth gaps. Start free." />
+```
+
+Wire these through SSR/SSG head managers (or a meta-framework) — client-only `document.title` is not enough for crawlers.
+
+## Deployment Checklist
+
+- [ ] Preview environments do not get indexed (robots / noindex as needed)
+- [ ] Production titles match messaging
+- [ ] `moneygap scan` reports no missing-title findings on key templates
+
+## Browser Extension Tips
+
+Open a key landing page and confirm the shared extension report lists metadata opportunities.
