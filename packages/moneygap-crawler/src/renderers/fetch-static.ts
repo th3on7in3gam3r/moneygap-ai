@@ -14,6 +14,8 @@ export type FetchTextResult =
       fetchMs: number;
     };
 
+const DEFAULT_TIMEOUT_MS = 15_000;
+
 export async function fetchText(
   url: string,
   opts: {
@@ -24,8 +26,9 @@ export async function fetchText(
   },
 ): Promise<FetchTextResult> {
   const started = Date.now();
+  const timeoutMs = opts.timeoutMs > 0 ? opts.timeoutMs : DEFAULT_TIMEOUT_MS;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), opts.timeoutMs);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, {
       method: "GET",
@@ -37,8 +40,15 @@ export async function fetchText(
       },
     });
 
-    // fetch follows redirects; approximate redirect count via opaque URL change only
+    // Body read is also aborted by the same signal in Node/Undici.
     const buf = await res.arrayBuffer();
+    if (controller.signal.aborted) {
+      return {
+        ok: false,
+        error: "Request timed out",
+        fetchMs: Date.now() - started,
+      };
+    }
     if (buf.byteLength > opts.maxBytes) {
       return {
         ok: false,
@@ -61,10 +71,16 @@ export async function fetchText(
       fetchMs: Date.now() - started,
     };
   } catch (err) {
-    const aborted = err instanceof Error && err.name === "AbortError";
+    const aborted =
+      (err instanceof Error && err.name === "AbortError") ||
+      controller.signal.aborted;
     return {
       ok: false,
-      error: aborted ? "Request timed out" : err instanceof Error ? err.message : String(err),
+      error: aborted
+        ? "Request timed out"
+        : err instanceof Error
+          ? err.message
+          : String(err),
       fetchMs: Date.now() - started,
     };
   } finally {

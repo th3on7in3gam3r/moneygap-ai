@@ -12,7 +12,8 @@ POST /api/analysis (+ scanProfile)
   → websiteAnalyses + after(runAnalysisPipeline)
      quick: crawlWebsite → finishPipelineWithPages
      other: runIncrementalDiscover → processScanTick loop
-            → scheduleScanTick (POST /api/scan/tick)
+            → scheduleScanTick (fire-and-forget POST /api/scan/tick)
+            → reclaim stale processing → concurrent extract
             → runPostCrawlAnalysis when queue drained
 ```
 
@@ -24,10 +25,21 @@ Also: `paused`, `cancelled`, `failed`, `waiting`, `retrying`.
 ### Tick (`POST /api/scan/tick`)
 
 - Auth: `Authorization: Bearer $CRON_SECRET` (or internal secret header).
-- Claims up to `batchSize` pages (`queued` / `retry` → `processing`).
-- Extracts via moneygap-crawler, mirrors into `website_pages`.
-- Updates `pagesCompleted` / `pagesFailed` / `estimatedRemainingMs`.
-- Reschedules via `after()` / `waitUntil` until drained, then post-crawl.
+- **Reclaims** `processing` rows older than 20s → `retry` (or `failed` after 3 attempts).
+- Claims up to `batchSize` pages (`queued` / `retry` → `processing`) with state-guarded UPDATE…RETURNING.
+- Extracts up to **5 pages concurrently**, each with a **15s** timeout.
+- Updates progress **after each page** (`pagesCompleted` / `pagesFailed` / `currentUrl`).
+- **Watchdog (20s)**: no progress → abort active extracts, requeue, continue.
+- Reschedules via **fire-and-forget** `after(scheduleScanTick)` (5s AbortSignal on the HTTP call — never awaits nested ticks).
+- When drained → post-crawl analysis.
+
+### Caps (quick / standard)
+
+- `maxPages`: quick **30**, standard **50** (hard enqueue ceiling 50 for those paths)
+- `maxDepth`: **2**
+- `concurrency`: **5**
+
+Deep / enterprise keep higher caps but use the same reclaim / watchdog / concurrency machinery.
 
 ### Control APIs
 
@@ -54,6 +66,11 @@ previous in-process crawl for speed.
 ## Env
 
 - `OPENAI_API_KEY` — required for post-crawl Engine
-- `CRON_SECRET` — required to authorize `/api/scan/tick`
+- `CRON_SECRET` — **required** to authorize `/api/scan/tick` (missing → ticks stop after first ~50s loop; `scanMeta.tickScheduleError` set)
+- `APP_URL` / `NEXT_PUBLIC_APP_URL` — tick self-invoke origin
 - `FIRECRAWL_API_KEY` — optional fallback for empty Quick crawls
-- `PLAYWRIGHT_ENABLED=1` — optional JS render on extract
+- `PLAYWRIGHT_ENABLED=1` — optional JS render on extract (launch/content timed)
+
+## Fault-tolerance report
+
+See [crawl-engine-fault-tolerance.md](./crawl-engine-fault-tolerance.md).

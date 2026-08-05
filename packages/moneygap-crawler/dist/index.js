@@ -73,13 +73,37 @@ __export(playwright_exports, {
   renderWithPlaywright: () => renderWithPlaywright,
   shouldUsePlaywright: () => shouldUsePlaywright
 });
-async function getBrowser() {
+function raceTimeout(promise, ms, label) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
+    promise.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      }
+    );
+  });
+}
+async function getBrowser(launchTimeoutMs) {
   try {
     const pw = await import("playwright");
     if (!browserPromise) {
-      browserPromise = pw.chromium.launch({
-        headless: true,
-        args: ["--disable-dev-shm-usage", "--no-sandbox"]
+      browserPromise = raceTimeout(
+        pw.chromium.launch({
+          headless: true,
+          args: ["--disable-dev-shm-usage", "--no-sandbox"]
+        }),
+        launchTimeoutMs,
+        "playwright.launch"
+      ).catch((err) => {
+        browserPromise = null;
+        throw err;
       });
     }
     return await browserPromise;
@@ -92,28 +116,38 @@ async function closeBrowser() {
   if (!browserPromise) return;
   try {
     const browser = await browserPromise;
-    await browser.close();
+    await raceTimeout(browser.close(), 5e3, "playwright.close");
   } catch {
   } finally {
     browserPromise = null;
   }
 }
 async function renderWithPlaywright(url, opts) {
-  const browser = await getBrowser();
+  const timeoutMs = opts.timeoutMs > 0 ? opts.timeoutMs : 15e3;
+  const browser = await getBrowser(Math.min(timeoutMs, 15e3));
   if (!browser) return null;
   const started = Date.now();
-  const context = await browser.newContext({
-    userAgent: opts.userAgent,
-    javaScriptEnabled: true
-  });
+  let context = null;
   try {
-    const page = await context.newPage();
+    context = await raceTimeout(
+      browser.newContext({
+        userAgent: opts.userAgent,
+        javaScriptEnabled: true
+      }),
+      1e4,
+      "playwright.newContext"
+    );
+    const page = await raceTimeout(context.newPage(), 1e4, "playwright.newPage");
     const res = await page.goto(url, {
       waitUntil: "domcontentloaded",
-      timeout: opts.timeoutMs
+      timeout: timeoutMs
     });
-    await page.waitForTimeout(400);
-    const html = await page.content();
+    await page.waitForTimeout(Math.min(400, timeoutMs));
+    const html = await raceTimeout(
+      page.content(),
+      Math.max(5e3, timeoutMs),
+      "playwright.content"
+    );
     return {
       html,
       finalUrl: page.url(),
@@ -124,7 +158,11 @@ async function renderWithPlaywright(url, opts) {
   } catch {
     return null;
   } finally {
-    await context.close().catch(() => void 0);
+    if (context) {
+      await raceTimeout(context.close(), 5e3, "playwright.contextClose").catch(
+        () => void 0
+      );
+    }
   }
 }
 function shouldUsePlaywright(html, playwrightEnabled) {
@@ -196,14 +234,44 @@ var globalCrawlCache = new MemoryCache();
 
 // src/discovery/normalize.ts
 import normalizeUrlLib from "normalize-url";
+var STRIP_QUERY_PARAMS = [
+  /^utm_/i,
+  "fbclid",
+  "gclid",
+  "gbraid",
+  "wbraid",
+  /^mc_/i,
+  "_ga",
+  "_gl",
+  "yclid",
+  "msclkid",
+  "dclid",
+  "twclid",
+  "li_fat_id",
+  "igshid",
+  "vero_id"
+];
 function normalizeCrawlUrl(raw, opts) {
   const withProto = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-  return normalizeUrlLib(withProto, {
-    stripHash: opts?.stripHash ?? true,
-    removeQueryParameters: false,
-    stripWWW: false,
-    forceHttps: false
-  });
+  try {
+    return normalizeUrlLib(withProto, {
+      stripHash: opts?.stripHash ?? true,
+      stripWWW: opts?.stripWww ?? false,
+      forceHttps: true,
+      removeTrailingSlash: true,
+      removeQueryParameters: STRIP_QUERY_PARAMS,
+      sortQueryParameters: true
+    });
+  } catch {
+    try {
+      const u = new URL(withProto);
+      u.hash = "";
+      u.protocol = "https:";
+      return u.href.replace(/\/$/, "") || u.origin;
+    } catch {
+      return withProto;
+    }
+  }
 }
 function sameOrigin(a, b) {
   try {
@@ -566,10 +634,12 @@ function isTransientError(statusCode, message) {
 }
 
 // src/renderers/fetch-static.ts
+var DEFAULT_TIMEOUT_MS = 15e3;
 async function fetchText(url, opts) {
   const started = Date.now();
+  const timeoutMs = opts.timeoutMs > 0 ? opts.timeoutMs : DEFAULT_TIMEOUT_MS;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), opts.timeoutMs);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, {
       method: "GET",
@@ -581,6 +651,13 @@ async function fetchText(url, opts) {
       }
     });
     const buf = await res.arrayBuffer();
+    if (controller.signal.aborted) {
+      return {
+        ok: false,
+        error: "Request timed out",
+        fetchMs: Date.now() - started
+      };
+    }
     if (buf.byteLength > opts.maxBytes) {
       return {
         ok: false,
@@ -603,7 +680,7 @@ async function fetchText(url, opts) {
       fetchMs: Date.now() - started
     };
   } catch (err) {
-    const aborted = err instanceof Error && err.name === "AbortError";
+    const aborted = err instanceof Error && err.name === "AbortError" || controller.signal.aborted;
     return {
       ok: false,
       error: aborted ? "Request timed out" : err instanceof Error ? err.message : String(err),

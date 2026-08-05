@@ -19,13 +19,17 @@ export interface QueueProvider {
   claimBatch(
     jobId: string,
     limit: number,
-  ): Promise<Array<{ id: string; url: string }>>;
+  ): Promise<Array<{ id: string; url: string; attempts: number }>>;
   markCompleted(
     pageId: string,
     data: { title: string | null; markdown: string; pageType: string; metadata: Record<string, unknown> },
   ): Promise<void>;
   markFailed(pageId: string, error: string, retry: boolean): Promise<void>;
   countByState(jobId: string): Promise<Record<string, number>>;
+  reclaimStaleProcessing(
+    jobId: string,
+    staleMs?: number,
+  ): Promise<{ retried: number; failed: number }>;
 }
 
 export interface StorageProvider {

@@ -68,6 +68,31 @@ export const ANALYSIS_STAGES = [
 
 export type AnalysisStageId = (typeof ANALYSIS_STAGES)[number]["id"];
 
+/**
+ * Fault-tolerant scan engine stages (progress reporting / diagnostics).
+ * Soft-fail: mark failed in scanMeta.stageDiagnostics and continue when possible.
+ */
+export const SCAN_ENGINE_STAGES = [
+  { id: "connect", label: "Connect", progress: 6 },
+  { id: "discover", label: "Discover URLs", progress: 10 },
+  { id: "read_pages", label: "Read Pages", progress: 18 },
+  { id: "extract_content", label: "Extract Content", progress: 32 },
+  { id: "business_intelligence", label: "Business Intelligence", progress: 42 },
+  { id: "revenue_intelligence", label: "Revenue Intelligence", progress: 76 },
+  { id: "money_gap_engine", label: "Money Gap Engine", progress: 88 },
+  { id: "generate_report", label: "Generate Report", progress: 100 },
+] as const;
+
+export type ScanEngineStageId = (typeof SCAN_ENGINE_STAGES)[number]["id"];
+
+export type StageDiagnostic = {
+  stage: ScanEngineStageId | string;
+  status: "ok" | "failed" | "skipped";
+  detail?: string;
+  completed?: number;
+  failed?: number;
+};
+
 export const PAGE_TYPES = [
   "homepage",
   "nav",

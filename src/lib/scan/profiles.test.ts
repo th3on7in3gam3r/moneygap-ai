@@ -14,10 +14,13 @@ import {
 
 describe("scan profiles", () => {
   it("defines four profiles with increasing page caps", () => {
-    assert.equal(SCAN_PROFILES.quick.maxPages, 25);
-    assert.equal(SCAN_PROFILES.standard.maxPages, 250);
+    assert.equal(SCAN_PROFILES.quick.maxPages, 30);
+    assert.equal(SCAN_PROFILES.standard.maxPages, 50);
     assert.equal(SCAN_PROFILES.deep.maxPages, 5_000);
     assert.equal(SCAN_PROFILES.enterprise.maxPages, 50_000);
+    assert.equal(SCAN_PROFILES.quick.maxDepth, 2);
+    assert.equal(SCAN_PROFILES.standard.maxDepth, 2);
+    assert.equal(SCAN_PROFILES.standard.concurrency, 5);
     assert.ok(SCAN_PROFILES.standard.batchSize >= 5);
     assert.ok(SCAN_PROFILES.standard.batchSize <= 15);
     assert.equal(getScanProfile("enterprise").crawlerMode, "deep");

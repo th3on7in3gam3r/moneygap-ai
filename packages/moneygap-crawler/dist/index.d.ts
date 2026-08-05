@@ -205,8 +205,14 @@ declare function loadRobots(origin: string, opts: {
 declare function classifyPageType(url: string, homepageUrl: string): PageType;
 declare function prioritizeUrls(homepage: string, candidates: string[], limit: number, mode: "quick" | "standard" | "deep"): string[];
 
+/**
+ * Canonical crawl URL for dedup.
+ * Collapses: trailing slash, hash, utm/fbclid/gclid, http→https.
+ * example.com / example.com/ / ?utm= / #section → one URL.
+ */
 declare function normalizeCrawlUrl(raw: string, opts?: {
     stripHash?: boolean;
+    stripWww?: boolean;
 }): string;
 declare function sameOrigin(a: string, b: string): boolean;
 declare function resolveUrl(base: string, href: string): string | null;

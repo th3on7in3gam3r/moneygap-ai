@@ -694,6 +694,15 @@ export async function runAnalysisPipeline(analysisId: string) {
       .where(eq(websites.id, analysis.websiteId));
 
     await setStage(analysisId, "connecting");
+    await db
+      .update(websiteAnalyses)
+      .set({
+        scanMeta: {
+          scanStage: "connect",
+          stageDiagnostics: [{ stage: "connect", status: "ok" }],
+        },
+      })
+      .where(eq(websiteAnalyses.id, analysisId));
 
     const profileId: ScanProfile = isScanProfile(analysis.scanProfile)
       ? analysis.scanProfile
@@ -835,6 +844,29 @@ async function finishPipelineWithPages(
   startedAtMs: number,
 ) {
   try {
+    const priorMeta =
+      (analysis.scanMeta as Record<string, unknown> | null) ?? {};
+    const priorDiag = Array.isArray(priorMeta.stageDiagnostics)
+      ? (priorMeta.stageDiagnostics as unknown[])
+      : [];
+    await db
+      .update(websiteAnalyses)
+      .set({
+        scanMeta: {
+          ...priorMeta,
+          scanStage: "extract_content",
+          stageDiagnostics: [
+            ...priorDiag,
+            {
+              stage: "extract_content",
+              status: "ok",
+              detail: `Corpus from ${pages.length} pages`,
+            },
+          ],
+        },
+      })
+      .where(eq(websiteAnalyses.id, analysisId));
+
     const corpus = buildCrawlCorpus(pages);
 
     await setStage(analysisId, "understanding");
