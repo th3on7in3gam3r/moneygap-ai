@@ -49,7 +49,8 @@ export async function GET(
     !analysis.reportId &&
     (analysis.status === "running" || analysis.status === "queued")
   ) {
-    // Hung during crawl / Reading pages — fail after ~3m so UI unlocks.
+    // Hung during crawl / Reading pages — fail after stale budget so UI unlocks.
+    // Incremental profiles use a longer budget (see failStalePreReportAnalysis).
     const failedStale = await failStalePreReportAnalysis(id);
     if (failedStale.ok) {
       analysis = await db.query.websiteAnalyses.findFirst({
@@ -78,6 +79,18 @@ export async function GET(
     reportId: analysis.reportId,
     startedAt: analysis.startedAt,
     completedAt: analysis.completedAt,
+    scanProfile: analysis.scanProfile,
+    scanPhase: analysis.scanPhase,
+    pagesDiscovered: analysis.pagesDiscovered ?? 0,
+    pagesCompleted: analysis.pagesCompleted ?? 0,
+    pagesFailed: analysis.pagesFailed ?? 0,
+    estimatedRemainingMs: analysis.estimatedRemainingMs,
+    scanMeta: analysis.scanMeta,
+    currentUrl:
+      analysis.scanMeta &&
+      typeof (analysis.scanMeta as { currentUrl?: unknown }).currentUrl === "string"
+        ? (analysis.scanMeta as { currentUrl: string }).currentUrl
+        : null,
     stages: ANALYSIS_STAGES.map((s, index) => {
       const done =
         analysis.status === "completed" ||
@@ -109,6 +122,9 @@ function resolveAnalysisStageIndex(stage: string, progress: number): number {
   if (byLabel >= 0) return byLabel;
 
   const lower = stage.toLowerCase();
+  if (lower.startsWith("reading pages")) {
+    return ANALYSIS_STAGES.findIndex((s) => s.id === "reading");
+  }
   if (
     lower.includes("opportunity module") ||
     lower.includes("scoring growth roadmap") ||

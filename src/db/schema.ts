@@ -480,6 +480,16 @@ export const websiteAnalyses = pgTable(
     stage: text("stage").notNull().default("queued"),
     progress: integer("progress").notNull().default(0),
     error: text("error"),
+    /** Scan Profiles: quick | standard | deep | enterprise */
+    scanProfile: text("scan_profile").default("standard"),
+    /** queued|estimating|discovering|processing|paused|waiting|analyzing|completed|failed|cancelled|retrying */
+    scanPhase: text("scan_phase").default("queued"),
+    pagesDiscovered: integer("pages_discovered").default(0),
+    pagesCompleted: integer("pages_completed").default(0),
+    pagesFailed: integer("pages_failed").default(0),
+    crawlJobId: uuid("crawl_job_id"),
+    estimatedRemainingMs: integer("estimated_remaining_ms"),
+    scanMeta: jsonb("scan_meta").$type<Record<string, unknown>>(),
     startedAt: timestamp("started_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     durationMs: integer("duration_ms"),
@@ -513,6 +523,58 @@ export const websitePages = pgTable(
   (t) => [
     index("website_pages_analysis_idx").on(t.analysisId),
     index("website_pages_type_idx").on(t.pageType),
+  ],
+);
+
+/** Crawl Engine v2 — durable Deep Scan jobs (Render worker). */
+export const crawlJobs = pgTable(
+  "crawl_jobs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    analysisId: uuid("analysis_id").references(() => websiteAnalyses.id, {
+      onDelete: "set null",
+    }),
+    url: text("url").notNull(),
+    mode: text("mode").notNull().default("deep"), // quick | standard | deep
+    maxPages: integer("max_pages").notNull().default(200),
+    status: text("status").notNull().default("queued"), // queued | processing | completed | failed | retry | cancelled
+    pageCount: integer("page_count"),
+    error: text("error"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("crawl_jobs_status_idx").on(t.status),
+    index("crawl_jobs_analysis_idx").on(t.analysisId),
+  ],
+);
+
+export const crawlPages = pgTable(
+  "crawl_pages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => crawlJobs.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    pageType: text("page_type").notNull().default("other"),
+    title: text("title"),
+    markdown: text("markdown"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    /** queued | processing | completed | retry | failed | skipped | cancelled */
+    state: text("state").notNull().default("queued"),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("crawl_pages_job_idx").on(t.jobId),
+    index("crawl_pages_url_idx").on(t.url),
+    index("crawl_pages_state_idx").on(t.state),
+    uniqueIndex("crawl_pages_job_url_uidx").on(t.jobId, t.url),
   ],
 );
 

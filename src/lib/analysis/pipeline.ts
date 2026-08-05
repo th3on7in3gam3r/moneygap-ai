@@ -11,7 +11,7 @@ import {
   websitePages,
   websites,
 } from "@/db/schema";
-import { buildCrawlCorpus, crawlWebsite } from "@/lib/analysis/firecrawl";
+import { buildCrawlCorpus, crawlWebsite, type ScrapedPage } from "@/lib/analysis/firecrawl";
 import type { IntelligenceResult } from "@/lib/analysis/openai";
 import { generateWebsiteIntelligence } from "@/lib/analysis/openai";
 import { persistMoneyGapEngineResult } from "@/lib/analysis/persist-money-gaps";
@@ -24,6 +24,8 @@ import {
 } from "@/lib/analysis/stages";
 import { log } from "@/lib/observability/logger";
 import { trackProductMetric } from "@/lib/observability/metrics";
+import { getScanProfile, isScanProfile } from "@/lib/scan/profiles";
+import type { ScanProfile } from "@/lib/scan/types";
 import { MONEYGAP_ENGINE_VERSION, TRUST_ENGINE_VERSION } from "@/lib/trust";
 
 async function setStage(analysisId: string, stageId: AnalysisStageId | "complete") {
@@ -150,6 +152,10 @@ export async function failStalePreReportAnalysis(analysisId: string) {
       createdAt: true,
       websiteId: true,
       stage: true,
+      scanPhase: true,
+      scanProfile: true,
+      pagesCompleted: true,
+      estimatedRemainingMs: true,
     },
   });
   if (!analysis) return { ok: false as const, reason: "missing" as const };
@@ -157,9 +163,34 @@ export async function failStalePreReportAnalysis(analysisId: string) {
   if (analysis.status !== "running" && analysis.status !== "queued") {
     return { ok: false as const, reason: "not_running" as const };
   }
+  if (analysis.scanPhase === "paused") {
+    return { ok: false as const, reason: "paused" as const };
+  }
 
   const clock = analysis.startedAt ?? analysis.createdAt;
-  if (Date.now() - clock.getTime() < PRE_REPORT_STALE_MS) {
+  const ageMs = Date.now() - clock.getTime();
+
+  // Incremental profiles can run well past a single serverless window.
+  const incremental =
+    analysis.scanProfile != null &&
+    analysis.scanProfile !== "quick" &&
+    (analysis.scanPhase === "discovering" ||
+      analysis.scanPhase === "processing" ||
+      analysis.scanPhase === "waiting" ||
+      analysis.scanPhase === "analyzing");
+  const budgetMs = incremental
+    ? Math.max(
+        PRE_REPORT_STALE_MS,
+        (analysis.estimatedRemainingMs ?? 0) + 15 * 60 * 1000,
+        // Hard ceiling so truly hung jobs still unlock the UI.
+        Math.min(
+          3 * 60 * 60 * 1000,
+          30 * 60 * 1000 + (analysis.pagesCompleted ?? 0) * 2_000,
+        ),
+      )
+    : PRE_REPORT_STALE_MS;
+
+  if (ageMs < budgetMs) {
     return { ok: false as const, reason: "too_fresh" as const };
   }
 
@@ -167,6 +198,8 @@ export async function failStalePreReportAnalysis(analysisId: string) {
     analysisId,
     stage: analysis.stage,
     status: analysis.status,
+    scanPhase: analysis.scanPhase,
+    budgetMs,
   });
 
   await failAnalysis(
@@ -369,7 +402,7 @@ export async function runMoneyGapEngineOnly(analysisId: string) {
 
 const STALE_RUNNING_MS = 8 * 60 * 1000;
 /** Pre-report crawl (Reading pages) should fail sooner than full engine stale. */
-const PRE_REPORT_STALE_MS = 3 * 60 * 1000;
+const PRE_REPORT_STALE_MS = 25 * 60 * 1000;
 /** Terminal fail if still not done this long after analysis creation (resume loops). */
 const RESUME_WALL_CLOCK_MS = 25 * 60 * 1000;
 
@@ -634,7 +667,7 @@ export async function runAnalysisPipeline(analysisId: string) {
 
   if (!analysis) return;
 
-  if (!process.env.FIRECRAWL_API_KEY || !process.env.OPENAI_API_KEY) {
+  if (!process.env.OPENAI_API_KEY) {
     await failAnalysis(analysisId, analysis.websiteId, MISSING_KEYS_ERROR);
     return;
   }
@@ -662,8 +695,52 @@ export async function runAnalysisPipeline(analysisId: string) {
 
     await setStage(analysisId, "connecting");
 
+    const profileId: ScanProfile = isScanProfile(analysis.scanProfile)
+      ? analysis.scanProfile
+      : "standard";
+    const profile = getScanProfile(profileId);
+
+    // Incremental profiles: discover + serverless ticks; post-crawl runs from tick.
+    if (profileId !== "quick") {
+      await db
+        .update(websiteAnalyses)
+        .set({
+          scanProfile: profileId,
+          scanPhase: "discovering",
+          status: "running",
+        })
+        .where(eq(websiteAnalyses.id, analysisId));
+      const { runIncrementalDiscover } = await import("@/lib/scan/batch");
+      await runIncrementalDiscover(analysisId);
+      return;
+    }
+
     await setStage(analysisId, "reading");
-    const pages = await crawlWebsite(analysis.url);
+    await db
+      .update(websiteAnalyses)
+      .set({ scanProfile: "quick", scanPhase: "processing" })
+      .where(eq(websiteAnalyses.id, analysisId));
+
+    const pages = await crawlWebsite(analysis.url, {
+      mode: profile.crawlerMode,
+      maxPages: profile.maxPages,
+      onProgress: async (event) => {
+        const label =
+          event.pagesProcessed > 0
+            ? `Reading pages (${event.pagesProcessed} processed, ${event.pagesRemaining} remaining)`
+            : `Reading pages (${event.phase})`;
+        const progress = Math.min(
+          30,
+          18 +
+            Math.round(
+              (event.pagesProcessed /
+                Math.max(1, Math.max(event.pagesDiscovered, event.pagesProcessed))) *
+                12,
+            ),
+        );
+        await updateAnalysisStageLabel(analysisId, label, progress);
+      },
+    });
 
     const afterCrawl = await db.query.websiteAnalyses.findFirst({
       where: eq(websiteAnalyses.id, analysisId),
@@ -686,6 +763,78 @@ export async function runAnalysisPipeline(analysisId: string) {
       })),
     );
 
+    await db
+      .update(websiteAnalyses)
+      .set({
+        scanPhase: "analyzing",
+        pagesDiscovered: pages.length,
+        pagesCompleted: pages.length,
+      })
+      .where(eq(websiteAnalyses.id, analysisId));
+
+    await finishPipelineWithPages(analysisId, analysis, pages, startedAtMs);
+  } catch (err) {
+    log("error", "analysis_failed", {
+      analysisId,
+      durationMs: Date.now() - startedAtMs,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    await failAnalysis(analysisId, analysis.websiteId, toUserSafeError(err));
+  }
+}
+
+/** Resume analysis after durable crawl pages are stored in website_pages. */
+export async function runPostCrawlAnalysis(analysisId: string) {
+  const startedAtMs = Date.now();
+  const analysis = await db.query.websiteAnalyses.findFirst({
+    where: eq(websiteAnalyses.id, analysisId),
+    with: { website: true },
+  });
+  if (!analysis) return;
+  if (!process.env.OPENAI_API_KEY) {
+    await failAnalysis(analysisId, analysis.websiteId, MISSING_KEYS_ERROR);
+    return;
+  }
+
+  const rows = await db.query.websitePages.findMany({
+    where: eq(websitePages.analysisId, analysisId),
+  });
+  const pages: ScrapedPage[] = rows.map((p) => ({
+    url: p.url,
+    pageType: (p.pageType as ScrapedPage["pageType"]) || "other",
+    title: p.title,
+    markdown: p.markdown ?? "",
+    metadata: (p.metadata as Record<string, unknown>) ?? {},
+  }));
+
+  if (pages.length === 0) {
+    await failAnalysis(analysisId, analysis.websiteId, PUBLIC_CRAWL_ERROR);
+    return;
+  }
+
+  try {
+    await finishPipelineWithPages(analysisId, analysis, pages, startedAtMs);
+  } catch (err) {
+    log("error", "analysis_failed", {
+      analysisId,
+      durationMs: Date.now() - startedAtMs,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    await failAnalysis(analysisId, analysis.websiteId, toUserSafeError(err));
+  }
+}
+
+type PipelineAnalysis = NonNullable<
+  Awaited<ReturnType<typeof db.query.websiteAnalyses.findFirst>>
+> & { website: { domain: string; name: string; id: string } };
+
+async function finishPipelineWithPages(
+  analysisId: string,
+  analysis: PipelineAnalysis,
+  pages: ScrapedPage[],
+  startedAtMs: number,
+) {
+  try {
     const corpus = buildCrawlCorpus(pages);
 
     await setStage(analysisId, "understanding");
@@ -869,10 +1018,9 @@ export async function runAnalysisPipeline(analysisId: string) {
 
     await db
       .update(websiteAnalyses)
-      .set({ reportId: report.id })
+      .set({ reportId: report.id, scanPhase: "analyzing" })
       .where(eq(websiteAnalyses.id, analysisId));
 
-    // Phase 3: Money Gap Engine — intelligence stays usable if engine fails
     await setStage(analysisId, "detecting_gaps");
     await setStage(analysisId, "quantifying");
     await setStage(analysisId, "action_plans");
@@ -886,7 +1034,6 @@ export async function runAnalysisPipeline(analysisId: string) {
       corpus,
     });
 
-    // Phase 4: Competitive Intelligence™ — soft-fail (Phase 2/3 remain usable)
     await setStage(analysisId, "discovering_competitors");
     await persistCompetitiveIntelligence({
       analysisId,
@@ -906,7 +1053,6 @@ export async function runAnalysisPipeline(analysisId: string) {
       },
     });
 
-    // Phase 6: Monitor post-process — soft-fail
     try {
       const { runMonitorPostProcess } = await import("@/lib/monitor/post-process");
       await runMonitorPostProcess({
@@ -922,7 +1068,6 @@ export async function runAnalysisPipeline(analysisId: string) {
       });
     }
 
-    // Phase 10: API webhooks — soft-fail
     try {
       const { emitWebhookEvent } = await import("@/lib/platform/webhooks");
       await emitWebhookEvent({
@@ -976,6 +1121,7 @@ export async function runAnalysisPipeline(analysisId: string) {
       .set({
         reportId: report.id,
         status: "completed",
+        scanPhase: "completed",
         stage: "Complete",
         progress: 100,
         completedAt: new Date(),
@@ -1063,14 +1209,17 @@ export async function runAnalysisPipeline(analysisId: string) {
       if (score >= 90) {
         await recordTimelineEvent({
           workspaceId: analysis.workspaceId,
-          type: "score_threshold",
-          title: "Score reached 90",
-          meta: { score },
+          type: "score_milestone",
+          title: `MoneyGap Score™ hit ${score}`,
+          meta: { score, reportId: report.id },
         });
       }
       await evaluateAchievements(analysis.workspaceId);
-    } catch {
-      // soft-fail Growth OS hooks
+    } catch (err) {
+      log("warn", "growth_os_soft_fail", {
+        analysisId,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     await db
@@ -1082,11 +1231,6 @@ export async function runAnalysisPipeline(analysisId: string) {
       })
       .where(eq(websites.id, analysis.websiteId));
   } catch (err) {
-    log("error", "analysis_failed", {
-      analysisId,
-      durationMs: Date.now() - startedAtMs,
-      error: err instanceof Error ? err.message : String(err),
-    });
-    await failAnalysis(analysisId, analysis.websiteId, toUserSafeError(err));
+    throw err;
   }
 }

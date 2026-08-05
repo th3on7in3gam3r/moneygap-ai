@@ -28,6 +28,9 @@
   "publishConfig": {
     "access": "public"
   },
+  "dependencies": {
+    "moneygap-crawler": "file:../moneygap-crawler"
+  },
   "devDependencies": {
     "@types/node": "^22.13.10",
     "tsup": "^8.4.0",

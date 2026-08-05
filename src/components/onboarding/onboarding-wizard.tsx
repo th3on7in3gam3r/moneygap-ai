@@ -23,6 +23,7 @@ import {
 import { MoneyGapScore } from "@/components/money-gap";
 import { GOAL_OPTIONS, PERSONA_OPTIONS } from "@/lib/onboarding/constants";
 import { readSandboxHandoff } from "@/lib/public-diagnostics/sandbox-storage";
+import type { EstimateResult, ScanProfile } from "@/lib/scan/types";
 import { cn } from "@/lib/utils";
 import type {
   DiscoverySignals,
@@ -98,6 +99,9 @@ export function OnboardingWizard() {
   const [persona, setPersona] = useState<OnboardingPersonaRole | null>(null);
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [copilotHref, setCopilotHref] = useState("/dashboard/copilot");
+  const [scanProfile, setScanProfile] = useState<ScanProfile>("quick");
+  const [estimate, setEstimate] = useState<EstimateResult | null>(null);
+  const [estimating, setEstimating] = useState(false);
   const dismissToast = useCallback(() => setToast(null), []);
 
   const refresh = useCallback(async () => {
@@ -350,6 +354,42 @@ export function OnboardingWizard() {
     }
   }
 
+  async function runScanEstimate() {
+    const target = url || onboarding?.primaryWebsiteUrl;
+    if (!target) {
+      setToast(makeFlashToast("Add a website URL first.", "error"));
+      return;
+    }
+    setEstimating(true);
+    try {
+      const res = await fetch("/api/scan/estimate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: target }),
+      });
+      const data = (await res.json()) as {
+        estimate?: EstimateResult;
+        error?: string;
+      };
+      if (!res.ok || !data.estimate) {
+        setToast(
+          makeFlashToast(data.error ?? "Could not estimate this website.", "error"),
+        );
+        return;
+      }
+      setEstimate(data.estimate);
+      // Onboarding prefers quick when viable; otherwise follow the estimator.
+      setScanProfile(
+        data.estimate.recommendedProfile === "quick" ||
+          data.estimate.estimatedPages <= 40
+          ? "quick"
+          : data.estimate.recommendedProfile,
+      );
+    } finally {
+      setEstimating(false);
+    }
+  }
+
   async function startScan() {
     setBusy(true);
     setToast(makeFlashToast("Checking that the website is reachable…", "info"));
@@ -357,7 +397,10 @@ export function OnboardingWizard() {
       const res = await fetch("/api/onboarding/start-scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url || onboarding?.primaryWebsiteUrl }),
+        body: JSON.stringify({
+          url: url || onboarding?.primaryWebsiteUrl,
+          scanProfile,
+        }),
       });
       const data = (await res.json()) as {
         analysisId?: string;
@@ -718,6 +761,89 @@ export function OnboardingWizard() {
                 );
               })}
             </ul>
+
+            <div className="space-y-3 rounded-xl border border-border bg-bg-muted/40 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+                    Scan profile
+                  </p>
+                  <p className="mt-1 text-xs text-fg-muted">
+                    Estimate your site, then pick Quick (default for onboarding) or a deeper crawl.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy || estimating}
+                  onClick={() => void runScanEstimate()}
+                >
+                  {estimating ? "Estimating…" : estimate ? "Re-estimate" : "Estimate site"}
+                </Button>
+              </div>
+              {estimate ? (
+                <p className="text-xs text-fg">
+                  ~{estimate.estimatedPages.toLocaleString()} pages · {estimate.complexity}{" "}
+                  complexity
+                  {estimate.framework !== "unknown" ? ` · ${estimate.framework}` : ""}
+                </p>
+              ) : null}
+              <div className="grid gap-2 sm:grid-cols-2">
+                {(
+                  [
+                    {
+                      id: "quick" as const,
+                      label: "Quick",
+                      hint: "Fast first results",
+                    },
+                    {
+                      id: "standard" as const,
+                      label: "Standard",
+                      hint: "Up to 250 pages",
+                    },
+                    {
+                      id: "deep" as const,
+                      label: "Deep",
+                      hint: "Large sites, resumable",
+                    },
+                    {
+                      id: "enterprise" as const,
+                      label: "Enterprise",
+                      hint: "Very large sites",
+                    },
+                  ] as const
+                ).map((p) => {
+                  const selected = scanProfile === p.id;
+                  const recommended = estimate?.recommendedProfile === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setScanProfile(p.id)}
+                      className={cn(
+                        "rounded-xl border px-3 py-2.5 text-left transition",
+                        selected
+                          ? "border-accent bg-accent-soft/40"
+                          : "border-border hover:border-border-strong",
+                      )}
+                    >
+                      <p className="text-sm font-semibold text-fg">
+                        {p.label}
+                        {recommended ? (
+                          <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-accent">
+                            Recommended
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="mt-0.5 text-xs text-fg-muted">
+                        {estimate?.etaByProfile[p.id]?.etaLabel ?? p.hint}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="flex flex-wrap justify-end gap-2">
               <Button variant="ghost" disabled={busy} onClick={() => void go("role")}>
                 Back

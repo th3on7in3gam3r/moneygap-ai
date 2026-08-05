@@ -35,6 +35,13 @@ type StatusPayload = {
   error: string | null;
   reportId: string | null;
   stages: StageState[];
+  scanProfile?: string | null;
+  scanPhase?: string | null;
+  pagesDiscovered?: number;
+  pagesCompleted?: number;
+  pagesFailed?: number;
+  estimatedRemainingMs?: number | null;
+  currentUrl?: string | null;
 };
 
 export function AnalysisProgress({
@@ -62,6 +69,7 @@ export function AnalysisProgress({
   const [data, setData] = useState<StatusPayload | null>(null);
   const [pollError, setPollError] = useState<string | null>(null);
   const [stopping, setStopping] = useState(false);
+  const [pausing, setPausing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -151,6 +159,23 @@ export function AnalysisProgress({
     }
   }
 
+  async function togglePause() {
+    setPausing(true);
+    try {
+      const paused = data?.scanPhase === "paused";
+      const res = await fetch(
+        `/api/analysis/${analysisId}/${paused ? "resume" : "pause"}`,
+        { method: "POST" },
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setPollError(body.error ?? "Could not update scan.");
+      }
+    } finally {
+      setPausing(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="space-y-2">
@@ -183,12 +208,32 @@ export function AnalysisProgress({
           {running && !failed ? (
             <div className="flex gap-3 rounded-xl border border-border bg-bg-muted/60 px-3.5 py-3">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-fg-muted" />
-              <p className="text-xs leading-relaxed text-fg-muted">
-                <span className="font-semibold text-fg">Heads up:</span> full scans usually take a
-                few minutes. Larger sites can take{" "}
-                <span className="font-medium text-fg">10–15 minutes</span> — leave this tab open
-                while we crawl pages, score gaps, and build your report.
-              </p>
+              <div className="min-w-0 space-y-1 text-xs leading-relaxed text-fg-muted">
+                <p>
+                  <span className="font-semibold text-fg">
+                    {data?.scanProfile
+                      ? `${data.scanProfile} scan`
+                      : "Scan"}
+                    :
+                  </span>{" "}
+                  {data?.scanPhase === "discovering" || data?.scanPhase === "processing"
+                    ? "Crawling in small batches so large sites stay reliable."
+                    : "Leave this tab open while we crawl pages, score gaps, and build your report."}
+                </p>
+                {typeof data?.pagesDiscovered === "number" &&
+                data.pagesDiscovered > 0 ? (
+                  <p className="tabular-nums text-fg">
+                    Pages {data.pagesCompleted ?? 0}/{data.pagesDiscovered}
+                    {data.pagesFailed ? ` · ${data.pagesFailed} failed` : ""}
+                    {data.estimatedRemainingMs
+                      ? ` · ~${Math.max(1, Math.round(data.estimatedRemainingMs / 60000))}m remaining`
+                      : ""}
+                  </p>
+                ) : null}
+                {data?.currentUrl ? (
+                  <p className="truncate text-fg-subtle">{data.currentUrl}</p>
+                ) : null}
+              </div>
             </div>
           ) : null}
 
@@ -230,6 +275,26 @@ export function AnalysisProgress({
 
           {running && !failed ? (
             <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+              {data?.scanProfile &&
+              data.scanProfile !== "quick" &&
+              (data.scanPhase === "processing" ||
+                data.scanPhase === "discovering" ||
+                data.scanPhase === "paused" ||
+                data.scanPhase === "waiting") ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={pausing || stopping}
+                  onClick={() => void togglePause()}
+                >
+                  {pausing
+                    ? "Updating…"
+                    : data.scanPhase === "paused"
+                      ? "Resume scan"
+                      : "Pause scan"}
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant="secondary"

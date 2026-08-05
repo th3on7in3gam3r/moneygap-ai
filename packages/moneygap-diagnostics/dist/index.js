@@ -486,6 +486,31 @@ var DEFAULT_MAX_HTML = 15e5;
 function stage(id, label, status) {
   return { id, label, status };
 }
+async function fetchWithCrawler(href, opts) {
+  try {
+    const { loadPageHtml } = await import("moneygap-crawler");
+    const loaded = await loadPageHtml(href, {
+      timeoutMs: opts.timeoutMs,
+      maxBytes: opts.maxHtmlBytes,
+      userAgent: opts.userAgent,
+      playwrightEnabled: process.env.PLAYWRIGHT_ENABLED === "1"
+    });
+    if (loaded && loaded.html.length > 0) {
+      return {
+        ok: true,
+        page: {
+          finalUrl: loaded.finalUrl,
+          statusCode: loaded.statusCode,
+          html: loaded.html,
+          bytes: Buffer.byteLength(loaded.html, "utf8"),
+          contentType: "text/html"
+        }
+      };
+    }
+  } catch {
+  }
+  return fetchPage(href, opts);
+}
 async function runLiveDiagnostics(inputUrl, options = {}) {
   const started = Date.now();
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT;
@@ -509,7 +534,7 @@ async function runLiveDiagnostics(inputUrl, options = {}) {
     onStage?.({ ...s });
   };
   emit("fetching", "running");
-  const pageRes = await fetchPage(normalized.href, {
+  const pageRes = await fetchWithCrawler(normalized.href, {
     timeoutMs,
     maxHtmlBytes,
     userAgent: options.userAgent

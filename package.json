@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "npm run build --prefix packages/moneygap-diagnostics || true",
+    "prebuild": "npm run build --prefix packages/moneygap-crawler || true; npm run build --prefix packages/moneygap-diagnostics || true",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -12,6 +12,7 @@
     "db:push": "drizzle-kit push",
     "db:seed": "tsx --env-file=.env.local src/db/seed.ts",
     "db:studio": "drizzle-kit studio",
+    "test:scan": "tsx --test src/lib/scan/profiles.test.ts",
     "stripe:setup": "node --import tsx --env-file=.env.local scripts/setup-stripe-catalog.ts",
     "stripe:setup:vercel": "node --import tsx --env-file=.env.local scripts/setup-stripe-catalog.ts --vercel"
   },
@@ -25,6 +26,7 @@
     "drizzle-orm": "^0.45.2",
     "framer-motion": "^12.43.0",
     "lucide-react": "^1.28.0",
+    "moneygap-crawler": "file:packages/moneygap-crawler",
     "moneygap-diagnostics": "file:packages/moneygap-diagnostics",
     "next": "16.2.12",
     "next-themes": "^0.4.6",

@@ -12,6 +12,7 @@ export const maxDuration = 300;
 
 const createSchema = z.object({
   url: z.string().min(1),
+  scanProfile: z.enum(["quick", "standard", "deep", "enterprise"]).optional(),
 });
 
 export async function POST(req: Request) {
@@ -95,6 +96,8 @@ export async function POST(req: Request) {
         status: "queued",
         stage: "Queued",
         progress: 0,
+        scanProfile: parsed.data.scanProfile ?? "standard",
+        scanPhase: "queued",
       })
       .returning();
 

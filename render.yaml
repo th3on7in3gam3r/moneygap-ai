@@ -20,6 +20,14 @@ services:
         sync: false
       - key: FIRECRAWL_API_KEY
         sync: false
+      - key: CRAWL_MODE_DEFAULT
+        value: "standard"
+      - key: CRAWL_MAX_PAGES
+        value: "15"
+      - key: CRAWL_CONCURRENCY
+        value: "3"
+      - key: PLAYWRIGHT_ENABLED
+        value: "0"
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL
@@ -36,6 +44,26 @@ services:
         value: resend
       - key: RESEND_WEBHOOK_SECRET
         sync: false
+
+  - type: worker
+    name: moneygap-crawl-worker
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build --prefix packages/moneygap-crawler
+    startCommand: npm run worker --prefix packages/moneygap-crawler
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        sync: false
+      - key: CRAWL_WORKER_POLL_MS
+        value: "5000"
+      - key: CRAWL_CONCURRENCY
+        value: "10"
+      - key: CRAWL_MAX_RUNTIME_MS
+        value: "900000"
+      - key: PLAYWRIGHT_ENABLED
+        value: "1"
 
   - type: cron
     name: moneygap-monitor

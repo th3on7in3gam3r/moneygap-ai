@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { cancelRunningAnalysis } from "@/lib/analysis/pipeline";
+import { cancelScanCrawl } from "@/lib/scan/jobs";
 
 export async function POST(
   _req: Request,
@@ -21,6 +22,12 @@ export async function POST(
       { error: "Analysis already completed." },
       { status: 409 },
     );
+  }
+
+  try {
+    await cancelScanCrawl(id);
+  } catch {
+    // soft-fail
   }
 
   return Response.json({ ok: true, reason: result.reason });

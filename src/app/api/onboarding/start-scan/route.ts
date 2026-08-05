@@ -18,6 +18,7 @@ export const maxDuration = 300;
 
 const schema = z.object({
   url: z.string().min(1).optional(),
+  scanProfile: z.enum(["quick", "standard", "deep", "enterprise"]).optional(),
 });
 
 export async function POST(req: Request) {
@@ -87,6 +88,10 @@ export async function POST(req: Request) {
     websiteId = site.id;
   }
 
+  const scanProfile = body.success
+    ? (body.data.scanProfile ?? "quick")
+    : "quick";
+
   const [analysis] = await db
     .insert(websiteAnalyses)
     .values({
@@ -97,6 +102,8 @@ export async function POST(req: Request) {
       status: "queued",
       stage: "Queued",
       progress: 0,
+      scanProfile,
+      scanPhase: "queued",
     })
     .returning();
 

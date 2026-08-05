@@ -13,13 +13,26 @@ This is **not** the MoneyGap Engine. Results live in `workspace_onboarding.disco
 
 ## Full AI scan (step 6)
 
-`POST /api/onboarding/start-scan` reuses the same path as `POST /api/analysis`:
+Before start, the integrations step can call `POST /api/scan/estimate` and let
+the user pick a **scan profile** (default **quick** for onboarding speed).
 
-- Validate URL, upsert website, queue `websiteAnalyses`  
+`POST /api/onboarding/start-scan` accepts `{ url?, scanProfile? }` and reuses
+the same pipeline as `POST /api/analysis`:
+
+- Validate URL, upsert website, queue `websiteAnalyses` (with `scanProfile`)  
 - `runAnalysisPipeline` in `after()`  
 - Billing gate + usage recording  
 
-UI: `AnalysisProgress` with `stayOnComplete` so onboarding can show first results instead of hard-redirecting to the report.
+See [scan-profiles.md](./scan-profiles.md) and [scan-jobs.md](./scan-jobs.md).
+
+### Crawl Engine v2
+
+- **Quick:** in-process crawl via moneygap-crawler (+ Firecrawl fallback if empty).  
+- **Standard / Deep / Enterprise:** discover-only → `crawl_pages` queue →
+  batched `/api/scan/tick` → `runPostCrawlAnalysis`.  
+
+UI: `AnalysisProgress` shows page counters / ETA when present, with pause /
+resume for non-quick profiles. `stayOnComplete` keeps onboarding on first results.
 
 ## First results
 

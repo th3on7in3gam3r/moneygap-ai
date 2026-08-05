@@ -4,10 +4,12 @@ import { checkPerfHeuristics, extractTitle } from "./performance.js";
 import { checkSchema } from "./schema.js";
 import { scoreFindings } from "./score.js";
 import type {
+  DiagnosticFinding,
   DiagnosticStage,
   LiveDiagnosticsOptions,
   LiveDiagnosticsResult,
 } from "./types.js";
+import type { FetchedPage } from "./fetch.js";
 import { normalizePublicUrl } from "./url.js";
 
 const DEFAULT_TIMEOUT = 15_000;
@@ -19,6 +21,39 @@ function stage(
   status: DiagnosticStage["status"],
 ): DiagnosticStage {
   return { id, label, status };
+}
+
+async function fetchWithCrawler(
+  href: string,
+  opts: { timeoutMs: number; maxHtmlBytes: number; userAgent?: string },
+): Promise<
+  | { ok: true; page: FetchedPage }
+  | { ok: false; error: string; findings: DiagnosticFinding[] }
+> {
+  try {
+    const { loadPageHtml } = await import("moneygap-crawler");
+    const loaded = await loadPageHtml(href, {
+      timeoutMs: opts.timeoutMs,
+      maxBytes: opts.maxHtmlBytes,
+      userAgent: opts.userAgent,
+      playwrightEnabled: process.env.PLAYWRIGHT_ENABLED === "1",
+    });
+    if (loaded && loaded.html.length > 0) {
+      return {
+        ok: true,
+        page: {
+          finalUrl: loaded.finalUrl,
+          statusCode: loaded.statusCode,
+          html: loaded.html,
+          bytes: Buffer.byteLength(loaded.html, "utf8"),
+          contentType: "text/html",
+        },
+      };
+    }
+  } catch {
+    // fall through to classic fetch
+  }
+  return fetchPage(href, opts);
 }
 
 export async function runLiveDiagnostics(
@@ -54,7 +89,7 @@ export async function runLiveDiagnostics(
   };
 
   emit("fetching", "running");
-  const pageRes = await fetchPage(normalized.href, {
+  const pageRes = await fetchWithCrawler(normalized.href, {
     timeoutMs,
     maxHtmlBytes,
     userAgent: options.userAgent,

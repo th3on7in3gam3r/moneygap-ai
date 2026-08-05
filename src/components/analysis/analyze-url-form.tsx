@@ -9,12 +9,25 @@ import {
   clearSandboxHandoff,
   readSandboxHandoff,
 } from "@/lib/public-diagnostics/sandbox-storage";
+import type { EstimateResult, ScanProfile } from "@/lib/scan/types";
+import { cn } from "@/lib/utils";
+
+type ProfileOption = {
+  id: ScanProfile;
+  label: string;
+  description: string;
+  maxPages: number;
+};
 
 export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
   const router = useRouter();
   const [url, setUrl] = useState(initialUrl);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [estimating, setEstimating] = useState(false);
+  const [estimate, setEstimate] = useState<EstimateResult | null>(null);
+  const [profiles, setProfiles] = useState<ProfileOption[]>([]);
+  const [scanProfile, setScanProfile] = useState<ScanProfile>("standard");
   const [sandboxBanner, setSandboxBanner] = useState<{
     url: string;
     score: number;
@@ -28,16 +41,45 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
     setSandboxBanner({ url: handoff.url, score: handoff.score });
   }, [initialUrl]);
 
-  async function onSubmit(e: React.FormEvent) {
+  async function runEstimate(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setSubmitting(true);
+    setEstimating(true);
+    setEstimate(null);
+    try {
+      const res = await fetch("/api/scan/estimate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data = (await res.json()) as {
+        estimate?: EstimateResult;
+        profiles?: ProfileOption[];
+        error?: string;
+      };
+      if (!res.ok || !data.estimate) {
+        setError(data.error ?? "Could not estimate this website.");
+        setEstimating(false);
+        return;
+      }
+      setEstimate(data.estimate);
+      setProfiles(data.profiles ?? []);
+      setScanProfile(data.estimate.recommendedProfile);
+      setEstimating(false);
+    } catch {
+      setError("Could not estimate this website.");
+      setEstimating(false);
+    }
+  }
 
+  async function startScan() {
+    setError(null);
+    setSubmitting(true);
     try {
       const res = await fetch("/api/analysis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url: estimate?.url ?? url, scanProfile }),
       });
       const data = (await res.json()) as { analysisId?: string; error?: string };
       if (!res.ok || !data.analysisId) {
@@ -56,7 +98,7 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
   return (
     <Card>
       <CardBody>
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={estimate ? (e) => { e.preventDefault(); void startScan(); } : runEstimate} className="space-y-4">
           {sandboxBanner ? (
             <div className="flex gap-3 rounded-xl border border-accent/30 bg-accent-soft/50 px-3.5 py-3">
               <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
@@ -94,24 +136,89 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
               autoComplete="url"
               placeholder="https://example.com"
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              disabled={submitting}
+              onChange={(e) => {
+                setUrl(e.target.value);
+                setEstimate(null);
+              }}
+              disabled={submitting || estimating}
               className="mt-2 h-12 w-full rounded-xl border border-border bg-bg px-4 text-sm text-fg outline-none transition placeholder:text-fg-subtle focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
             />
-            <p className="mt-2 text-xs text-fg-muted">
-              Enter a public website. We verify it&apos;s reachable first, then crawl key pages and
-              generate a Website Intelligence Report.
-            </p>
           </div>
 
-          <div className="flex gap-3 rounded-xl border border-border bg-bg-muted/60 px-3.5 py-3">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-fg-muted" />
-            <p className="text-xs leading-relaxed text-fg-muted">
-              <span className="font-semibold text-fg">Scan time:</span> most sites finish in a few
-              minutes. Depending on site size, a full scan can take{" "}
-              <span className="font-medium text-fg">up to 10–15 minutes</span>.
-            </p>
-          </div>
+          {estimate ? (
+            <div className="space-y-4 rounded-xl border border-border bg-bg-muted/40 p-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+                  Pre-scan estimate
+                </p>
+                <p className="mt-1 text-sm text-fg">
+                  <span className="font-semibold">{estimate.domain}</span>
+                  {" · "}
+                  ~{estimate.estimatedPages.toLocaleString()} pages
+                  {" · "}
+                  {estimate.complexity} complexity
+                  {estimate.framework !== "unknown"
+                    ? ` · ${estimate.framework}`
+                    : ""}
+                </p>
+                <p className="mt-2 text-xs leading-relaxed text-fg-muted">
+                  {estimate.guidance}
+                </p>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                {(profiles.length
+                  ? profiles
+                  : (["quick", "standard", "deep", "enterprise"] as ScanProfile[]).map(
+                      (id) => ({
+                        id,
+                        label: id,
+                        description: "",
+                        maxPages: 0,
+                      }),
+                    )
+                ).map((p) => {
+                  const eta = estimate.etaByProfile[p.id];
+                  const selected = scanProfile === p.id;
+                  const recommended = estimate.recommendedProfile === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setScanProfile(p.id)}
+                      className={cn(
+                        "rounded-xl border px-3 py-3 text-left transition",
+                        selected
+                          ? "border-accent bg-accent-soft/40"
+                          : "border-border hover:border-border-strong",
+                      )}
+                    >
+                      <p className="text-sm font-semibold text-fg">
+                        {p.label}
+                        {recommended ? (
+                          <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-accent">
+                            Recommended
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="mt-1 text-xs text-fg-muted">
+                        {eta?.etaLabel ?? "—"}
+                        {p.maxPages ? ` · up to ${p.maxPages.toLocaleString()} pages` : ""}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-3 rounded-xl border border-border bg-bg-muted/60 px-3.5 py-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-fg-muted" />
+              <p className="text-xs leading-relaxed text-fg-muted">
+                We estimate size and recommend a scan profile before crawling, so large
+                sites stay reliable on serverless.
+              </p>
+            </div>
+          )}
 
           {error && (
             <div className="rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger">
@@ -119,18 +226,47 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
             </div>
           )}
 
-          <Button type="submit" size="lg" disabled={submitting || !url.trim()} className="w-full sm:w-auto">
-            {submitting ? (
+          <div className="flex flex-wrap gap-3">
+            {estimate ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Checking website…
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="lg"
+                  disabled={submitting}
+                  onClick={() => setEstimate(null)}
+                >
+                  Back
+                </Button>
+                <Button type="submit" size="lg" disabled={submitting} className="sm:w-auto">
+                  {submitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Starting…
+                    </>
+                  ) : (
+                    "Start scan"
+                  )}
+                </Button>
               </>
-            ) : sandboxBanner ? (
-              "Run full AI scan"
             ) : (
-              "Analyze website"
+              <Button
+                type="submit"
+                size="lg"
+                disabled={estimating || !url.trim()}
+                className="w-full sm:w-auto"
+              >
+                {estimating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Estimating…
+                  </>
+                ) : (
+                  "Estimate & choose profile"
+                )}
+              </Button>
             )}
-          </Button>
+          </div>
         </form>
       </CardBody>
     </Card>

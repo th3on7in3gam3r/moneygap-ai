@@ -97,4 +97,4 @@ export const COMPETITIVE_ENGINE_ERROR =
   "Competitive Intelligence could not finish. Your growth opportunities are ready — retry competitive analysis when you can.";
 
 export const MISSING_KEYS_ERROR =
-  "Analysis requires FIRECRAWL_API_KEY and OPENAI_API_KEY. Add them to your environment and try again.";
+  "Analysis requires OPENAI_API_KEY. Add it to your environment and try again. FIRECRAWL_API_KEY is optional (fallback crawl).";
