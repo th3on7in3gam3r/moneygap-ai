@@ -21,6 +21,8 @@ type SummaryResponse = {
   websites?: Site[];
   ok?: boolean;
   website?: Site;
+  populated?: boolean;
+  hasIntelligenceReport?: boolean;
   snapshot?: {
     recommendationCount: number;
     graphNodeCount: number;
@@ -103,7 +105,6 @@ export default function OpportunityIntelligencePage() {
       setData(json);
       if (!id && json.websites?.[0] && json.hasAccess) {
         setWebsiteId(json.websites[0].id);
-        load(json.websites[0].id);
       }
     });
   }
@@ -118,6 +119,20 @@ export default function OpportunityIntelligencePage() {
     if (websiteId) load(websiteId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [websiteId]);
+
+  const selected =
+    data?.website ??
+    data?.websites?.find((s) => s.id === websiteId) ??
+    null;
+  const siteLabel = selected?.name || selected?.domain || "this website";
+  const analyzeHref = selected?.url
+    ? `/dashboard/analyze?url=${encodeURIComponent(selected.url)}`
+    : "/dashboard/analyze";
+  const empty =
+    Boolean(websiteId) &&
+    Boolean(data?.hasAccess) &&
+    !pending &&
+    data?.populated === false;
 
   const recs = (data?.recommendations ?? []).filter(
     (r) => kindFilter === "all" || r.kind === kindFilter,
@@ -187,7 +202,32 @@ export default function OpportunityIntelligencePage() {
             </Button>
           </div>
         )}
+        {pending && websiteId ? (
+          <p className="pb-2 text-xs text-fg-subtle">Loading {siteLabel}…</p>
+        ) : null}
       </div>
+
+      {empty ? (
+        <Card>
+          <CardBody className="space-y-3">
+            <p className="text-sm text-fg">
+              No Opportunity Intelligence™ for{" "}
+              <span className="font-semibold">{siteLabel}</span> yet.
+            </p>
+            <p className="text-sm text-fg-muted">
+              The dropdown switches which site you’re viewing. Growth Graph™,
+              Content Roadmap™, and recommendations appear after a full website
+              analysis finishes for that site.
+              {data?.hasIntelligenceReport
+                ? " An intelligence report exists, but the Opportunity Intelligence pass has not populated yet — re-run Analyze."
+                : " Run Analyze on this URL to generate them."}
+            </p>
+            <Button href={analyzeHref} size="sm">
+              Analyze {siteLabel}
+            </Button>
+          </CardBody>
+        </Card>
+      ) : null}
 
       {data?.hasAccess && data.snapshot && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -237,7 +277,7 @@ export default function OpportunityIntelligencePage() {
         />
       )}
 
-      {data?.hasAccess && (
+      {data?.hasAccess && !empty && (
         <>
           <Card>
             <CardHeader>

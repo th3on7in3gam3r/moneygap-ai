@@ -7,6 +7,7 @@ import {
   oiRecommendations,
   reports,
   websites,
+  type OpportunityIntelligenceSnapshot,
 } from "@/db/schema";
 import { buildContentRoadmap } from "@/lib/opportunity-intelligence/content-roadmap/build";
 import type { OiRecommendationDraft } from "@/lib/opportunity-intelligence/types";
@@ -32,18 +33,28 @@ export async function getOiSummaryForWebsite(input: {
     orderBy: [desc(reports.createdAt)],
   });
 
-  const analysisId = report
-    ? (
-        await db.query.oiRecommendations.findFirst({
-          where: and(
-            eq(oiRecommendations.websiteId, input.websiteId),
-            eq(oiRecommendations.workspaceId, input.workspaceId),
-          ),
-          orderBy: [desc(oiRecommendations.createdAt)],
-          columns: { analysisId: true },
-        })
-      )?.analysisId
+  // Load OI by website even when the report snapshot is missing.
+  const latestOi = await db.query.oiRecommendations.findFirst({
+    where: and(
+      eq(oiRecommendations.websiteId, input.websiteId),
+      eq(oiRecommendations.workspaceId, input.workspaceId),
+    ),
+    orderBy: [desc(oiRecommendations.createdAt)],
+    columns: { analysisId: true },
+  });
+
+  const latestGraph = !latestOi
+    ? await db.query.growthGraphNodes.findFirst({
+        where: and(
+          eq(growthGraphNodes.websiteId, input.websiteId),
+          eq(growthGraphNodes.workspaceId, input.workspaceId),
+        ),
+        orderBy: [desc(growthGraphNodes.createdAt)],
+        columns: { analysisId: true },
+      })
     : null;
+
+  const analysisId = latestOi?.analysisId ?? latestGraph?.analysisId ?? null;
 
   const recs = analysisId
     ? await db.query.oiRecommendations.findMany({
@@ -109,6 +120,43 @@ export async function getOiSummaryForWebsite(input: {
     ),
   );
 
+  const populated = Boolean(analysisId && (recs.length > 0 || nodes.length > 0));
+
+  let snapshot: OpportunityIntelligenceSnapshot | null =
+    report?.opportunityIntelligence ?? null;
+
+  if (!snapshot && populated) {
+    snapshot = {
+      generatedAt: new Date().toISOString(),
+      recommendationCount: recs.length,
+      roadmapCount: roadmap.length,
+      briefCount: briefs.length,
+      graphNodeCount: nodes.length,
+      graphEdgeCount: edges.length,
+      keywordClusterCount: 0,
+      questionCount: 0,
+      entityCount: 0,
+      avgOpportunityScore:
+        recs.length > 0
+          ? Math.round(
+              recs.reduce((s, r) => s + r.opportunityScore, 0) / recs.length,
+            )
+          : null,
+      topRecommendations: recs.slice(0, 5).map((r) => ({
+        title: r.title,
+        kind: r.kind,
+        opportunityScore: r.opportunityScore,
+        businessImpact: r.businessImpact,
+      })),
+      roadmapPreview: roadmap.slice(0, 5).map((r) => ({
+        title: r.title,
+        businessImpact: r.businessImpact,
+        opportunityScore: r.opportunityScore,
+      })),
+      executiveBlurb: null,
+    };
+  }
+
   return {
     ok: true as const,
     website: {
@@ -117,10 +165,12 @@ export async function getOiSummaryForWebsite(input: {
       domain: site.domain,
       url: site.url,
     },
-    snapshot: report?.opportunityIntelligence ?? null,
+    snapshot,
     moneyGapScore: report?.moneyGapScore ?? null,
     analysisId,
     reportId: report?.id ?? null,
+    hasIntelligenceReport: Boolean(report),
+    populated,
     recommendations: recs,
     briefs,
     roadmap,
