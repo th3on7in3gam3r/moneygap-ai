@@ -82,11 +82,18 @@ export const ruleBasedDigestContent: DigestContentProvider = {
     const improvements = brief?.payload?.completed?.slice(0, 5) ?? [];
     const newIssues = brief?.payload?.newOps?.slice(0, 5) ?? [];
     const topRecommendation =
+      latest?.opportunityIntelligence?.topRecommendations?.[0]?.title ??
       brief?.payload?.priorities?.[0] ??
       brief?.payload?.nextSteps?.[0] ??
       (score == null
         ? "Run your first website analysis to unlock Money Gaps™ and Fix Paths™."
         : "Review your highest Opportunity Index™ gap in Action Center.");
+
+    const oiCount = latest?.opportunityIntelligence?.recommendationCount;
+    const productUpdate =
+      oiCount && oiCount > 0
+        ? `Opportunity Intelligence™ found ${oiCount} growth opportunities on your latest scan — open Opportunity Intel in the dashboard.`
+        : PRODUCT_UPDATE;
 
     let framework: string | null = null;
     const onboarding = await db.query.workspaceOnboarding.findFirst({
@@ -126,11 +133,11 @@ export const ruleBasedDigestContent: DigestContentProvider = {
       topRecommendation,
       frameworkTip: tipForFramework(framework),
       docsArticle: article,
-      productUpdate: PRODUCT_UPDATE,
+      productUpdate,
       reportId: latest?.id ?? null,
       cta: {
         analyzeHref: `${origin}/dashboard/analyze`,
-        dashboardHref: `${origin}/dashboard`,
+        dashboardHref: `${origin}/dashboard/opportunity-intelligence`,
         reportHref: latest?.id ? `${origin}/reports/${latest.id}` : null,
       },
       unsubscribeHref: `${origin}/api/email/unsubscribe?token=${unsubscribeToken}`,

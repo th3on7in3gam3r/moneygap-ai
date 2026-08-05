@@ -19,6 +19,8 @@ export function upgradeMessage(feature: FeatureKey): string {
       return "Invite your team. Upgrade to unlock additional seats.";
     case "api_access":
       return "API access is included on all plans. If you still see this, refresh or contact support.";
+    case "opportunity_intelligence":
+      return "Opportunity Intelligence™ and Growth Graph™ unlock on Growth and above.";
     case "moneygap_engine":
     default:
       return "You're discovering real growth opportunities. Upgrade to analyze more and go deeper.";

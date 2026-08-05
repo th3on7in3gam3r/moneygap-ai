@@ -219,6 +219,8 @@ export const reports = pgTable(
     crawlabilityReport: jsonb("crawlability_report").$type<CrawlabilityReportSnapshot | null>(),
     /** Privacy Score™ (health; higher = better) */
     privacyReport: jsonb("privacy_report").$type<PrivacyReportSnapshot | null>(),
+    /** Opportunity Intelligence™ & Growth Graph™ snapshot */
+    opportunityIntelligence: jsonb("opportunity_intelligence").$type<OpportunityIntelligenceSnapshot | null>(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
@@ -227,6 +229,31 @@ export const reports = pgTable(
     index("reports_type_idx").on(t.type),
   ],
 );
+
+export type OpportunityIntelligenceSnapshot = {
+  generatedAt: string;
+  recommendationCount: number;
+  roadmapCount: number;
+  briefCount: number;
+  graphNodeCount: number;
+  graphEdgeCount: number;
+  keywordClusterCount: number;
+  questionCount: number;
+  entityCount: number;
+  avgOpportunityScore: number | null;
+  topRecommendations: {
+    title: string;
+    kind: string;
+    opportunityScore: number;
+    businessImpact: string;
+  }[];
+  roadmapPreview: {
+    title: string;
+    businessImpact: string;
+    opportunityScore: number;
+  }[];
+  executiveBlurb: string | null;
+};
 
 export type CrawlabilityReportSnapshot = {
   score: number | null;
@@ -5126,3 +5153,154 @@ export const publicAuditSnapshots = pgTable(
 );
 
 export type PublicAuditSnapshot = typeof publicAuditSnapshots.$inferSelect;
+
+/** Growth Graph™ nodes — Opportunity Intelligence connective tissue */
+export const growthGraphNodes = pgTable(
+  "growth_graph_nodes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    websiteId: uuid("website_id")
+      .notNull()
+      .references(() => websites.id, { onDelete: "cascade" }),
+    analysisId: uuid("analysis_id")
+      .notNull()
+      .references(() => websiteAnalyses.id, { onDelete: "cascade" }),
+    nodeType: text("node_type").notNull(),
+    label: text("label").notNull(),
+    slug: text("slug").notNull(),
+    meta: jsonb("meta").$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("growth_graph_nodes_analysis_idx").on(t.analysisId),
+    index("growth_graph_nodes_workspace_idx").on(t.workspaceId),
+    index("growth_graph_nodes_website_idx").on(t.websiteId),
+    index("growth_graph_nodes_type_idx").on(t.nodeType),
+  ],
+);
+
+export const growthGraphEdges = pgTable(
+  "growth_graph_edges",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    analysisId: uuid("analysis_id")
+      .notNull()
+      .references(() => websiteAnalyses.id, { onDelete: "cascade" }),
+    fromNodeId: uuid("from_node_id")
+      .notNull()
+      .references(() => growthGraphNodes.id, { onDelete: "cascade" }),
+    toNodeId: uuid("to_node_id")
+      .notNull()
+      .references(() => growthGraphNodes.id, { onDelete: "cascade" }),
+    edgeType: text("edge_type").notNull(),
+    weight: integer("weight").notNull().default(1),
+    meta: jsonb("meta").$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("growth_graph_edges_analysis_idx").on(t.analysisId),
+    index("growth_graph_edges_from_idx").on(t.fromNodeId),
+    index("growth_graph_edges_to_idx").on(t.toNodeId),
+  ],
+);
+
+export type OiScoreFactorsJson = {
+  businessValue: number;
+  revenuePotential: number;
+  searchDemand: number;
+  competition: number;
+  implementationEffort: number;
+  aiVisibility: number;
+  topicalAuthority: number;
+};
+
+export const oiContentBriefs = pgTable(
+  "oi_content_briefs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    websiteId: uuid("website_id")
+      .notNull()
+      .references(() => websites.id, { onDelete: "cascade" }),
+    analysisId: uuid("analysis_id")
+      .notNull()
+      .references(() => websiteAnalyses.id, { onDelete: "cascade" }),
+    reportId: uuid("report_id").references(() => reports.id, {
+      onDelete: "set null",
+    }),
+    title: text("title").notNull(),
+    primaryIntent: text("primary_intent"),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("oi_content_briefs_analysis_idx").on(t.analysisId),
+    index("oi_content_briefs_workspace_idx").on(t.workspaceId),
+  ],
+);
+
+export const oiRecommendations = pgTable(
+  "oi_recommendations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    websiteId: uuid("website_id")
+      .notNull()
+      .references(() => websites.id, { onDelete: "cascade" }),
+    analysisId: uuid("analysis_id")
+      .notNull()
+      .references(() => websiteAnalyses.id, { onDelete: "cascade" }),
+    reportId: uuid("report_id").references(() => reports.id, {
+      onDelete: "set null",
+    }),
+    kind: text("kind").notNull(),
+    title: text("title").notNull(),
+    summary: text("summary").notNull(),
+    whyItMatters: text("why_it_matters").notNull(),
+    businessImpact: text("business_impact").notNull().default("medium"),
+    seoImpact: text("seo_impact").notNull().default("medium"),
+    aiReadinessImpact: text("ai_readiness_impact").notNull().default("medium"),
+    difficulty: text("difficulty").notNull().default("medium"),
+    estimatedTime: text("estimated_time").notNull().default("1–2 weeks"),
+    priority: integer("priority").notNull().default(50),
+    opportunityScore: integer("opportunity_score").notNull().default(0),
+    scoreFactors: jsonb("score_factors").$type<OiScoreFactorsJson>(),
+    dependencies: jsonb("dependencies").$type<string[]>().default([]),
+    nextSteps: jsonb("next_steps").$type<string[]>().default([]),
+    intent: text("intent"),
+    moneyGapOpportunityId: uuid("money_gap_opportunity_id").references(
+      () => moneyGapOpportunities.id,
+      { onDelete: "set null" },
+    ),
+    briefId: uuid("brief_id").references(() => oiContentBriefs.id, {
+      onDelete: "set null",
+    }),
+    implementationLinks: jsonb("implementation_links")
+      .$type<{ label: string; href: string }[]>()
+      .default([]),
+    meta: jsonb("meta").$type<Record<string, unknown>>().default({}),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("oi_recommendations_analysis_idx").on(t.analysisId),
+    index("oi_recommendations_workspace_idx").on(t.workspaceId),
+    index("oi_recommendations_website_idx").on(t.websiteId),
+    index("oi_recommendations_score_idx").on(t.opportunityScore),
+  ],
+);
+
+export type GrowthGraphNode = typeof growthGraphNodes.$inferSelect;
+export type GrowthGraphEdge = typeof growthGraphEdges.$inferSelect;
+export type OiRecommendation = typeof oiRecommendations.$inferSelect;
+export type OiContentBrief = typeof oiContentBriefs.$inferSelect;

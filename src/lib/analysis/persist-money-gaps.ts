@@ -5,6 +5,7 @@ import {
   reports,
   websiteAnalyses,
   websiteClassifications,
+  competitors,
   type ConfidenceIntelJson,
   type CrawlabilityReportSnapshot,
   type PrivacyReportSnapshot,
@@ -40,6 +41,7 @@ import {
   runKnowledgeGraphPass,
   type ClassificationOverride,
 } from "@/lib/knowledge-graph";
+import { runOpportunityIntelligencePass } from "@/lib/opportunity-intelligence";
 import { log } from "@/lib/observability/logger";
 import {
   MONEYGAP_ENGINE_VERSION,
@@ -428,6 +430,53 @@ export async function persistMoneyGapEngineResult(input: {
         moneyGapEngineError: null,
       })
       .where(eq(reports.id, input.reportId));
+
+    // Opportunity Intelligence™ + Growth Graph™ (soft-fail)
+    try {
+      await heartbeat("Building Opportunity Intelligence™…", 92);
+      const reportMeta = await db.query.reports.findFirst({
+        where: eq(reports.id, input.reportId),
+        columns: {
+          workspaceId: true,
+          websiteId: true,
+          moneyGapScore: true,
+          competitiveAnalysis: true,
+        },
+      });
+      if (reportMeta?.workspaceId && reportMeta.websiteId) {
+        const comps = await db.query.competitors.findMany({
+          where: eq(competitors.websiteId, reportMeta.websiteId),
+          columns: { name: true },
+          limit: 10,
+        });
+        const gapTitles = [
+          ...(reportMeta.competitiveAnalysis?.opportunityGaps ?? []),
+          ...(reportMeta.competitiveAnalysis?.contentGaps ?? []),
+        ]
+          .map((g) => g.title)
+          .filter(Boolean)
+          .slice(0, 8);
+
+        await runOpportunityIntelligencePass({
+          analysisId: input.analysisId,
+          reportId: input.reportId,
+          workspaceId: reportMeta.workspaceId,
+          websiteId: reportMeta.websiteId,
+          domain: input.domain,
+          url: input.url,
+          intelligence: input.intelligence,
+          corpus: input.corpus,
+          moneyGapScore: reportMeta.moneyGapScore ?? rollups.moneyGapScore,
+          competitorNames: comps.map((c) => c.name),
+          competitorGapTitles: gapTitles,
+        });
+      }
+    } catch (err) {
+      log("warn", "opportunity_intelligence_hook_soft_fail", {
+        analysisId: input.analysisId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     log("info", "money_gap_engine_persisted", {
       analysisId: input.analysisId,

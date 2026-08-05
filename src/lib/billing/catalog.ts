@@ -18,7 +18,8 @@ export type FeatureKey =
   | "agency_workspace"
   | "api_access"
   | "team_members"
-  | "scheduled_reports";
+  | "scheduled_reports"
+  | "opportunity_intelligence";
 
 export type PlanLimitsJson = {
   maxClients: number;
@@ -112,6 +113,7 @@ export const PLAN_CATALOG: PlanDefinition[] = [
       "competitor_intelligence",
       "team_members",
       "api_access",
+      "opportunity_intelligence",
     ],
   },
   {
@@ -141,6 +143,7 @@ export const PLAN_CATALOG: PlanDefinition[] = [
       "team_members",
       "scheduled_reports",
       "api_access",
+      "opportunity_intelligence",
     ],
   },
   {
@@ -172,6 +175,7 @@ export const PLAN_CATALOG: PlanDefinition[] = [
       "team_members",
       "scheduled_reports",
       "api_access",
+      "opportunity_intelligence",
     ],
   },
   {
@@ -203,6 +207,7 @@ export const PLAN_CATALOG: PlanDefinition[] = [
       "api_access",
       "team_members",
       "scheduled_reports",
+      "opportunity_intelligence",
     ],
   },
 ];

@@ -12,6 +12,7 @@ export const ALL_FEATURES: FeatureKey[] = [
   "api_access",
   "team_members",
   "scheduled_reports",
+  "opportunity_intelligence",
 ];
 
 export function planHasFeature(planId: string, feature: FeatureKey): boolean {
