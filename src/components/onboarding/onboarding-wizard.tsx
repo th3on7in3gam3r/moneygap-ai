@@ -12,6 +12,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { AnalysisProgress } from "@/components/analysis/analysis-progress";
+import { ConnectivityDiagnosticsPanel } from "@/components/analysis/connectivity-diagnostics-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -23,6 +24,7 @@ import {
 import { MoneyGapScore } from "@/components/money-gap";
 import { GOAL_OPTIONS, PERSONA_OPTIONS } from "@/lib/onboarding/constants";
 import { readSandboxHandoff } from "@/lib/public-diagnostics/sandbox-storage";
+import type { ConnectivityDiagnostics } from "@/lib/scan/connectivity/types";
 import type { EstimateResult, ScanProfile } from "@/lib/scan/types";
 import { cn } from "@/lib/utils";
 import type {
@@ -102,6 +104,8 @@ export function OnboardingWizard() {
   const [scanProfile, setScanProfile] = useState<ScanProfile>("quick");
   const [estimate, setEstimate] = useState<EstimateResult | null>(null);
   const [estimating, setEstimating] = useState(false);
+  const [connectivityDiagnostics, setConnectivityDiagnostics] =
+    useState<ConnectivityDiagnostics | null>(null);
   const dismissToast = useCallback(() => setToast(null), []);
 
   const refresh = useCallback(async () => {
@@ -361,6 +365,7 @@ export function OnboardingWizard() {
       return;
     }
     setEstimating(true);
+    setConnectivityDiagnostics(null);
     try {
       const res = await fetch("/api/scan/estimate", {
         method: "POST",
@@ -369,8 +374,10 @@ export function OnboardingWizard() {
       });
       const data = (await res.json()) as {
         estimate?: EstimateResult;
+        diagnostics?: ConnectivityDiagnostics;
         error?: string;
       };
+      if (data.diagnostics) setConnectivityDiagnostics(data.diagnostics);
       if (!res.ok || !data.estimate) {
         setToast(
           makeFlashToast(data.error ?? "Could not estimate this website.", "error"),
@@ -407,7 +414,9 @@ export function OnboardingWizard() {
         error?: string;
         message?: string;
         code?: string;
+        diagnostics?: ConnectivityDiagnostics;
       };
+      if (data.diagnostics) setConnectivityDiagnostics(data.diagnostics);
       if (!res.ok) {
         setToast(
           makeFlashToast(data.error ?? data.message ?? "Could not start scan", "error", {
@@ -787,6 +796,12 @@ export function OnboardingWizard() {
                   complexity
                   {estimate.framework !== "unknown" ? ` · ${estimate.framework}` : ""}
                 </p>
+              ) : null}
+              {connectivityDiagnostics ? (
+                <ConnectivityDiagnosticsPanel
+                  diagnostics={connectivityDiagnostics}
+                  defaultOpen={!connectivityDiagnostics.ok}
+                />
               ) : null}
               <div className="grid gap-2 sm:grid-cols-2">
                 {(

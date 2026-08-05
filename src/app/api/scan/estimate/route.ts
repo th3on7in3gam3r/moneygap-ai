@@ -31,12 +31,17 @@ export async function POST(req: Request) {
     const result = await estimateScan(parsed.data.url);
     if (!result.ok) {
       return Response.json(
-        { error: result.error, code: result.code },
+        {
+          error: result.error,
+          code: result.code,
+          diagnostics: result.diagnostics,
+        },
         { status: 400 },
       );
     }
     return Response.json({
       estimate: result.estimate,
+      diagnostics: result.diagnostics,
       profiles: Object.values(SCAN_PROFILES).map((p) => ({
         id: p.id,
         label: p.label,

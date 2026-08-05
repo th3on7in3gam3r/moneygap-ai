@@ -14,14 +14,20 @@ with higher app-level caps and concurrency.
 
 ## Pre-scan estimator
 
-`POST /api/scan/estimate` with `{ url }` runs a lightweight `discoverOnly()`
-pass (robots, sitemaps, homepage framework / link density) and returns:
+`POST /api/scan/estimate` with `{ url }` runs the **connectivity diagnostics
+pipeline** first (DNS → TCP → TLS → homepage GET → robots → sitemap → framework),
+then returns profile recommendations. See
+[connectivity-diagnostics.md](./connectivity-diagnostics.md).
+
+Returns:
 
 - `estimatedPages`, `complexity`, `framework`, `jsRequired`, `sitemapFound`
 - `etaByProfile`, `recommendedProfile`, `guidance`, `estimatedCostUnits`
+- `diagnostics` (staged connectivity object) on success **and** failure
+- `warnings` for soft issues (e.g. missing sitemap)
 
-UI: Analyze form and onboarding integrations step show the estimate + profile
-picker before `POST /api/analysis` / `POST /api/onboarding/start-scan`.
+UI: Analyze form and onboarding show actionable `summary` errors plus expandable
+**Technical details**. Profile picker remains after a successful estimate.
 
 Default for dashboard analyze: **standard** (or estimator recommendation).  
 Default for onboarding when no estimate: **quick**.

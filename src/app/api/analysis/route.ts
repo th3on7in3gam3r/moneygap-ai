@@ -36,7 +36,11 @@ export async function POST(req: Request) {
   const validated = await verifyUrlReachable(parsed.data.url);
   if (!validated.ok) {
     return Response.json(
-      { error: validated.error, code: validated.code ?? "unreachable" },
+      {
+        error: validated.error,
+        code: validated.code ?? "unreachable",
+        diagnostics: validated.diagnostics,
+      },
       { status: 400 },
     );
   }

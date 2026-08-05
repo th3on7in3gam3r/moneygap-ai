@@ -3,12 +3,14 @@
 import { AlertTriangle, Loader2, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { ConnectivityDiagnosticsPanel } from "@/components/analysis/connectivity-diagnostics-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import {
   clearSandboxHandoff,
   readSandboxHandoff,
 } from "@/lib/public-diagnostics/sandbox-storage";
+import type { ConnectivityDiagnostics } from "@/lib/scan/connectivity/types";
 import type { EstimateResult, ScanProfile } from "@/lib/scan/types";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +25,9 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
   const router = useRouter();
   const [url, setUrl] = useState(initialUrl);
   const [error, setError] = useState<string | null>(null);
+  const [diagnostics, setDiagnostics] = useState<ConnectivityDiagnostics | null>(
+    null,
+  );
   const [submitting, setSubmitting] = useState(false);
   const [estimating, setEstimating] = useState(false);
   const [estimate, setEstimate] = useState<EstimateResult | null>(null);
@@ -44,6 +49,7 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
   async function runEstimate(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setDiagnostics(null);
     setEstimating(true);
     setEstimate(null);
     try {
@@ -55,8 +61,10 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
       const data = (await res.json()) as {
         estimate?: EstimateResult;
         profiles?: ProfileOption[];
+        diagnostics?: ConnectivityDiagnostics;
         error?: string;
       };
+      if (data.diagnostics) setDiagnostics(data.diagnostics);
       if (!res.ok || !data.estimate) {
         setError(data.error ?? "Could not estimate this website.");
         setEstimating(false);
@@ -81,7 +89,12 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: estimate?.url ?? url, scanProfile }),
       });
-      const data = (await res.json()) as { analysisId?: string; error?: string };
+      const data = (await res.json()) as {
+        analysisId?: string;
+        error?: string;
+        diagnostics?: ConnectivityDiagnostics;
+      };
+      if (data.diagnostics) setDiagnostics(data.diagnostics);
       if (!res.ok || !data.analysisId) {
         setError(data.error ?? "We couldn't start this analysis. Please try again.");
         setSubmitting(false);
@@ -98,7 +111,17 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
   return (
     <Card>
       <CardBody>
-        <form onSubmit={estimate ? (e) => { e.preventDefault(); void startScan(); } : runEstimate} className="space-y-4">
+        <form
+          onSubmit={
+            estimate
+              ? (e) => {
+                  e.preventDefault();
+                  void startScan();
+                }
+              : runEstimate
+          }
+          className="space-y-4"
+        >
           {sandboxBanner ? (
             <div className="flex gap-3 rounded-xl border border-accent/30 bg-accent-soft/50 px-3.5 py-3">
               <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
@@ -139,6 +162,8 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
               onChange={(e) => {
                 setUrl(e.target.value);
                 setEstimate(null);
+                setDiagnostics(null);
+                setError(null);
               }}
               disabled={submitting || estimating}
               className="mt-2 h-12 w-full rounded-xl border border-border bg-bg px-4 text-sm text-fg outline-none transition placeholder:text-fg-subtle focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
@@ -164,7 +189,20 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
                 <p className="mt-2 text-xs leading-relaxed text-fg-muted">
                   {estimate.guidance}
                 </p>
+                {estimate.warnings?.length ? (
+                  <ul className="mt-2 space-y-1 text-xs text-fg-muted">
+                    {estimate.warnings.map((w) => (
+                      <li key={w}>· {w}</li>
+                    ))}
+                  </ul>
+                ) : null}
               </div>
+
+              {(estimate.connectivity ?? diagnostics) ? (
+                <ConnectivityDiagnosticsPanel
+                  diagnostics={estimate.connectivity ?? diagnostics!}
+                />
+              ) : null}
 
               <div className="grid gap-2 sm:grid-cols-2">
                 {(profiles.length
@@ -214,15 +252,18 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
             <div className="flex gap-3 rounded-xl border border-border bg-bg-muted/60 px-3.5 py-3">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-fg-muted" />
               <p className="text-xs leading-relaxed text-fg-muted">
-                We estimate size and recommend a scan profile before crawling, so large
-                sites stay reliable on serverless.
+                We run staged connectivity diagnostics (DNS, TLS, homepage, robots,
+                sitemap) then recommend a scan profile.
               </p>
             </div>
           )}
 
           {error && (
-            <div className="rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger">
-              {error}
+            <div className="space-y-3 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3">
+              <p className="text-sm text-danger">{error}</p>
+              {diagnostics ? (
+                <ConnectivityDiagnosticsPanel diagnostics={diagnostics} defaultOpen />
+              ) : null}
             </div>
           )}
 
@@ -234,7 +275,10 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
                   variant="secondary"
                   size="lg"
                   disabled={submitting}
-                  onClick={() => setEstimate(null)}
+                  onClick={() => {
+                    setEstimate(null);
+                    setDiagnostics(null);
+                  }}
                 >
                   Back
                 </Button>
@@ -259,7 +303,7 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
                 {estimating ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Estimating…
+                    Checking connectivity…
                   </>
                 ) : (
                   "Estimate & choose profile"

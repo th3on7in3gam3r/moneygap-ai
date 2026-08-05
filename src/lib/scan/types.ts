@@ -55,4 +55,7 @@ export type EstimateResult = {
     homepageLinkCount: number;
     robotsFound: boolean;
   };
+  /** Full staged connectivity diagnostics (Pre-Scan foundation). */
+  connectivity?: import("./connectivity/types").ConnectivityDiagnostics;
+  warnings?: string[];
 };

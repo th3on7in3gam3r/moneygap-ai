@@ -75,7 +75,11 @@ export async function POST(req: Request) {
       req,
     });
     return Response.json(
-      { error: validated.error, code: validated.code ?? "unreachable_url" },
+      {
+        error: validated.error,
+        code: validated.code ?? "unreachable_url",
+        diagnostics: validated.diagnostics,
+      },
       { status: 400 },
     );
   }
