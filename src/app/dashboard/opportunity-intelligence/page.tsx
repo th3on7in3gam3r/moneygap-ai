@@ -89,8 +89,50 @@ export default function OpportunityIntelligencePage() {
     title: string;
     payload: Record<string, unknown>;
   } | null>(null);
+  const [briefError, setBriefError] = useState<string | null>(null);
+  const [briefLoading, setBriefLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  async function openBrief(briefId: string) {
+    setBriefError(null);
+    const cached = data?.briefs?.find((x) => x.id === briefId);
+    if (cached) {
+      setBrief({
+        title: cached.title,
+        payload: (cached.payload ?? {}) as Record<string, unknown>,
+      });
+      return;
+    }
+
+    setBriefLoading(true);
+    try {
+      const res = await fetch(
+        `/api/opportunity-intelligence/briefs/${encodeURIComponent(briefId)}`,
+      );
+      const json = (await res.json()) as {
+        ok?: boolean;
+        brief?: {
+          id: string;
+          title: string;
+          payload: Record<string, unknown>;
+        };
+        error?: string;
+      };
+      if (!res.ok || !json.brief) {
+        setBriefError(json.error ?? "Could not load this content brief.");
+        return;
+      }
+      setBrief({
+        title: json.brief.title,
+        payload: (json.brief.payload ?? {}) as Record<string, unknown>,
+      });
+    } catch {
+      setBriefError("Could not load this content brief.");
+    } finally {
+      setBriefLoading(false);
+    }
+  }
 
   function load(id?: string) {
     startTransition(async () => {
@@ -159,6 +201,18 @@ export default function OpportunityIntelligencePage() {
         <UpgradePrompt payload={data.upgrade} />
       )}
       {error && <p className="text-sm text-gap">{error}</p>}
+      {briefError && <p className="text-sm text-gap">{briefError}</p>}
+      {briefLoading && (
+        <p className="text-xs text-fg-subtle">Loading content brief…</p>
+      )}
+
+      {brief && (
+        <BriefPanel
+          title={brief.title}
+          payload={brief.payload}
+          onClose={() => setBrief(null)}
+        />
+      )}
 
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-sm">
@@ -269,14 +323,6 @@ export default function OpportunityIntelligencePage() {
         </p>
       )}
 
-      {brief && (
-        <BriefPanel
-          title={brief.title}
-          payload={brief.payload}
-          onClose={() => setBrief(null)}
-        />
-      )}
-
       {data?.hasAccess && !empty && (
         <>
           <Card>
@@ -347,8 +393,7 @@ export default function OpportunityIntelligencePage() {
                     key={r.id}
                     rec={r}
                     onOpenBrief={(briefId) => {
-                      const b = data.briefs?.find((x) => x.id === briefId);
-                      if (b) setBrief({ title: b.title, payload: b.payload });
+                      void openBrief(briefId);
                     }}
                   />
                 ))}

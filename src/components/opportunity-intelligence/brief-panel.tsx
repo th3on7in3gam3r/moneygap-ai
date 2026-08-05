@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 
@@ -25,79 +26,111 @@ export function BriefPanel({
   payload: BriefPayload;
   onClose: () => void;
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = panelRef.current;
+    el?.focus();
+    el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
-    <Card>
-      <CardHeader>
-        <div>
-          <h3 className="font-display text-lg font-semibold">
-            {payload.suggestedTitle ?? title}
-          </h3>
-          <p className="mt-1 text-xs text-fg-muted">Content Brief</p>
-        </div>
-        <Button type="button" size="sm" variant="ghost" onClick={onClose}>
-          Close
-        </Button>
-      </CardHeader>
-      <CardBody className="space-y-3 text-sm text-fg-muted">
-        {payload.description && <p>{payload.description}</p>}
-        {payload.targetAudience && (
-          <p>
-            <span className="font-medium text-fg">Audience: </span>
-            {payload.targetAudience}
-          </p>
-        )}
-        {payload.primaryIntent && (
-          <p>
-            <span className="font-medium text-fg">Intent: </span>
-            {payload.primaryIntent}
-          </p>
-        )}
-        {payload.recommendedHeadings && (
-          <div>
-            <p className="font-medium text-fg">Headings</p>
-            <ul className="mt-1 list-disc pl-4">
-              {payload.recommendedHeadings.map((h) => (
-                <li key={h}>{h}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {payload.suggestedFaqs && (
-          <div>
-            <p className="font-medium text-fg">FAQs</p>
-            <ul className="mt-1 list-disc pl-4">
-              {payload.suggestedFaqs.map((h) => (
-                <li key={h}>{h}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {payload.schemaRecommendations && (
-          <p>
-            <span className="font-medium text-fg">Schema: </span>
-            {payload.schemaRecommendations.join(", ")}
-          </p>
-        )}
-        {payload.callsToAction && (
-          <p>
-            <span className="font-medium text-fg">CTAs: </span>
-            {payload.callsToAction.join(" · ")}
-          </p>
-        )}
-        {payload.successMetrics && (
-          <p>
-            <span className="font-medium text-fg">Success metrics: </span>
-            {payload.successMetrics.join(" · ")}
-          </p>
-        )}
-        <div className="flex flex-wrap gap-2">
-          {(payload.implementationLinks ?? []).map((l) => (
-            <Button key={l.href} href={l.href} size="sm" variant="secondary">
-              {l.label}
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 sm:items-center sm:p-6"
+      role="presentation"
+      onClick={onClose}
+    >
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Content brief"
+        tabIndex={-1}
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto outline-none"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Card>
+          <CardHeader>
+            <div>
+              <h3 className="font-display text-lg font-semibold">
+                {payload.suggestedTitle ?? title}
+              </h3>
+              <p className="mt-1 text-xs text-fg-muted">Content Brief</p>
+            </div>
+            <Button type="button" size="sm" variant="ghost" onClick={onClose}>
+              Close
             </Button>
-          ))}
-        </div>
-      </CardBody>
-    </Card>
+          </CardHeader>
+          <CardBody className="space-y-3 text-sm text-fg-muted">
+            {payload.description && <p>{payload.description}</p>}
+            {payload.targetAudience && (
+              <p>
+                <span className="font-medium text-fg">Audience: </span>
+                {payload.targetAudience}
+              </p>
+            )}
+            {payload.primaryIntent && (
+              <p>
+                <span className="font-medium text-fg">Intent: </span>
+                {payload.primaryIntent}
+              </p>
+            )}
+            {payload.recommendedHeadings &&
+              payload.recommendedHeadings.length > 0 && (
+                <div>
+                  <p className="font-medium text-fg">Headings</p>
+                  <ul className="mt-1 list-disc pl-4">
+                    {payload.recommendedHeadings.map((h) => (
+                      <li key={h}>{h}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            {payload.suggestedFaqs && payload.suggestedFaqs.length > 0 && (
+              <div>
+                <p className="font-medium text-fg">FAQs</p>
+                <ul className="mt-1 list-disc pl-4">
+                  {payload.suggestedFaqs.map((h) => (
+                    <li key={h}>{h}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {payload.schemaRecommendations &&
+              payload.schemaRecommendations.length > 0 && (
+                <p>
+                  <span className="font-medium text-fg">Schema: </span>
+                  {payload.schemaRecommendations.join(", ")}
+                </p>
+              )}
+            {payload.callsToAction && payload.callsToAction.length > 0 && (
+              <p>
+                <span className="font-medium text-fg">CTAs: </span>
+                {payload.callsToAction.join(" · ")}
+              </p>
+            )}
+            {payload.successMetrics && payload.successMetrics.length > 0 && (
+              <p>
+                <span className="font-medium text-fg">Success metrics: </span>
+                {payload.successMetrics.join(" · ")}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {(payload.implementationLinks ?? []).map((l) => (
+                <Button key={l.href} href={l.href} size="sm" variant="secondary">
+                  {l.label}
+                </Button>
+              ))}
+            </div>
+          </CardBody>
+        </Card>
+      </div>
+    </div>
   );
 }
