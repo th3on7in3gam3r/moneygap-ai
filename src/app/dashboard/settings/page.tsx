@@ -337,10 +337,15 @@ export default function SettingsPage() {
             <Button href="/dashboard/billing" size="sm">
               Open billing
             </Button>
-            <div className="flex flex-wrap gap-2 pt-1">
-              <Button href="/dashboard/developers" size="sm" variant="secondary">
+            <div className="space-y-2 pt-2">
+              <p className="text-xs text-fg-subtle">
+                Create keys for Cadence and other integrations.
+              </p>
+              <Button href="/dashboard/developers" size="sm">
                 Developers / API
               </Button>
+            </div>
+            <div className="flex flex-wrap gap-2 pt-1">
               <Button href="/dashboard/integrations" size="sm" variant="secondary">
                 Integration Hub
               </Button>

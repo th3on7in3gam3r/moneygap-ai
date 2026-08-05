@@ -257,6 +257,23 @@ export default function IntegrationsPage() {
 
       <WhyConnectBand />
 
+      <Card>
+        <CardHeader>
+          <div>
+            <h2 className="font-display text-lg font-semibold">MoneyGap API keys</h2>
+            <p className="mt-1 text-sm text-fg-muted">
+              Cadence → Settings → Integrations → Growth stack expects a MoneyGap
+              API key. Create and copy one in Developer Hub.
+            </p>
+          </div>
+        </CardHeader>
+        <CardBody>
+          <Button href="/dashboard/developers" size="sm">
+            Open Developer Hub
+          </Button>
+        </CardBody>
+      </Card>
+
       {success && (
         <p
           role="status"

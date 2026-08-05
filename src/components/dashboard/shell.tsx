@@ -5,6 +5,7 @@ import {
   BarChart3,
   BookOpen,
   Bot,
+  Code2,
   FileText,
   Gauge,
   Globe2,
@@ -61,6 +62,7 @@ function buildNav(isAgency: boolean, isClient: boolean) {
     items.push({ href: "/dashboard/clients", label: "Clients", icon: Users });
     items.push({ href: "/dashboard/team", label: "Team", icon: UsersRound });
   }
+  items.push({ href: "/dashboard/developers", label: "Developers", icon: Code2 });
   items.push({ href: "/dashboard/settings", label: "Settings", icon: Settings });
   return items;
 }

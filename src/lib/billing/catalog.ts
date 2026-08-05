@@ -62,9 +62,9 @@ export const PLAN_CATALOG: PlanDefinition[] = [
       reportsPerMonth: 2,
       competitorAnalysesPerMonth: 0,
       exportsPerMonth: 2,
-      apiCallsPerMonth: 0,
+      apiCallsPerMonth: 100,
     },
-    features: ["moneygap_engine"],
+    features: ["moneygap_engine", "api_access"],
   },
   {
     id: "starter",
@@ -82,9 +82,9 @@ export const PLAN_CATALOG: PlanDefinition[] = [
       reportsPerMonth: 10,
       competitorAnalysesPerMonth: 2,
       exportsPerMonth: 10,
-      apiCallsPerMonth: 0,
+      apiCallsPerMonth: 250,
     },
-    features: ["moneygap_engine", "monitor", "team_members"],
+    features: ["moneygap_engine", "monitor", "team_members", "api_access"],
   },
   {
     id: "growth",
@@ -102,7 +102,7 @@ export const PLAN_CATALOG: PlanDefinition[] = [
       reportsPerMonth: 40,
       competitorAnalysesPerMonth: 20,
       exportsPerMonth: 40,
-      apiCallsPerMonth: 0,
+      apiCallsPerMonth: 1_000,
     },
     features: [
       "moneygap_engine",
@@ -111,6 +111,7 @@ export const PLAN_CATALOG: PlanDefinition[] = [
       "monitor",
       "competitor_intelligence",
       "team_members",
+      "api_access",
     ],
   },
   {

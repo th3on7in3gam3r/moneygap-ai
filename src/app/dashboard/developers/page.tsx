@@ -52,6 +52,7 @@ export default function DevelopersPage() {
   const [webhooks, setWebhooks] = useState<WebhookRow[]>([]);
   const [events, setEvents] = useState<string[]>([]);
   const [secret, setSecret] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [keyName, setKeyName] = useState("Default key");
   const [keyEnv, setKeyEnv] = useState<"development" | "production">("development");
   const [hookUrl, setHookUrl] = useState("");
@@ -82,11 +83,20 @@ export default function DevelopersPage() {
     return () => clearTimeout(t);
   }, []);
 
+  function copySecret() {
+    if (!secret) return;
+    void navigator.clipboard.writeText(secret).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
   function createKey() {
     startTransition(async () => {
       setMsg(null);
       setUpgrade(null);
       setSecret(null);
+      setCopied(false);
       const res = await fetch("/api/developer/keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -122,6 +132,7 @@ export default function DevelopersPage() {
   function rotateKey(id: string) {
     startTransition(async () => {
       setSecret(null);
+      setCopied(false);
       const res = await fetch(`/api/developer/keys/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -179,8 +190,12 @@ export default function DevelopersPage() {
           Developers
         </h1>
         <p className="mt-1 text-sm text-fg-muted">
-          MoneyGap API™ keys, usage, webhooks, and docs. Requires{" "}
-          <span className="text-fg">api_access</span> (Professional+).
+          MoneyGap API™ keys, usage, webhooks, and docs. API access is included on
+          all plans (monthly call quotas vary by plan).
+        </p>
+        <p className="mt-2 text-sm text-fg">
+          Use this key in Cadence → Settings → Integrations → Growth stack → MoneyGap
+          AI.
         </p>
       </div>
 
@@ -188,9 +203,14 @@ export default function DevelopersPage() {
       {upgrade && <UpgradePrompt payload={upgrade} />}
       {secret && (
         <div className="rounded-xl border border-accent/40 bg-accent-soft/50 px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-accent">
-            New API secret — copy now
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-accent">
+              New API secret — copy now
+            </p>
+            <Button type="button" size="sm" variant="secondary" onClick={copySecret}>
+              {copied ? "Copied" : "Copy"}
+            </Button>
+          </div>
           <code className="mt-2 block break-all text-sm text-fg">{secret}</code>
         </div>
       )}
@@ -229,8 +249,8 @@ export default function DevelopersPage() {
           payload={{
             code: "upgrade_required",
             message:
-              "API access unlocks on Professional, Agency, and Enterprise. Soft-switch on Billing until Stripe Checkout is configured.",
-            suggestedPlan: "professional",
+              "API access should be available on your plan. Soft-switch on Billing if entitlements look stale, or contact support.",
+            suggestedPlan: "starter",
           }}
         />
       )}
