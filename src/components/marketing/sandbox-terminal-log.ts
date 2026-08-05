@@ -41,6 +41,7 @@ export function findingSummaryLines(
 
 /**
  * Schedules progressive stage lines. Calls `onLine` for each stage.
+ * Lines stay as pending “› …” (never fake ✓) until the API returns.
  * Returns a cancel function.
  */
 export function runProgressiveStages(
@@ -48,10 +49,12 @@ export function runProgressiveStages(
   intervalMs = STAGE_INTERVAL_MS,
 ): () => void {
   let i = 0;
+  let stopped = false;
   const id = window.setInterval(() => {
+    if (stopped) return;
     if (i >= SCAN_STAGE_LINES.length) {
       window.clearInterval(id);
-      onLine("› Working…");
+      onLine("› Still working…");
       return;
     }
     onLine(SCAN_STAGE_LINES[i]!);
@@ -62,5 +65,18 @@ export function runProgressiveStages(
   onLine(SCAN_STAGE_LINES[0]!);
   i = 1;
 
-  return () => window.clearInterval(id);
+  return () => {
+    stopped = true;
+    window.clearInterval(id);
+  };
+}
+
+/** Collapse optimistic stage chatter into a clear failure line. */
+export function failureLogLines(
+  priorLines: string[],
+  error: string,
+): string[] {
+  const cmd = priorLines.find((l) => l.startsWith("$ "));
+  const base = cmd ? [cmd] : [];
+  return [...base, `✗ ${error}`];
 }

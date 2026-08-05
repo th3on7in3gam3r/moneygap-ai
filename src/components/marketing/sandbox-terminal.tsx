@@ -12,6 +12,7 @@ import type {
 } from "@/lib/public-diagnostics/types";
 import {
   commandLine,
+  failureLogLines,
   findingSummaryLines,
   runProgressiveStages,
   severityMark,
@@ -139,15 +140,15 @@ export function SandboxTerminal({ className }: { className?: string }) {
         cancelStagesRef.current = null;
 
         if (!res.ok || !data.result) {
+          const errMsg = data.error ?? "Scan failed. Try another public URL.";
           setState((prev) => {
             const baseLines =
               prev.status === "running" ? prev.lines : initialLines;
-            const cleaned = baseLines.filter((l) => l !== "› Working…");
             return {
               status: "error",
-              message: data.error ?? "Scan failed. Try another public URL.",
+              message: errMsg,
               result: data.result ?? null,
-              logLines: [...cleaned, `✗ ${data.error ?? "Scan failed"}`],
+              logLines: failureLogLines(baseLines, errMsg),
             };
           });
           return;
@@ -170,12 +171,13 @@ export function SandboxTerminal({ className }: { className?: string }) {
       } catch {
         cancelStagesRef.current?.();
         cancelStagesRef.current = null;
+        const errMsg = "Network error — check your connection and try again.";
         setState((prev) => ({
           status: "error",
-          message: "Network error — check your connection and try again.",
+          message: errMsg,
           logLines:
             prev.status === "running"
-              ? [...prev.lines.filter((l) => l !== "› Working…"), "✗ Network error"]
+              ? failureLogLines(prev.lines, errMsg)
               : undefined,
         }));
       }

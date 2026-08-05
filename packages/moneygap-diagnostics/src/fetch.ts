@@ -11,6 +11,49 @@ export type FetchedPage = {
   contentType: string | null;
 };
 
+function classifyFetchError(err: unknown): string {
+  if (err instanceof Error && err.name === "AbortError") {
+    return "Request timed out. The site may be slow or blocking automated requests — try again, or use a faster public page.";
+  }
+
+  const chain: unknown[] = [err];
+  let cur: unknown = err;
+  for (let i = 0; i < 5; i++) {
+    if (!cur || typeof cur !== "object" || !("cause" in cur)) break;
+    const next = (cur as { cause?: unknown }).cause;
+    if (!next) break;
+    chain.push(next);
+    cur = next;
+  }
+
+  const blob = chain
+    .map((e) => {
+      if (!e || typeof e !== "object") return String(e ?? "");
+      const o = e as { code?: string; name?: string; message?: string };
+      return `${o.code ?? ""} ${o.name ?? ""} ${o.message ?? ""}`;
+    })
+    .join(" ")
+    .toUpperCase();
+
+  if (/ENOTFOUND|EAI_AGAIN|ESERVFAIL|GETADDRINFO|DNS/.test(blob)) {
+    return "We couldn’t resolve DNS for that domain. Check the spelling and confirm the domain is registered and publicly resolvable.";
+  }
+  if (/CERT_|UNABLE_TO_VERIFY|ERR_TLS|CERTIFICATE/.test(blob)) {
+    return "TLS/certificate check failed for that URL. The site’s HTTPS may be misconfigured.";
+  }
+  if (/ECONNREFUSED/.test(blob)) {
+    return "Connection refused. The host is not accepting HTTPS connections.";
+  }
+  if (/ETIMEDOUT|UND_ERR_CONNECT_TIMEOUT|TIMEOUT/.test(blob)) {
+    return "Connection timed out. The site may be down or blocking this network.";
+  }
+  if (/ECONNRESET|EPIPE/.test(blob)) {
+    return "The connection was reset while fetching the page.";
+  }
+
+  return "Could not fetch this URL. Confirm it’s a public https site that loads in a private browser window.";
+}
+
 export async function fetchText(
   url: string,
   opts: { timeoutMs: number; maxBytes: number; userAgent?: string },
@@ -47,10 +90,9 @@ export async function fetchText(
       finalUrl: res.url || url,
     };
   } catch (err) {
-    const aborted = err instanceof Error && err.name === "AbortError";
     return {
       ok: false,
-      error: aborted ? "Request timed out." : "Could not fetch this URL.",
+      error: classifyFetchError(err),
     };
   } finally {
     clearTimeout(timer);

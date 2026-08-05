@@ -1,5 +1,40 @@
 // src/fetch.ts
 var DEFAULT_UA = "MoneyGapDiagnostics/0.1 (+https://moneygap-ai.com; sandbox+cli)";
+function classifyFetchError(err) {
+  if (err instanceof Error && err.name === "AbortError") {
+    return "Request timed out. The site may be slow or blocking automated requests \u2014 try again, or use a faster public page.";
+  }
+  const chain = [err];
+  let cur = err;
+  for (let i = 0; i < 5; i++) {
+    if (!cur || typeof cur !== "object" || !("cause" in cur)) break;
+    const next = cur.cause;
+    if (!next) break;
+    chain.push(next);
+    cur = next;
+  }
+  const blob = chain.map((e) => {
+    if (!e || typeof e !== "object") return String(e ?? "");
+    const o = e;
+    return `${o.code ?? ""} ${o.name ?? ""} ${o.message ?? ""}`;
+  }).join(" ").toUpperCase();
+  if (/ENOTFOUND|EAI_AGAIN|ESERVFAIL|GETADDRINFO|DNS/.test(blob)) {
+    return "We couldn\u2019t resolve DNS for that domain. Check the spelling and confirm the domain is registered and publicly resolvable.";
+  }
+  if (/CERT_|UNABLE_TO_VERIFY|ERR_TLS|CERTIFICATE/.test(blob)) {
+    return "TLS/certificate check failed for that URL. The site\u2019s HTTPS may be misconfigured.";
+  }
+  if (/ECONNREFUSED/.test(blob)) {
+    return "Connection refused. The host is not accepting HTTPS connections.";
+  }
+  if (/ETIMEDOUT|UND_ERR_CONNECT_TIMEOUT|TIMEOUT/.test(blob)) {
+    return "Connection timed out. The site may be down or blocking this network.";
+  }
+  if (/ECONNRESET|EPIPE/.test(blob)) {
+    return "The connection was reset while fetching the page.";
+  }
+  return "Could not fetch this URL. Confirm it\u2019s a public https site that loads in a private browser window.";
+}
 async function fetchText(url, opts) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), opts.timeoutMs);
@@ -29,10 +64,9 @@ async function fetchText(url, opts) {
       finalUrl: res.url || url
     };
   } catch (err) {
-    const aborted = err instanceof Error && err.name === "AbortError";
     return {
       ok: false,
-      error: aborted ? "Request timed out." : "Could not fetch this URL."
+      error: classifyFetchError(err)
     };
   } finally {
     clearTimeout(timer);

@@ -88,9 +88,23 @@ export async function POST(req: Request) {
   });
 
   if (!outcome.ok) {
+    let error = outcome.error;
+    try {
+      const host = new URL(
+        url.startsWith("http") ? url : `https://${url}`,
+      ).hostname.replace(/^www\./, "");
+      if (
+        (host === "moneygap.com" || host.endsWith(".moneygap.com")) &&
+        /dns|resolve/i.test(error)
+      ) {
+        error = `${error} Tip: the product site is https://moneygap-ai.com — moneygap.com does not resolve.`;
+      }
+    } catch {
+      /* keep original */
+    }
     return NextResponse.json(
       {
-        error: outcome.error,
+        error,
         result: outcome.result ?? null,
       },
       { status: outcome.result ? 422 : 400 },
