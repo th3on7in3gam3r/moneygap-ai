@@ -5,6 +5,7 @@ import {
   UpgradePrompt,
   type UpgradePayload,
 } from "@/components/billing/upgrade-prompt";
+import { MgLoader } from "@/components/mg-loader";
 import { BriefPanel } from "@/components/opportunity-intelligence/brief-panel";
 import { GrowthGraphView } from "@/components/opportunity-intelligence/growth-graph-view";
 import { RecommendationCard } from "@/components/opportunity-intelligence/recommendation-card";
@@ -203,7 +204,7 @@ export default function OpportunityIntelligencePage() {
       {error && <p className="text-sm text-gap">{error}</p>}
       {briefError && <p className="text-sm text-gap">{briefError}</p>}
       {briefLoading && (
-        <p className="text-xs text-fg-subtle">Loading content brief…</p>
+        <MgLoader overlay label="Loading content brief…" size="md" />
       )}
 
       {brief && (
@@ -257,7 +258,11 @@ export default function OpportunityIntelligencePage() {
           </div>
         )}
         {pending && websiteId ? (
-          <p className="pb-2 text-xs text-fg-subtle">Loading {siteLabel}…</p>
+          <MgLoader
+            className="pb-1"
+            label={`Loading ${siteLabel}…`}
+            size="sm"
+          />
         ) : null}
       </div>
 
@@ -415,7 +420,7 @@ export default function OpportunityIntelligencePage() {
       )}
 
       {!data?.hasAccess && data && !data.upgrade && (
-        <p className="text-sm text-fg-muted">Loading…</p>
+        <MgLoader label="Loading Opportunity Intelligence…" size="sm" />
       )}
     </div>
   );
