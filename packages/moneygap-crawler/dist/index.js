@@ -66,6 +66,80 @@ var init_framework_detectors = __esm({
   }
 });
 
+// src/renderers/playwright.ts
+var playwright_exports = {};
+__export(playwright_exports, {
+  closeBrowser: () => closeBrowser,
+  renderWithPlaywright: () => renderWithPlaywright,
+  shouldUsePlaywright: () => shouldUsePlaywright
+});
+async function getBrowser() {
+  try {
+    const pw = await import("playwright");
+    if (!browserPromise) {
+      browserPromise = pw.chromium.launch({
+        headless: true,
+        args: ["--disable-dev-shm-usage", "--no-sandbox"]
+      });
+    }
+    return await browserPromise;
+  } catch {
+    browserPromise = null;
+    return null;
+  }
+}
+async function closeBrowser() {
+  if (!browserPromise) return;
+  try {
+    const browser = await browserPromise;
+    await browser.close();
+  } catch {
+  } finally {
+    browserPromise = null;
+  }
+}
+async function renderWithPlaywright(url, opts) {
+  const browser = await getBrowser();
+  if (!browser) return null;
+  const started = Date.now();
+  const context = await browser.newContext({
+    userAgent: opts.userAgent,
+    javaScriptEnabled: true
+  });
+  try {
+    const page = await context.newPage();
+    const res = await page.goto(url, {
+      waitUntil: "domcontentloaded",
+      timeout: opts.timeoutMs
+    });
+    await page.waitForTimeout(400);
+    const html = await page.content();
+    return {
+      html,
+      finalUrl: page.url(),
+      statusCode: res?.status() ?? 200,
+      fetchMs: Date.now() - started,
+      renderedWith: "playwright"
+    };
+  } catch {
+    return null;
+  } finally {
+    await context.close().catch(() => void 0);
+  }
+}
+function shouldUsePlaywright(html, playwrightEnabled) {
+  if (!playwrightEnabled) return false;
+  return detectFramework(html).needsJs;
+}
+var browserPromise;
+var init_playwright = __esm({
+  "src/renderers/playwright.ts"() {
+    "use strict";
+    init_framework_detectors();
+    browserPromise = null;
+  }
+});
+
 // src/crawl.ts
 import PQueue from "p-queue";
 
@@ -540,67 +614,8 @@ async function fetchText(url, opts) {
   }
 }
 
-// src/renderers/playwright.ts
-init_framework_detectors();
-var browserPromise = null;
-async function getBrowser() {
-  try {
-    const pw = await import("playwright");
-    if (!browserPromise) {
-      browserPromise = pw.chromium.launch({
-        headless: true,
-        args: ["--disable-dev-shm-usage", "--no-sandbox"]
-      });
-    }
-    return await browserPromise;
-  } catch {
-    browserPromise = null;
-    return null;
-  }
-}
-async function closeBrowser() {
-  if (!browserPromise) return;
-  try {
-    const browser = await browserPromise;
-    await browser.close();
-  } catch {
-  } finally {
-    browserPromise = null;
-  }
-}
-async function renderWithPlaywright(url, opts) {
-  const browser = await getBrowser();
-  if (!browser) return null;
-  const started = Date.now();
-  const context = await browser.newContext({
-    userAgent: opts.userAgent,
-    javaScriptEnabled: true
-  });
-  try {
-    const page = await context.newPage();
-    const res = await page.goto(url, {
-      waitUntil: "domcontentloaded",
-      timeout: opts.timeoutMs
-    });
-    await page.waitForTimeout(400);
-    const html = await page.content();
-    return {
-      html,
-      finalUrl: page.url(),
-      statusCode: res?.status() ?? 200,
-      fetchMs: Date.now() - started,
-      renderedWith: "playwright"
-    };
-  } catch {
-    return null;
-  } finally {
-    await context.close().catch(() => void 0);
-  }
-}
-function shouldUsePlaywright(html, playwrightEnabled) {
-  if (!playwrightEnabled) return false;
-  return detectFramework(html).needsJs;
-}
+// src/crawl.ts
+init_playwright();
 
 // src/robots/index.ts
 import robotsParser from "robots-parser";
@@ -1129,6 +1144,10 @@ async function discoverOnly(input) {
 
 // src/index.ts
 init_framework_detectors();
+async function closeBrowser2() {
+  const { closeBrowser: close } = await Promise.resolve().then(() => (init_playwright(), playwright_exports));
+  await close();
+}
 export {
   CrawlConfigSchema,
   CrawlModeSchema,
@@ -1137,7 +1156,7 @@ export {
   QueueStateSchema,
   backoffMs,
   classifyPageType,
-  closeBrowser,
+  closeBrowser2 as closeBrowser,
   crawlSite,
   detectFramework,
   discoverOnly,

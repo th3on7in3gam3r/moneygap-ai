@@ -1,6 +1,6 @@
 /**
- * Thin re-exports for the Next.js app. Source of truth lives in
- * packages/moneygap-diagnostics.
+ * Server / shared re-exports. Client Components should import types from
+ * `./types` and `SANDBOX_STORAGE_KEY` from `./constants` instead of this barrel.
  */
 export {
   runLiveDiagnostics,
@@ -8,12 +8,15 @@ export {
   isPrivateHostname,
   scoreFindings,
   hasCriticalFailures,
-  SANDBOX_STORAGE_KEY,
-  type DiagnosticFinding,
-  type DiagnosticSeverity,
-  type DiagnosticCategory,
-  type DiagnosticStage,
-  type LiveDiagnosticsResult,
-  type LiveDiagnosticsOptions,
-  type SandboxStoragePayload,
 } from "moneygap-diagnostics";
+
+export { SANDBOX_STORAGE_KEY } from "./constants";
+export type {
+  DiagnosticFinding,
+  DiagnosticSeverity,
+  DiagnosticCategory,
+  DiagnosticStage,
+  LiveDiagnosticsResult,
+  LiveDiagnosticsOptions,
+  SandboxStoragePayload,
+} from "./types";

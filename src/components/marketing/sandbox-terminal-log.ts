@@ -1,4 +1,4 @@
-import type { DiagnosticFinding } from "@/lib/public-diagnostics";
+import type { DiagnosticFinding } from "@/lib/public-diagnostics/types";
 
 /** Progressive stage lines shown while the real sandbox scan runs. */
 export const SCAN_STAGE_LINES = [

@@ -7,7 +7,11 @@ export { loadRobots } from "./robots/index.js";
 export { classifyPageType, prioritizeUrls } from "./discovery/prioritize.js";
 export { normalizeCrawlUrl, sameOrigin, resolveUrl } from "./discovery/normalize.js";
 export { backoffMs, InMemoryCrawlQueue, isTransientError } from "./queue/memory.js";
-export { closeBrowser } from "./renderers/playwright.js";
+/** Lazy Playwright cleanup — avoid static export of the playwright renderer. */
+export async function closeBrowser(): Promise<void> {
+  const { closeBrowser: close } = await import("./renderers/playwright.js");
+  await close();
+}
 export {
   CrawlConfigSchema,
   CrawlModeSchema,

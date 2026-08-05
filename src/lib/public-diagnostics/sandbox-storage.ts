@@ -1,9 +1,7 @@
 "use client";
 
-import {
-  SANDBOX_STORAGE_KEY,
-  type SandboxStoragePayload,
-} from "@/lib/public-diagnostics";
+import { SANDBOX_STORAGE_KEY } from "@/lib/public-diagnostics/constants";
+import type { SandboxStoragePayload } from "@/lib/public-diagnostics/types";
 
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 

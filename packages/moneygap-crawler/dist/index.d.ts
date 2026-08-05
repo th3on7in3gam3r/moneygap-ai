@@ -232,6 +232,7 @@ declare class InMemoryCrawlQueue {
 declare function backoffMs(attempt: number, baseMs?: number): number;
 declare function isTransientError(statusCode?: number, message?: string): boolean;
 
+/** Lazy Playwright cleanup — avoid static export of the playwright renderer. */
 declare function closeBrowser(): Promise<void>;
 
 export { type CrawlConfig, type CrawlConfigInput, CrawlConfigSchema, type CrawlMode, CrawlModeSchema, type CrawlResult, type DiscoveryResult, type FrameworkId, InMemoryCrawlQueue, type OnProgress, type PageRecord, type PageType, PageTypeSchema, type ProgressEvent, type ProgressPhase, type QueueState, QueueStateSchema, type ScrapedPage, backoffMs, classifyPageType, closeBrowser, crawlSite, detectFramework, discoverOnly, discoverSitemapUrls, extractSinglePage, isTransientError, loadPageHtml, loadRobots, normalizeCrawlUrl, parseSitemapXml, prioritizeUrls, resolveUrl, sameOrigin, toScrapedPage, toScrapedPages };

@@ -4,12 +4,12 @@ import { CheckCircle2, Copy, Loader2, Terminal, XCircle } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { StartFreeButton } from "@/components/auth-buttons";
 import { Button } from "@/components/ui/button";
-import {
-  SANDBOX_STORAGE_KEY,
-  type DiagnosticFinding,
-  type LiveDiagnosticsResult,
-  type SandboxStoragePayload,
-} from "@/lib/public-diagnostics";
+import { SANDBOX_STORAGE_KEY } from "@/lib/public-diagnostics/constants";
+import type {
+  DiagnosticFinding,
+  LiveDiagnosticsResult,
+  SandboxStoragePayload,
+} from "@/lib/public-diagnostics/types";
 import {
   commandLine,
   findingSummaryLines,
