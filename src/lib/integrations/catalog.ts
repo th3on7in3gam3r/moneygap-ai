@@ -56,6 +56,15 @@ export const SEED_INTEGRATION_PROVIDERS: SeedProvider[] = [
         status: "available",
         description: "Session recordings and heatmaps.",
       },
+      {
+        slug: "cadence_pulse",
+        name: "Cadence Pulse",
+        authType: "api_key",
+        scopes: ["collect"],
+        status: "available",
+        description:
+          "Pulse website analytics via Cadence. Paste the Collect key (pck_…) from the Cadence Pulse install snippet.",
+      },
     ],
     10,
   ),

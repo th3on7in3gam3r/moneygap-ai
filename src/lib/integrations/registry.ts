@@ -2,6 +2,7 @@ import { SEED_INTEGRATION_PROVIDERS } from "@/lib/integrations/catalog";
 import {
   createApiKeyConnector,
   createStubConnector,
+  cadencePulseConnector,
   githubConnector,
   hubspotConnector,
   stripeConnector,
@@ -12,6 +13,7 @@ const REFERENCE: Record<string, IntegrationConnector> = {
   github: githubConnector,
   stripe: stripeConnector,
   hubspot: hubspotConnector,
+  cadence_pulse: cadencePulseConnector,
 };
 
 let cache: Map<string, IntegrationConnector> | null = null;

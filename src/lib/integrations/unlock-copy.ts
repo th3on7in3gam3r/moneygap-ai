@@ -10,6 +10,8 @@ export function providerUnlockLine(slug: string): string {
     case "google_analytics":
     case "microsoft_clarity":
       return "Stages analytics credentials for Hub health. Crawl/traffic findings from Hub are not wired yet.";
+    case "cadence_pulse":
+      return "Connects Cadence Pulse — paste the Collect key (pck_…) so the public site pixel can authenticate with Pulse.";
     case "google_search_console":
       return "Stages Search Console credentials for Hub health. Live indexing pull from Hub is not wired yet.";
     case "cloudflare_pages":
@@ -23,6 +25,9 @@ export function connectedSuccessMessage(slug: string, name?: string): string {
   const label = name ?? slug;
   if (slug === "github") {
     return `Connected ${label}. Developer Mode™ is ready — open Developer Mode for repos, Project Memory™, and draft PRs.`;
+  }
+  if (slug === "cadence_pulse") {
+    return `Connected ${label}. The site pixel will use this Collect key on the next page load.`;
   }
   return `Connected ${label}. Integration Health and Connection Map will reflect this connection. Engine enrichment from Hub data ships incrementally.`;
 }

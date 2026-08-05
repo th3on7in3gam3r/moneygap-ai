@@ -1,9 +1,11 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { DM_Sans, Geist_Mono, Space_Grotesk } from "next/font/google";
+import Script from "next/script";
 import { SmartConsentHost } from "@/components/privacy/smart-consent-host";
 import { PwaRegister } from "@/components/pwa/pwa-register";
 import { ThemeProvider } from "@/components/theme-provider";
+import { getPulseEmbedConfig } from "@/lib/analytics/pulse";
 import {
   SITE_DEFAULT_DESCRIPTION,
   SITE_DEFAULT_TITLE,
@@ -87,7 +89,9 @@ const jsonLd = [
   softwareApplicationJsonLd(),
 ];
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const pulse = await getPulseEmbedConfig();
+
   return (
     <html lang="en" suppressHydrationWarning className="h-full">
       <body
@@ -104,6 +108,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <PwaRegister />
           </ThemeProvider>
         </ClerkProvider>
+        <Script
+          src={pulse.src}
+          strategy="afterInteractive"
+          data-site={pulse.site}
+          {...(pulse.dataKey ? { "data-key": pulse.dataKey } : {})}
+          defer
+        />
       </body>
     </html>
   );

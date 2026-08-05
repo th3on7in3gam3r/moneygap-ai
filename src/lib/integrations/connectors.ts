@@ -349,3 +349,32 @@ export function createApiKeyConnector(input: {
       ]),
   };
 }
+
+/** Cadence Pulse — website collect key (`pck_…`) from the Cadence install snippet. */
+export const cadencePulseConnector: IntegrationConnector = {
+  slug: "cadence_pulse",
+  category: "analytics",
+  authType: "api_key",
+  async validateCredentials(creds: IntegrationCredentialPayload) {
+    const key = creds.apiKey?.trim() ?? "";
+    return /^pck_[A-Za-z0-9_-]{8,}$/.test(key);
+  },
+  async fetchRaw() {
+    return {
+      ok: true,
+      message: "Cadence Pulse collect key stored for site pixel + Hub health.",
+    };
+  },
+  normalize(raw: unknown): NormalizedIntegrationData {
+    const body = raw as { message?: string };
+    return {
+      provider: "cadence_pulse",
+      category: "analytics",
+      metrics: { collectKeyConfigured: 1 },
+      entities: [],
+      freshness: new Date().toISOString(),
+      warnings: body.message ? [] : ["Collect key connected."],
+    };
+  },
+};
+

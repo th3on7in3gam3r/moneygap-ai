@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { AccountProfile } from "@/components/dashboard/account-profile";
+import { PulseCadenceSettings } from "@/components/dashboard/pulse-cadence-settings";
 import {
   UpgradePrompt,
   type UpgradePayload,
@@ -635,6 +636,8 @@ export default function SettingsPage() {
           </Button>
         </CardBody>
       </Card>
+
+      <PulseCadenceSettings />
 
       <Card>
         <CardHeader>
