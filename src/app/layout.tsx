@@ -5,7 +5,7 @@ import Script from "next/script";
 import { SmartConsentHost } from "@/components/privacy/smart-consent-host";
 import { PwaRegister } from "@/components/pwa/pwa-register";
 import { ThemeProvider } from "@/components/theme-provider";
-import { getPulseEmbedConfig } from "@/lib/analytics/pulse";
+import { getPulseEmbedConfig, PULSE_COLLECT_ENDPOINT } from "@/lib/analytics/pulse";
 import {
   SITE_DEFAULT_DESCRIPTION,
   SITE_DEFAULT_TITLE,
@@ -112,6 +112,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           src={pulse.src}
           strategy="afterInteractive"
           data-site={pulse.site}
+          data-endpoint={PULSE_COLLECT_ENDPOINT}
           {...(pulse.dataKey ? { "data-key": pulse.dataKey } : {})}
           defer
         />

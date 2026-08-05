@@ -9,6 +9,8 @@ import { decryptCredentials, isEncryptionConfigured } from "@/lib/integrations/c
 export const PULSE_SCRIPT_SRC = "https://pulse-5o1m.onrender.com/pulse.js";
 export const PULSE_SITE_ID = "moneygap-ai-com";
 export const PULSE_PROVIDER_SLUG = "cadence_pulse";
+/** Same-origin collect proxy — avoids Pulse host CORS credentials mismatch. */
+export const PULSE_COLLECT_ENDPOINT = "/api/pulse/collect";
 
 const CACHE_TTL_MS = 60_000;
 

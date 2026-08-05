@@ -77,6 +77,15 @@ export async function POST(req: Request) {
     }
 
     const collectKey = parsed.data.collectKey.trim();
+    if (collectKey.startsWith("psk_")) {
+      return Response.json(
+        {
+          error:
+            "That looks like a Dashboard Read Key (psk_…). Paste the Collect key (pck_…) from the Pulse install snippet instead.",
+        },
+        { status: 400 },
+      );
+    }
     if (!isPulseCollectKey(collectKey)) {
       return Response.json(
         {

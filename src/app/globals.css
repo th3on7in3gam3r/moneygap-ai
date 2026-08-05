@@ -277,48 +277,9 @@ body {
   transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Clerk UserProfile — flatten into Settings Account card */
-.mg-clerk-account .cl-navbar,
-.mg-clerk-account .cl-navbarMobileMenuRow,
-.mg-clerk-account .cl-header,
-.mg-clerk-account .cl-profileSection__profile .cl-header {
-  display: none !important;
-}
-
-.mg-clerk-account .cl-rootBox,
-.mg-clerk-account .cl-cardBox,
-.mg-clerk-account .cl-card {
-  width: 100% !important;
-  max-width: none !important;
-  box-shadow: none !important;
-  border: none !important;
-  background: transparent !important;
-}
-
-.mg-clerk-account .cl-scrollBox,
-.mg-clerk-account .cl-pageScrollBox {
-  background: transparent !important;
-  padding: 0 !important;
-}
-
-.mg-clerk-account .cl-profileSection {
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
-  background: var(--bg-elevated);
-  padding: 0.875rem 1rem;
-  margin-bottom: 0.75rem;
-}
-
-.mg-clerk-account .cl-profileSectionTitleText {
-  font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--fg);
-}
-
-.mg-clerk-account a,
-.mg-clerk-account .cl-profileSectionPrimaryButton,
-.mg-clerk-account .cl-button__text {
+/* Clerk UserProfile — prefer appearance.elements in account-profile.tsx.
+   Avoid .cl-* structural selectors (Clerk warns structural_css_pin_clerk_ui). */
+.mg-clerk-account a {
   color: var(--accent);
 }
 
