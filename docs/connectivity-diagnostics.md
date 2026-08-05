@@ -20,9 +20,13 @@ Implementation: [`src/lib/scan/connectivity/`](../src/lib/scan/connectivity/).
 
 ## Hard vs soft failures
 
-**Hard (`ok: false`):** invalid URL, private host, DNS fail, TCP refused/timeout, TLS cert/handshake fail, homepage network/timeout, homepage 404/410/5xx.
+**Hard (`ok: false`):** invalid URL, private host, DNS fail, TCP refused/timeout, TLS cert/handshake fail, homepage network/timeout, homepage 404/410/5xx, **auth/login redirects** (e.g. Clerk handshake), redirect loops.
 
 **Soft (warnings only):** robots 404, sitemap 404, HTTP 401/403 (reachable but bot-gated), Cloudflare challenge with HTML returned, unknown framework.
+
+### Auth-gated sites
+
+If the homepage redirects to Clerk, Auth0, Google/Microsoft login, or a `/sign-in` path, diagnostics stop early with `code: "auth"` and an actionable summary — not “Exceeded N redirects.” The host is reachable (DNS/TCP/TLS passed); the page simply isn’t publicly crawlable.
 
 ## Structured result
 

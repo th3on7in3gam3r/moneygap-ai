@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
+import { detectAuthRedirect, authGateMessage } from "./auth-gate";
 import { runConnectivityDiagnostics } from "./pipeline";
 import { stageDns, stageHomepageGet } from "./stages";
 import type { ConnectivityFetchRecord } from "./types";
@@ -8,6 +9,41 @@ const originalFetch = globalThis.fetch;
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+});
+
+describe("detectAuthRedirect", () => {
+  it("detects Clerk accounts.dev handshake", () => {
+    const r = detectAuthRedirect(
+      "https://postwick.kerygmasocial.com/",
+      "https://engaged-fawn-13.clerk.accounts.dev/v1/client/handshake?redirect_url=https%3A%2F%2Fpostwick.kerygmasocial.com%2F",
+    );
+    assert.equal(r.detected, true);
+    assert.equal(r.provider, "Clerk");
+  });
+
+  it("detects same-origin sign-in path", () => {
+    const r = detectAuthRedirect(
+      "https://example.com/",
+      "https://example.com/sign-in",
+    );
+    assert.equal(r.detected, true);
+  });
+
+  it("ignores normal www redirect", () => {
+    const r = detectAuthRedirect(
+      "https://example.com/",
+      "https://www.example.com/",
+    );
+    assert.equal(r.detected, false);
+  });
+});
+
+describe("authGateMessage", () => {
+  it("mentions Clerk and public pages", () => {
+    const s = authGateMessage("Clerk", "postwick.kerygmasocial.com");
+    assert.match(s, /Clerk/);
+    assert.match(s, /public/i);
+  });
 });
 
 describe("runConnectivityDiagnostics (URL stage)", () => {
@@ -75,17 +111,34 @@ describe("stageHomepageGet (mocked fetch)", () => {
     assert.equal(calls, 1);
   });
 
+  it("stops early on Clerk auth redirect with actionable error", async () => {
+    let calls = 0;
+    globalThis.fetch = async () => {
+      calls += 1;
+      return new Response("", {
+        status: 307,
+        headers: {
+          location:
+            "https://engaged-fawn-13.clerk.accounts.dev/v1/client/handshake?redirect_url=https%3A%2F%2Fpostwick.example.com%2F",
+        },
+      });
+    };
+    const log: ConnectivityFetchRecord[] = [];
+    const r = await stageHomepageGet("https://postwick.example.com/", log);
+    assert.equal(r.ok, false);
+    assert.equal(r.errorCode, "auth");
+    assert.match(r.hardError ?? "", /Clerk/i);
+    assert.equal(calls, 1, "must not follow the Clerk handshake chain");
+  });
+
   it("classifies abort as timeout without retry", async () => {
     let calls = 0;
-    globalThis.fetch = async (_input, init) => {
+    globalThis.fetch = async () => {
       calls += 1;
-      const err = Object.assign(new Error("The operation was aborted"), {
+      throw Object.assign(new Error("The operation was aborted"), {
         name: "AbortError",
         code: "ABORT_ERR",
       });
-      if (init?.signal?.aborted) throw err;
-      // Simulate abort immediately via rejected promise
-      throw err;
     };
     const log: ConnectivityFetchRecord[] = [];
     const r = await stageHomepageGet("https://example.com/", log);

@@ -1,5 +1,6 @@
 import { connect as netConnect } from "node:net";
 import { connect as tlsConnect } from "node:tls";
+import { authGateMessage, detectAuthRedirect } from "./auth-gate";
 import { loggedFetch } from "./fetch-log";
 import { classifyNetworkError } from "./classify-error";
 import { detectCloudflareOrWaf } from "./waf";
@@ -179,10 +180,47 @@ export type HomepageStageResult = {
   cloudflareOrWaf: boolean;
   wafWarning: string | null;
   hardError: string | null;
-  errorCode?: "timeout" | "tls" | "tcp" | "unreachable" | "http";
+  errorCode?: "timeout" | "tls" | "tcp" | "unreachable" | "http" | "auth";
   elapsedMs: number;
   stages: ConnectivityStageRecord[];
 };
+
+function authGateFail(
+  started: number,
+  current: string,
+  redirectHops: string[],
+  provider: string | null,
+  statusCode: number | null,
+): HomepageStageResult {
+  const hardError = authGateMessage(provider);
+  return {
+    ok: false,
+    homepage: "fail: auth redirect",
+    finalUrl: current,
+    redirect: redirectHops.length ? redirectHops.join(" → ") : null,
+    statusCode,
+    bodyText: "",
+    cloudflareOrWaf: false,
+    wafWarning: null,
+    hardError,
+    errorCode: "auth",
+    elapsedMs: Date.now() - started,
+    stages: [
+      {
+        id: "homepage",
+        status: "fail",
+        detail: provider ? `auth: ${provider}` : "auth redirect",
+        elapsedMs: Date.now() - started,
+      },
+      {
+        id: "redirect",
+        status: "fail",
+        detail: redirectHops[redirectHops.length - 1] ?? "auth redirect",
+        elapsedMs: 0,
+      },
+    ],
+  };
+}
 
 export async function stageHomepageGet(
   startUrl: string,
@@ -287,6 +325,18 @@ export async function stageHomepageGet(
       }
       redirectHops.push(`${status} -> ${nextUrl}`);
       redirectCount += 1;
+
+      const auth = detectAuthRedirect(current, nextUrl);
+      if (auth.detected) {
+        return authGateFail(
+          started,
+          current,
+          redirectHops,
+          auth.provider,
+          status,
+        );
+      }
+
       current = nextUrl;
       continue;
     }
@@ -412,16 +462,34 @@ export async function stageHomepageGet(
     };
   }
 
+  const redirectChain = redirectHops.join(" → ");
+  const authHop = redirectHops
+    .map((hop) => {
+      const m = hop.match(/->\s*(\S+)/);
+      return m?.[1] ? detectAuthRedirect(startUrl, m[1]) : null;
+    })
+    .find((a) => a?.detected);
+
+  if (authHop?.detected) {
+    return authGateFail(
+      started,
+      current,
+      redirectHops,
+      authHop.provider,
+      null,
+    );
+  }
+
   return {
     ok: false,
     homepage: "fail: too many redirects",
     finalUrl: current,
-    redirect: redirectHops.join(" → "),
+    redirect: redirectChain,
     statusCode: null,
     bodyText: "",
     cloudflareOrWaf: false,
     wafWarning: null,
-    hardError: `Exceeded ${MAX_REDIRECTS} redirects`,
+    hardError: `This site redirected more than ${MAX_REDIRECTS} times (possible redirect loop). Confirm the URL opens a public page in a private/incognito window without signing in.`,
     errorCode: "http",
     elapsedMs: Date.now() - started,
     stages: [

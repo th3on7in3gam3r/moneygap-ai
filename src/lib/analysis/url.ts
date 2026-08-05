@@ -18,7 +18,7 @@ export type UrlReachabilityResult =
   | {
       ok: false;
       error: string;
-      code?: "invalid" | "dns" | "unreachable" | "http" | "tcp" | "tls" | "timeout" | "waf";
+      code?: "invalid" | "dns" | "unreachable" | "http" | "tcp" | "tls" | "timeout" | "waf" | "auth";
       diagnostics: ConnectivityDiagnostics;
     };
 
@@ -34,11 +34,16 @@ export async function verifyUrlReachable(
   if (!diagnostics.ok || !diagnostics.value) {
     const code = diagnostics.code ?? "unreachable";
     const mapped =
-      code === "tcp" || code === "tls" || code === "timeout" || code === "waf"
+      code === "tcp" ||
+      code === "tls" ||
+      code === "timeout" ||
+      code === "waf" ||
+      code === "auth" ||
+      code === "dns" ||
+      code === "invalid" ||
+      code === "http"
         ? code
-        : code === "dns" || code === "invalid" || code === "http"
-          ? code
-          : "unreachable";
+        : "unreachable";
     return {
       ok: false,
       error: diagnostics.summary,

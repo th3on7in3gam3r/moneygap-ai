@@ -10,6 +10,7 @@ export type ConnectivityErrorCode =
   | "timeout"
   | "unreachable"
   | "http"
+  | "auth"
   | "waf";
 
 export type ConnectivityStageId =

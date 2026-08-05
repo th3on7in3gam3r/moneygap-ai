@@ -20,6 +20,8 @@ export function summaryForFailure(
       return `That website took too long to respond (${detail}). Confirm it’s online and try again.`;
     case "http":
       return detail;
+    case "auth":
+      return detail;
     case "waf":
       return `The site is reachable but a bot/WAF challenge may limit automated access (${detail}). You can still try a Quick Scan.`;
     case "unreachable":
