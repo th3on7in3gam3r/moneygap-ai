@@ -9,6 +9,8 @@ import { getPulseEmbedConfig, PULSE_COLLECT_ENDPOINT } from "@/lib/analytics/pul
 import {
   SITE_DEFAULT_DESCRIPTION,
   SITE_DEFAULT_TITLE,
+  SITE_OG_IMAGE,
+  absoluteUrl,
   getSiteOrigin,
   jsonLdScript,
   organizationJsonLd,
@@ -35,6 +37,12 @@ const geistMono = Geist_Mono({
 });
 
 const siteUrl = getSiteOrigin();
+const ogImage = {
+  url: absoluteUrl(SITE_OG_IMAGE.url),
+  width: SITE_OG_IMAGE.width,
+  height: SITE_OG_IMAGE.height,
+  alt: SITE_OG_IMAGE.alt,
+};
 
 export const metadata: Metadata = {
   title: {
@@ -75,11 +83,13 @@ export const metadata: Metadata = {
     url: "/",
     type: "website",
     siteName: "MoneyGap AI",
+    images: [ogImage],
   },
   twitter: {
     card: "summary_large_image",
     title: SITE_DEFAULT_TITLE,
     description: SITE_DEFAULT_DESCRIPTION,
+    images: [ogImage.url],
   },
 };
 
