@@ -8,13 +8,19 @@ export type BreadcrumbItem = {
 
 export function organizationJsonLd() {
   const origin = getSiteOrigin();
+  const logoUrl = absoluteUrl("/logo.png");
   return {
     "@context": "https://schema.org",
     "@type": "Organization",
+    "@id": `${origin}/#organization`,
     name: "MoneyGap AI",
     url: origin,
-    logo: absoluteUrl("/logo.png"),
-    sameAs: [] as string[],
+    description: SITE_DEFAULT_DESCRIPTION,
+    logo: {
+      "@type": "ImageObject",
+      url: logoUrl,
+      contentUrl: logoUrl,
+    },
   };
 }
 
