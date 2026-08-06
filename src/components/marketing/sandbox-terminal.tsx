@@ -321,42 +321,48 @@ export function SandboxTerminal({ className }: { className?: string }) {
         </div>
 
         <div className="space-y-4 p-4 sm:p-5">
-          <label className="block space-y-2">
-            <span className="font-mono text-xs text-accent/90">
-              moneygap-scan ›
-            </span>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <input
-                type="url"
-                inputMode="url"
-                autoComplete="url"
-                placeholder="https://your-site.com"
-                value={url}
-                disabled={pending || state.status === "running"}
-                onChange={(e) => setUrl(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") runScan();
-                }}
-                className="h-11 w-full flex-1 rounded-xl border border-white/15 bg-black/40 px-3.5 font-mono text-sm text-white outline-none placeholder:text-white/35 focus:border-accent/60 focus:ring-2 focus:ring-accent/25 disabled:opacity-60"
-              />
-              <Button
-                type="button"
-                size="md"
-                className="h-11 shrink-0 sm:w-auto"
-                disabled={pending || state.status === "running" || !url.trim()}
-                onClick={runScan}
-              >
-                {pending || state.status === "running" ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Scanning…
-                  </>
-                ) : (
-                  "Run free scan"
-                )}
-              </Button>
-            </div>
-          </label>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              runScan();
+            }}
+            className="block space-y-2"
+          >
+            <label htmlFor="sandbox-scan-url" className="block space-y-2">
+              <span className="font-mono text-xs text-accent/90">
+                moneygap-scan ›
+              </span>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  id="sandbox-scan-url"
+                  name="url"
+                  type="url"
+                  inputMode="url"
+                  autoComplete="url"
+                  placeholder="https://your-site.com"
+                  value={url}
+                  disabled={pending || state.status === "running"}
+                  onChange={(e) => setUrl(e.target.value)}
+                  className="h-11 w-full flex-1 rounded-xl border border-white/15 bg-black/40 px-3.5 font-mono text-sm text-white outline-none placeholder:text-white/35 focus:border-accent/60 focus:ring-2 focus:ring-accent/25 disabled:opacity-60"
+                />
+                <Button
+                  type="submit"
+                  size="md"
+                  className="h-11 shrink-0 sm:w-auto"
+                  disabled={pending || state.status === "running" || !url.trim()}
+                >
+                  {pending || state.status === "running" ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Scanning…
+                    </>
+                  ) : (
+                    "Run free scan"
+                  )}
+                </Button>
+              </div>
+            </label>
+          </form>
 
           <div
             ref={logRef}

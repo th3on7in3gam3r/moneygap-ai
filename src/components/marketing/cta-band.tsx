@@ -1,4 +1,5 @@
 import { StartFreeButton } from "@/components/auth-buttons";
+import { AnalyzeCaptureForm } from "@/components/marketing/analyze-capture-form";
 import { Button } from "@/components/ui/button";
 
 export function CtaBand({
@@ -23,7 +24,11 @@ export function CtaBand({
               {title}
             </h2>
             <p className="mt-4 text-fg-muted">{description}</p>
-            <div className="mt-8 flex flex-wrap gap-3">
+            <p className="mt-8 text-sm text-fg-muted">
+              Paste your site URL to start — no guessing which page to open next.
+            </p>
+            <AnalyzeCaptureForm className="mt-3" />
+            <div className="mt-6 flex flex-wrap gap-3">
               <StartFreeButton label={primaryLabel} size="lg" />
               <Button href={secondaryHref} variant="secondary" size="lg">
                 {secondaryLabel}
