@@ -378,6 +378,24 @@ export default function HomePage() {
               </li>
             ))}
           </ul>
+          <div className="mt-12 max-w-2xl">
+            <h3 className="font-display text-xl font-semibold tracking-tight text-fg">
+              Public proof — not invented star ratings
+            </h3>
+            <p className="mt-3 text-sm leading-relaxed text-fg-muted">
+              We do not publish AggregateRating schema without verifiable
+              on-page reviews. Instead, see how MoneyGap analyzes real public
+              sites in Open Audits, and read how we handle security disclosure.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link href="/labs" className="text-sm font-medium text-accent hover:underline">
+                Open Audits in Labs →
+              </Link>
+              <Link href="/security" className="text-sm text-fg-muted hover:text-fg">
+                Security practices
+              </Link>
+            </div>
+          </div>
           <p className="mt-10 text-sm text-fg-muted">
             Prefer a quick scan in the browser? The{" "}
             <Link href="/extension" className="font-medium text-accent underline-offset-2 hover:underline">

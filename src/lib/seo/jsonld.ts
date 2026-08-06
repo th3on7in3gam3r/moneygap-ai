@@ -41,6 +41,7 @@ export function websiteJsonLd() {
 }
 
 export function softwareApplicationJsonLd() {
+  // AggregateRating / Review omitted until verifiable on-page reviews exist.
   return {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
@@ -70,6 +71,55 @@ export function softwareApplicationJsonLd() {
       priceCurrency: "USD",
       description: "Free plan available; paid subscriptions for higher limits",
     },
+  };
+}
+
+export type SiteReview = {
+  authorName: string;
+  reviewBody: string;
+  ratingValue: number;
+  datePublished?: string;
+};
+
+/**
+ * Attach Review + AggregateRating only when real, visible reviews are supplied.
+ * Empty input returns the base SoftwareApplication node (no invented ratings).
+ */
+export function softwareApplicationWithReviewsJsonLd(reviews: SiteReview[]) {
+  const base = softwareApplicationJsonLd();
+  if (reviews.length === 0) return base;
+
+  const clamped = reviews.map((r) => ({
+    ...r,
+    ratingValue: Math.min(5, Math.max(1, r.ratingValue)),
+  }));
+  const avg =
+    clamped.reduce((sum, r) => sum + r.ratingValue, 0) / clamped.length;
+
+  return {
+    ...base,
+    aggregateRating: {
+      "@type": "AggregateRating",
+      ratingValue: Number(avg.toFixed(1)),
+      reviewCount: clamped.length,
+      bestRating: 5,
+      worstRating: 1,
+    },
+    review: clamped.map((r) => ({
+      "@type": "Review",
+      author: {
+        "@type": "Person",
+        name: r.authorName,
+      },
+      reviewBody: r.reviewBody,
+      reviewRating: {
+        "@type": "Rating",
+        ratingValue: r.ratingValue,
+        bestRating: 5,
+        worstRating: 1,
+      },
+      ...(r.datePublished ? { datePublished: r.datePublished } : {}),
+    })),
   };
 }
 

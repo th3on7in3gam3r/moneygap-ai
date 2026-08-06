@@ -9,8 +9,10 @@ export {
   organizationJsonLd,
   websiteJsonLd,
   softwareApplicationJsonLd,
+  softwareApplicationWithReviewsJsonLd,
   breadcrumbJsonLd,
   faqPageJsonLd,
   jsonLdScript,
   type BreadcrumbItem,
+  type SiteReview,
 } from "./jsonld";
