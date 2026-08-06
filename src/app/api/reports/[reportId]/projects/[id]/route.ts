@@ -84,6 +84,21 @@ export async function PATCH(
     } catch {
       // soft-fail
     }
+    try {
+      const { emitWebhookEvent } = await import("@/lib/platform/webhooks");
+      await emitWebhookEvent({
+        workspaceId: access.report.workspaceId,
+        event: "project.completed",
+        data: {
+          project_id: id,
+          report_id: reportId,
+          title: project.title,
+          website_id: access.report.websiteId,
+        },
+      });
+    } catch {
+      // soft-fail
+    }
   }
 
   return Response.json({ project: full });

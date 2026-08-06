@@ -72,32 +72,40 @@ export const PUBLIC_DOC_CATALOG: PublicDocEntry[] = [
     order: 7,
   },
   {
+    slug: "moneygap-api",
+    title: "MoneyGap API™",
+    summary:
+      "API keys, /api/v1 endpoints, webhooks, OpenAPI, and curl quickstarts.",
+    category: "platform",
+    order: 8,
+  },
+  {
     slug: "growth-badge",
     title: "Growth Badge™",
     summary: "Create, embed, and verify a branded Growth Badge™ for your site.",
     category: "grow",
-    order: 8,
+    order: 9,
   },
   {
     slug: "browser-extension",
     title: "Browser Extension (Coming Soon)",
     summary: "Waitlist for the Chrome extension — live-page scans and Fix Path™ shares.",
     category: "grow",
-    order: 9,
+    order: 10,
   },
   {
     slug: "growth-academy",
     title: "Growth Academy™",
     summary: "Educational playbooks that map to Fix Paths™ and live gaps.",
     category: "grow",
-    order: 10,
+    order: 11,
   },
   {
     slug: "programmatic-fix-paths",
     title: "Programmatic Fix Paths™",
     summary: "CLI, API, and CI-oriented ways to close top Money Gaps™.",
     category: "platform",
-    order: 11,
+    order: 12,
   },
 ];
 

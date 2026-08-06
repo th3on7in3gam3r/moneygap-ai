@@ -1,0 +1,185 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "MoneyGap API™",
+    "version": "1.0.0",
+    "description": "Authenticated MoneyGap Engine™ endpoints for analysis, scores, opportunities, and reports."
+  },
+  "servers": [
+    {
+      "url": "https://moneygap-ai.com",
+      "description": "Production"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API key secret (mg_test_… or mg_live_…)"
+      },
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string" },
+          "code": { "type": "string" }
+        }
+      },
+      "AnalyzeRequest": {
+        "type": "object",
+        "required": ["website_url"],
+        "properties": {
+          "website_url": { "type": "string", "format": "uri" },
+          "industry": { "type": "string", "maxLength": 200 },
+          "business_type": { "type": "string", "maxLength": 200 },
+          "target_audience": { "type": "string", "maxLength": 500 }
+        }
+      }
+    }
+  },
+  "security": [{ "BearerAuth": [] }, { "ApiKeyAuth": [] }],
+  "paths": {
+    "/api/v1/analyze": {
+      "post": {
+        "summary": "Queue website analysis",
+        "operationId": "analyzeWebsite",
+        "tags": ["Analysis"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AnalyzeRequest" }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Analysis queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "status": { "type": "string" },
+                    "website_id": { "type": "string", "format": "uuid" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Forbidden / quota" },
+          "429": { "description": "Rate limited" }
+        }
+      }
+    },
+    "/api/v1/analyze/{id}/status": {
+      "get": {
+        "summary": "Get analysis status",
+        "operationId": "getAnalysisStatus",
+        "tags": ["Analysis"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string" },
+                    "status": { "type": "string" },
+                    "stage": { "type": "string", "nullable": true },
+                    "progress": { "type": "number", "nullable": true },
+                    "report_id": { "type": "string", "nullable": true }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/api/v1/websites/{id}/score": {
+      "get": {
+        "summary": "Website MoneyGap score",
+        "operationId": "getWebsiteScore",
+        "tags": ["Websites"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Score + category breakdown + history" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/api/v1/websites/{id}/opportunities": {
+      "get": {
+        "summary": "Website opportunities",
+        "operationId": "getWebsiteOpportunities",
+        "tags": ["Websites"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Latest report opportunities" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/api/v1/reports/{id}": {
+      "get": {
+        "summary": "Full intelligence report",
+        "operationId": "getReport",
+        "tags": ["Reports"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Report + opportunities" },
+          "404": { "description": "Not found" }
+        }
+      }
+    }
+  }
+}

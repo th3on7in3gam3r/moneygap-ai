@@ -1,11 +1,17 @@
 /**
- * MoneyGap JavaScript SDK (thin stub)
- * Wraps MoneyGap API™ `/api/v1` — see docs/api-platform.md and docs/plugin-sdk.md
+ * MoneyGap JavaScript SDK (thin REST client)
+ * Wraps MoneyGap API™ `/api/v1` — see /docs/moneygap-api and /openapi/moneygap-v1.json
  */
 
 export type MoneyGapClientOptions = {
   baseUrl: string;
   apiKey: string;
+};
+
+export type AnalyzeOptions = {
+  industry?: string;
+  business_type?: string;
+  target_audience?: string;
 };
 
 export class MoneyGapClient {
@@ -29,23 +35,38 @@ export class MoneyGapClient {
     return body;
   }
 
-  analyze(url: string) {
+  analyze(websiteUrl: string, options?: AnalyzeOptions) {
     return this.request("/api/v1/analyze", {
       method: "POST",
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({
+        website_url: websiteUrl,
+        ...(options?.industry ? { industry: options.industry } : {}),
+        ...(options?.business_type
+          ? { business_type: options.business_type }
+          : {}),
+        ...(options?.target_audience
+          ? { target_audience: options.target_audience }
+          : {}),
+      }),
     });
   }
 
+  getAnalysisStatus(id: string) {
+    return this.request(`/api/v1/analyze/${encodeURIComponent(id)}/status`);
+  }
+
   getReport(id: string) {
-    return this.request(`/api/v1/reports/${id}`);
+    return this.request(`/api/v1/reports/${encodeURIComponent(id)}`);
   }
 
   getWebsiteScore(id: string) {
-    return this.request(`/api/v1/websites/${id}/score`);
+    return this.request(`/api/v1/websites/${encodeURIComponent(id)}/score`);
   }
 
   getWebsiteOpportunities(id: string) {
-    return this.request(`/api/v1/websites/${id}/opportunities`);
+    return this.request(
+      `/api/v1/websites/${encodeURIComponent(id)}/opportunities`,
+    );
   }
 }
 

@@ -17,7 +17,7 @@ Expose MoneyGap Engine™ as a secure intelligence layer so external systems can
 - API keys: `mg_test_…` (development) / `mg_live_…` (production)
 - Only the key prefix + SHA-256 hash are stored
 - Scopes: `analyze`, `read`, `webhooks`
-- Requires billing entitlement `api_access` (Professional, Agency, Enterprise)
+- Requires billing entitlement `api_access` (included on all plans; monthly call quotas vary by plan)
 - Usage: each authenticated v1 call records `api_call`; analyze also records `website_analysis`
 
 ## Public API (`/api/v1`)
@@ -45,7 +45,8 @@ Phase 14 Integration Hub™ is **inbound** (customer tools → MoneyGap via OAut
 
 ## Dashboard
 
-- `/dashboard/developers` — keys, usage, rate limits, request log, docs link
+- `/dashboard/developers` — tabbed console (Overview, API Keys, Webhooks, Logs, Resources)
+- `/docs/moneygap-api` — public API reference; OpenAPI at `/openapi/moneygap-v1.json`
 - `/dashboard/enterprise` — org overview scaffold (users, websites, reports, scores, usage)
 - Linked from Settings (no new sidebar chrome)
 

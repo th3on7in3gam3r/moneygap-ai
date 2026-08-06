@@ -20,6 +20,10 @@ export {
   createWebhookEndpoint,
   updateWebhookEndpoint,
   deleteWebhookEndpoint,
+  listWebhookDeliveries,
+  attemptWebhookDelivery,
+  dispatchWebhookDelivery,
+  redeliverWebhookDelivery,
   type WebhookEvent,
 } from "@/lib/platform/webhooks";
 export {

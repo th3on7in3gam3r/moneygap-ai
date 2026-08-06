@@ -46,7 +46,7 @@ export async function getDeveloperUsageSummary(workspaceId: string) {
   const recent = await db.query.apiRequestLogs.findMany({
     where: eq(apiRequestLogs.workspaceId, workspaceId),
     orderBy: [desc(apiRequestLogs.createdAt)],
-    limit: 40,
+    limit: 50,
   });
 
   const keys = await listApiKeys(workspaceId);
