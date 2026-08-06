@@ -1,7 +1,7 @@
-export { BADGE_STYLES, badgeStyleLabel, BADGE_SVG_THEME } from "./styles";
+export { BADGE_STYLES, badgeStyleLabel, badgeStyleMeta, BADGE_SVG_THEME } from "./styles";
 export { allocatePublicId } from "./ids";
 export { createEmbedCode, badgeSvgUrl, badgeVerifyUrl } from "./embed";
-export { renderBadgeSvg } from "./svg";
+export { renderBadgeSvg, badgeSvgDataUri } from "./svg";
 export {
   generateBadge,
   listBadgesForWorkspace,

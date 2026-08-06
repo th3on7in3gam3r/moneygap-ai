@@ -44,7 +44,7 @@ export async function GET(
     return new Response(svg, {
       headers: {
         "Content-Type": "image/svg+xml; charset=utf-8",
-        "Cache-Control": "public, max-age=300",
+          "Cache-Control": "public, max-age=60, must-revalidate",
       },
     });
   } catch (err) {

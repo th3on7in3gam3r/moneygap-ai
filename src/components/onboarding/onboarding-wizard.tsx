@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   CheckCircle2,
   Loader2,
@@ -82,8 +82,38 @@ const FEATURED_INTEGRATIONS = [
   "resend",
 ];
 
+const WIZARD_STEPS: OnboardingStepId[] = [
+  "welcome",
+  "website",
+  "profile",
+  "role",
+  "integrations",
+  "scan",
+  "results",
+  "complete",
+];
+
+function parseWizardStep(raw: string | null): OnboardingStepId | null {
+  if (!raw) return null;
+  return WIZARD_STEPS.includes(raw as OnboardingStepId)
+    ? (raw as OnboardingStepId)
+    : null;
+}
+
+/** Checklist Open targets that should jump to a wizard step in-page. */
+function wizardStepFromChecklistHref(href: string): OnboardingStepId | null {
+  try {
+    const u = new URL(href, "https://moneygap.local");
+    if (!u.pathname.startsWith("/dashboard/onboarding")) return null;
+    return parseWizardStep(u.searchParams.get("step"));
+  } catch {
+    return null;
+  }
+}
+
 export function OnboardingWizard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<FlashToastState>(null);
@@ -106,6 +136,7 @@ export function OnboardingWizard() {
   const [estimating, setEstimating] = useState(false);
   const [connectivityDiagnostics, setConnectivityDiagnostics] =
     useState<ConnectivityDiagnostics | null>(null);
+  const [deepLinkApplied, setDeepLinkApplied] = useState(false);
   const dismissToast = useCallback(() => setToast(null), []);
 
   const refresh = useCallback(async () => {
@@ -192,10 +223,27 @@ export function OnboardingWizard() {
     try {
       await patch("set_step", { step: next });
       setStep(next);
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        url.searchParams.set("step", next);
+        window.history.replaceState({}, "", `${url.pathname}?${url.searchParams.toString()}`);
+      }
     } finally {
       setBusy(false);
     }
   }
+
+  useEffect(() => {
+    if (loading || deepLinkApplied) return;
+    const fromQuery = parseWizardStep(searchParams.get("step"));
+    if (!fromQuery) {
+      setDeepLinkApplied(true);
+      return;
+    }
+    setDeepLinkApplied(true);
+    void go(fromQuery);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- apply ?step= once after first load
+  }, [loading, deepLinkApplied, searchParams]);
 
   async function startSetup() {
     setBusy(true);
@@ -727,6 +775,8 @@ export function OnboardingWizard() {
               <h2 className="font-display text-xl font-semibold">Connect your tools</h2>
               <p className="mt-1 text-sm text-fg-muted">
                 Optional — skip and reconnect anytime in Integration Hub™.
+                Analyzed blogs (WordPress, SignalDesk Blog, etc.) live under My
+                Websites™ after a scan — they are not separate Hub API connectors.
               </p>
             </div>
             <Plug className="size-5 text-accent" />
@@ -1028,7 +1078,23 @@ export function OnboardingWizard() {
               {checklist.progress.done}/{checklist.progress.total}
             </Badge>
           </CardHeader>
-          <CardBody>
+          <CardBody className="space-y-3">
+            {checklist.steps.some((s) => s.id === "profile" && !s.done && !s.dismissed) && (
+              <div className="rounded-xl border border-accent/30 bg-accent-soft/40 px-3 py-3">
+                <p className="text-sm text-fg">
+                  Finish your business profile so Copilot and reports can use Business Memory™.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="mt-2"
+                  disabled={busy}
+                  onClick={() => void go("profile")}
+                >
+                  Complete business profile
+                </Button>
+              </div>
+            )}
             <ul className="space-y-2">
               {checklist.steps
                 .filter((s) => !s.dismissed)
@@ -1037,22 +1103,49 @@ export function OnboardingWizard() {
                     key={s.id}
                     className="flex items-center justify-between gap-2 rounded-xl border border-border px-3 py-2 text-sm"
                   >
-                    <span className="flex items-center gap-2">
-                      {s.done ? (
-                        <CheckCircle2 className="size-4 text-accent" />
-                      ) : (
-                        <span className="size-4 rounded-full border border-border-strong" />
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="flex items-center gap-2">
+                        {s.done ? (
+                          <CheckCircle2 className="size-4 shrink-0 text-accent" />
+                        ) : (
+                          <span className="size-4 shrink-0 rounded-full border border-border-strong" />
+                        )}
+                        {s.title}
+                      </span>
+                      {!s.done && (
+                        <span className="pl-6 text-[11px] text-fg-subtle">
+                          {s.description}
+                        </span>
                       )}
-                      {s.title}
                     </span>
                     {!s.done && (
-                      <a href={s.href} className="text-xs font-medium text-accent hover:underline">
+                      <button
+                        type="button"
+                        className="shrink-0 text-xs font-medium text-accent hover:underline"
+                        onClick={() => {
+                          const wizardStep = wizardStepFromChecklistHref(s.href);
+                          if (wizardStep) {
+                            void go(wizardStep);
+                            return;
+                          }
+                          router.push(s.href);
+                        }}
+                      >
                         Open
-                      </a>
+                      </button>
                     )}
                   </li>
                 ))}
             </ul>
+            <p className="text-[11px] leading-relaxed text-fg-subtle">
+              Pending Analytics / Search Console open Integration Hub™ — Google OAuth
+              stays Pending until configured. Blog sites (e.g. SignalDesk Blog) are
+              managed under{" "}
+              <a href="/dashboard/websites" className="text-accent hover:underline">
+                My Websites™
+              </a>
+              , not as a separate Hub connector.
+            </p>
           </CardBody>
         </Card>
       )}

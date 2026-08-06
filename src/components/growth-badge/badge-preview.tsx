@@ -10,13 +10,14 @@ export function BadgePreview({
       <p className="text-xs font-semibold uppercase tracking-[0.1em] text-fg-subtle">
         Preview
       </p>
+      <p className="text-sm text-fg-muted">{styleLabel}</p>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={svgUrl}
+        src={`${svgUrl}${svgUrl.includes("?") ? "&" : "?"}v=2`}
         alt={styleLabel}
-        width={220}
-        height={56}
-        className="rounded-lg border border-border bg-bg"
+        width={280}
+        height={64}
+        className="max-w-full rounded-lg border border-border bg-bg"
       />
     </div>
   );

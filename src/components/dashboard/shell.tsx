@@ -20,6 +20,7 @@ import {
   Sparkles,
   UsersRound,
   Sprout,
+  Plug,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -59,6 +60,7 @@ function buildNav(isAgency: boolean, isClient: boolean) {
     { href: "/dashboard/reports", label: "Reports", icon: FileText },
     { href: "/dashboard/copilot", label: "Growth Concierge", icon: Sparkles },
     { href: "/dashboard/websites", label: "My Websites", icon: Globe2 },
+    { href: "/dashboard/integrations", label: "Integrations", icon: Plug },
     { href: "/dashboard/badge", label: "Growth Badge", icon: Award },
     { href: "/dashboard/ai-readiness", label: "AI Readiness", icon: Bot },
     { href: "/dashboard/academy", label: "Growth Academy", icon: BookOpen },
@@ -78,15 +80,23 @@ function NavLinks({
   isAgency,
   isClient,
   onNavigate,
+  className,
 }: {
   pathname: string;
   isAgency: boolean;
   isClient: boolean;
   onNavigate?: () => void;
+  className?: string;
 }) {
   const nav = buildNav(isAgency, isClient);
   return (
-    <nav className="flex flex-col gap-1 px-3">
+    <nav
+      className={cn(
+        "flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain px-3 py-1",
+        className,
+      )}
+      aria-label="Dashboard"
+    >
       {nav.map((item) => {
         const active =
           item.href === "/dashboard"
@@ -99,18 +109,66 @@ function NavLinks({
             href={item.href}
             onClick={onNavigate}
             className={cn(
-              "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
+              "flex shrink-0 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition",
               active
                 ? "bg-accent-soft text-accent"
                 : "text-fg-muted hover:bg-bg-muted hover:text-fg",
             )}
           >
-            <Icon className="h-4 w-4" />
+            <Icon className="h-4 w-4 shrink-0" />
             {item.label}
           </Link>
         );
       })}
     </nav>
+  );
+}
+
+function SidebarPromo({
+  isAgency,
+  isClient,
+}: {
+  isAgency: boolean;
+  isClient: boolean;
+}) {
+  return (
+    <div className="shrink-0 border-t border-border p-4">
+      <div className="rounded-xl border border-dashed border-border-strong bg-accent-soft/40 p-3">
+        <div className="mb-1 flex items-center gap-2 text-accent">
+          <Sparkles className="h-3.5 w-3.5" />
+          <span className="text-xs font-semibold uppercase tracking-[0.08em]">
+            {isClient
+              ? "Your growth"
+              : isAgency
+                ? "Agency Platform"
+                : "Growth Intelligence"}
+          </span>
+        </div>
+        <p className="text-xs leading-relaxed text-fg-muted">
+          {isClient
+            ? "Review opportunities, comment, and approve recommendations."
+            : isAgency
+              ? "Manage clients, brand reports, and portfolio growth."
+              : "Analyze any public website for missing revenue opportunities."}
+        </p>
+        <Link
+          href={
+            isClient
+              ? "/dashboard/my-growth"
+              : isAgency
+                ? "/dashboard/clients"
+                : "/dashboard/analyze"
+          }
+          className="mt-2 inline-block text-xs font-medium text-accent hover:underline"
+        >
+          {isClient
+            ? "My Growth →"
+            : isAgency
+              ? "Manage clients →"
+              : "Analyze New Website →"}
+        </Link>
+      </div>
+    </div>
   );
 }
 
@@ -133,11 +191,11 @@ export function DashboardShell({
 
   return (
     <div className="min-h-screen bg-bg">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-border bg-bg-elevated lg:flex lg:flex-col">
-        <div className="flex h-16 items-center px-5">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden h-dvh max-h-dvh w-64 flex-col border-r border-border bg-bg-elevated lg:flex">
+        <div className="flex h-16 shrink-0 items-center px-5">
           <Logo href={isClient ? "/dashboard/my-growth" : "/dashboard"} />
         </div>
-        <div className="mx-5 mb-4 rounded-xl border border-border bg-bg-muted/50 px-3 py-2.5">
+        <div className="mx-5 mb-3 shrink-0 rounded-xl border border-border bg-bg-muted/50 px-3 py-2.5">
           <p className="text-[10px] uppercase tracking-[0.1em] text-fg-subtle">
             {isClient ? "Client access" : "Workspace"}
           </p>
@@ -153,43 +211,7 @@ export function DashboardShell({
           isAgency={!!isAgency}
           isClient={isClient}
         />
-        <div className="mt-auto border-t border-border p-4">
-          <div className="rounded-xl border border-dashed border-border-strong bg-accent-soft/40 p-3">
-            <div className="mb-1 flex items-center gap-2 text-accent">
-              <Sparkles className="h-3.5 w-3.5" />
-              <span className="text-xs font-semibold uppercase tracking-[0.08em]">
-                {isClient
-                  ? "Your growth"
-                  : isAgency
-                    ? "Agency Platform"
-                    : "Growth Intelligence"}
-              </span>
-            </div>
-            <p className="text-xs leading-relaxed text-fg-muted">
-              {isClient
-                ? "Review opportunities, comment, and approve recommendations."
-                : isAgency
-                  ? "Manage clients, brand reports, and portfolio growth."
-                  : "Analyze any public website for missing revenue opportunities."}
-            </p>
-            <Link
-              href={
-                isClient
-                  ? "/dashboard/my-growth"
-                  : isAgency
-                    ? "/dashboard/clients"
-                    : "/dashboard/analyze"
-              }
-              className="mt-2 inline-block text-xs font-medium text-accent hover:underline"
-            >
-              {isClient
-                ? "My Growth →"
-                : isAgency
-                  ? "Manage clients →"
-                  : "Analyze New Website →"}
-            </Link>
-          </div>
-        </div>
+        <SidebarPromo isAgency={!!isAgency} isClient={isClient} />
       </aside>
 
       {open && (
@@ -200,8 +222,8 @@ export function DashboardShell({
             aria-label="Close menu"
             onClick={() => setOpen(false)}
           />
-          <aside className="absolute inset-y-0 left-0 flex w-72 flex-col border-r border-border bg-bg-elevated">
-            <div className="flex h-16 items-center justify-between px-5">
+          <aside className="absolute inset-y-0 left-0 flex h-dvh max-h-dvh w-72 flex-col border-r border-border bg-bg-elevated">
+            <div className="flex h-16 shrink-0 items-center justify-between px-5">
               <Logo href={isClient ? "/dashboard/my-growth" : "/dashboard"} />
               <button
                 type="button"
@@ -217,6 +239,7 @@ export function DashboardShell({
               isClient={isClient}
               onNavigate={() => setOpen(false)}
             />
+            <SidebarPromo isAgency={!!isAgency} isClient={isClient} />
           </aside>
         </div>
       )}

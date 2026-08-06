@@ -15,6 +15,7 @@ type StyleOption = {
   id: string;
   label: string;
   shortLabel: string;
+  hint?: string;
 };
 
 type WebsiteOption = {

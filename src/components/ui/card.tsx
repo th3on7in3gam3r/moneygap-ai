@@ -4,13 +4,16 @@ export function Card({
   children,
   className,
   interactive = false,
+  id,
 }: {
   children: React.ReactNode;
   className?: string;
   interactive?: boolean;
+  id?: string;
 }) {
   return (
     <div
+      id={id}
       className={cn(
         "rounded-2xl border border-border bg-bg-elevated shadow-[var(--shadow)]",
         interactive && "transition hover:border-border-strong",

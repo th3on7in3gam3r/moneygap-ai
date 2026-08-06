@@ -52,6 +52,12 @@ type Overview = {
     category: string;
     status: string;
   }[];
+  websites?: {
+    id: string;
+    name: string;
+    domain: string;
+    url: string;
+  }[];
 };
 
 type AuditRow = {
@@ -74,6 +80,20 @@ const CATEGORIES = [
   "automation",
 ] as const;
 
+const GOOGLE_OAUTH_STUBS = new Set([
+  "google_analytics",
+  "google_search_console",
+]);
+
+function isBlogProperty(site: { name: string; domain: string }): boolean {
+  const hay = `${site.name} ${site.domain}`.toLowerCase();
+  return (
+    hay.includes("signaldesk") ||
+    hay.includes("signal desk") ||
+    hay.includes("blog")
+  );
+}
+
 function statusTone(
   status: string,
 ): "accent" | "neutral" | "danger" | "gap" | "success" {
@@ -89,6 +109,7 @@ export default function IntegrationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [category, setCategory] = useState<string>("all");
+  const [focusSlug, setFocusSlug] = useState<string | null>(null);
   const [apiKeyDraft, setApiKeyDraft] = useState<Record<string, string>>({});
   const [pending, startTransition] = useTransition();
   const [ackOpen, setAckOpen] = useState(false);
@@ -122,6 +143,18 @@ export default function IntegrationsPage() {
           ? `${window.location.pathname}?${next}`
           : window.location.pathname;
         window.history.replaceState({}, "", url);
+      }
+
+      const focus = params.get("focus")?.trim();
+      if (focus) {
+        setFocusSlug(focus);
+        const provider = overview.providers.find((p) => p.slug === focus);
+        if (provider) setCategory(provider.category);
+        requestAnimationFrame(() => {
+          document
+            .getElementById(`integration-${focus}`)
+            ?.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
       }
 
       const auditRes = await fetch("/api/integrations/audit");
@@ -257,6 +290,38 @@ export default function IntegrationsPage() {
 
       <WhyConnectBand />
 
+      {data?.websites && data.websites.filter(isBlogProperty).length > 0 && (
+        <Card>
+          <CardHeader>
+            <div>
+              <h2 className="font-display text-lg font-semibold">
+                Your blog properties
+              </h2>
+              <p className="mt-1 text-sm text-fg-muted">
+                Sites like SignalDesk Blog are analyzed websites — open the
+                workspace for scans, Money Gaps, and Growth Recipes. They are
+                not a separate Hub OAuth connector.
+              </p>
+            </div>
+          </CardHeader>
+          <CardBody className="flex flex-wrap gap-2">
+            {data.websites.filter(isBlogProperty).map((site) => (
+              <Button
+                key={site.id}
+                href={`/dashboard/websites/${site.id}`}
+                size="sm"
+                variant="secondary"
+              >
+                Open {site.name}
+              </Button>
+            ))}
+            <Button href="/dashboard/websites" size="sm" variant="ghost">
+              All websites
+            </Button>
+          </CardBody>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <div>
@@ -380,8 +445,18 @@ export default function IntegrationsPage() {
               const conn = p.connection;
               const isLive =
                 conn?.status === "connected" || conn?.status === "error";
+              const focused = focusSlug === p.slug;
+              const oauthStub = GOOGLE_OAUTH_STUBS.has(p.slug);
               return (
-                <Card key={p.slug}>
+                <Card
+                  key={p.slug}
+                  id={`integration-${p.slug}`}
+                  className={
+                    focused
+                      ? "ring-2 ring-accent ring-offset-2 ring-offset-bg"
+                      : undefined
+                  }
+                >
                   <CardHeader>
                     <div>
                       <h2 className="font-display text-lg font-semibold">
@@ -403,6 +478,14 @@ export default function IntegrationsPage() {
                       <span className="font-medium text-fg-muted">What this unlocks: </span>
                       {providerUnlockLine(p.slug)}
                     </p>
+                    {oauthStub && (
+                      <p className="rounded-lg border border-gap/30 bg-gap-soft/40 px-3 py-2 text-xs text-fg">
+                        OAuth not configured yet — connection stays{" "}
+                        <strong>Pending</strong> until Google OAuth is enabled.
+                        Onboarding checklist items for Analytics / Search Console
+                        complete only after status is Connected.
+                      </p>
+                    )}
                     {conn?.lastError && (
                       <p className="text-xs text-gap">{conn.lastError}</p>
                     )}
