@@ -6,11 +6,21 @@ export const alt = "MoneyGap AI";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-async function loadBrandMark(): Promise<ArrayBuffer | null> {
+function arrayBufferToDataUrl(buffer: ArrayBuffer, mime = "image/png"): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 1) {
+    binary += String.fromCharCode(bytes[i]!);
+  }
+  return `data:${mime};base64,${btoa(binary)}`;
+}
+
+async function loadBrandMark(): Promise<string | null> {
   try {
     const res = await fetch(absoluteUrl("/og-mark.png"));
     if (!res.ok) return null;
-    return await res.arrayBuffer();
+    const buffer = await res.arrayBuffer();
+    return arrayBufferToDataUrl(buffer);
   } catch {
     return null;
   }
