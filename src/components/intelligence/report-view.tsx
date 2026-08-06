@@ -25,6 +25,7 @@ import type {
 } from "@/db/schema";
 import { ActionProjectsPanel } from "@/components/action-center/action-projects-panel";
 import { AdvisorChatPanel } from "@/components/action-center/advisor-chat";
+import { UpgradePrompt } from "@/components/billing/upgrade-prompt";
 import {
   CompetitiveTabPanel,
   type CompetitorView,
@@ -42,6 +43,10 @@ import { MoneyGapScore } from "@/components/money-gap";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import {
+  countByGoldenCategory,
+  GOLDEN_CATEGORIES,
+} from "@/lib/moneygap/categories";
 import { cn, formatCurrency } from "@/lib/utils";
 
 export type IntelligenceReportView = {
@@ -864,9 +869,13 @@ function RetryMoneyGapButton({ analysisId }: { analysisId: string }) {
 export function IntelligenceReport({
   report,
   initialFocusId = null,
+  canImplement = false,
+  showSoftUpgrade = false,
 }: {
   report: IntelligenceReportView;
   initialFocusId?: string | null;
+  canImplement?: boolean;
+  showSoftUpgrade?: boolean;
 }) {
   const [tab, setTab] = useState<TabId>(
     initialFocusId ? "opportunities" : "opportunities",
@@ -875,6 +884,7 @@ export function IntelligenceReport({
   const [executionFocusId, setExecutionFocusId] = useState<string | null>(
     initialFocusId,
   );
+  const [upgradeDismissed, setUpgradeDismissed] = useState(false);
   const breakdown = report.scoreBreakdown;
 
   const focusOpportunity =
@@ -963,6 +973,66 @@ export function IntelligenceReport({
           </CardBody>
         </Card>
       </div>
+
+      {report.opportunities.length > 0 && (
+        <Card>
+          <CardHeader>
+            <h2 className="font-display text-lg font-semibold">
+              MoneyGap Categories™
+            </h2>
+            <p className="mt-1 text-sm text-fg-muted">
+              Gaps found across the seven growth intelligence categories — then
+              prioritized into a Fix Roadmap and implementation prompts.
+            </p>
+          </CardHeader>
+          <CardBody>
+            <CategoryFoundStrip opportunities={report.opportunities} />
+          </CardBody>
+        </Card>
+      )}
+
+      {showSoftUpgrade &&
+        !upgradeDismissed &&
+        report.opportunities.length > 0 && (
+          <div className="relative">
+            <UpgradePrompt
+              payload={{
+                message: `You found ${report.opportunities.length} Money Gaps. Unlock the full Growth Roadmap.`,
+                suggestedPlan: "growth",
+                feature: "action_center",
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setUpgradeDismissed(true)}
+              className="absolute right-3 top-3 rounded-md p-1 text-fg-subtle transition hover:bg-bg-muted hover:text-fg"
+              aria-label="Dismiss upgrade prompt"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        )}
+
+      {report.categoryScores && (
+        <div id="categories">
+          <Card>
+            <CardHeader>
+              <h2 className="font-display text-lg font-semibold">
+                MoneyGap Score™ by category
+              </h2>
+              <p className="mt-1 text-sm text-fg-muted">
+                Higher = more missing opportunity in that MoneyGap Category™.
+              </p>
+            </CardHeader>
+            <CardBody>
+              <ScoreBreakdown
+                scores={report.categoryScores}
+                opportunities={report.opportunities}
+              />
+            </CardBody>
+          </Card>
+        </div>
+      )}
 
       {report.executiveBrief && (
         <Card>
@@ -1353,34 +1423,23 @@ export function IntelligenceReport({
         </Card>
       )}
 
-      {report.categoryScores && (
-        <Card>
-          <CardHeader>
-            <h2 className="font-display text-lg font-semibold">
-              MoneyGap Score™ by module
-            </h2>
-            <p className="mt-1 text-sm text-fg-muted">
-              Higher = more missing opportunity in that intelligence module.
-            </p>
-          </CardHeader>
-          <CardBody>
-            <ScoreBreakdown scores={report.categoryScores} />
-          </CardBody>
-        </Card>
-      )}
-
       {report.growthRoadmap && (
-        <Card>
-          <CardHeader>
-            <h2 className="font-display text-lg font-semibold">Growth Roadmap</h2>
-            <p className="mt-1 text-sm text-fg-muted">
-              Prioritized actions from Opportunity Index™ findings.
-            </p>
-          </CardHeader>
-          <CardBody>
-            <RoadmapTimeline roadmap={report.growthRoadmap} />
-          </CardBody>
-        </Card>
+        <div id="roadmap">
+          <Card>
+            <CardHeader>
+              <h2 className="font-display text-lg font-semibold">
+                Prioritized Fix Roadmap
+              </h2>
+              <p className="mt-1 text-sm text-fg-muted">
+                What to fix first — from Opportunity Index™ findings across
+                MoneyGap Categories™.
+              </p>
+            </CardHeader>
+            <CardBody>
+              <RoadmapTimeline roadmap={report.growthRoadmap} />
+            </CardBody>
+          </Card>
+        </div>
       )}
 
       <div className="-mx-1 flex flex-nowrap gap-1 overflow-x-auto border-b border-border px-1 pb-1">
@@ -1454,6 +1513,7 @@ export function IntelligenceReport({
                         opportunity={opportunity}
                         defaultOpen={index === 0 || opportunity.id === executionFocusId}
                         reportId={report.id}
+                        canImplement={canImplement}
                         onAskAdvisor={(id) => {
                           setAdvisorFocusId(id);
                           setTab("advisor");
@@ -1783,6 +1843,30 @@ export function IntelligenceReport({
           }}
         />
       )}
+    </div>
+  );
+}
+
+function CategoryFoundStrip({
+  opportunities,
+}: {
+  opportunities: { moduleId?: string | null }[];
+}) {
+  const counts = countByGoldenCategory(opportunities);
+  return (
+    <div className="flex flex-wrap gap-2">
+      {GOLDEN_CATEGORIES.map((cat) => {
+        const n = counts[cat.id] ?? 0;
+        return (
+          <Badge
+            key={cat.id}
+            tone={n > 0 ? "gap" : "neutral"}
+            className="text-[11px]"
+          >
+            {cat.shortLabel} Gaps · {n} Found
+          </Badge>
+        );
+      })}
     </div>
   );
 }

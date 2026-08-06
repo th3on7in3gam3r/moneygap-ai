@@ -2,6 +2,7 @@ export {
   PLAN_CATALOG,
   resolvePlanId,
   getPlanDefinition,
+  blueprintPersonaForPlan,
   ensureBillingPlansSeeded,
   listBillingPlans,
   getPlan,

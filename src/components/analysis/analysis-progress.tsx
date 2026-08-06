@@ -18,6 +18,86 @@ import { Card, CardBody } from "@/components/ui/card";
 import { ANALYSIS_STAGES } from "@/lib/analysis/stages";
 import { cn } from "@/lib/utils";
 
+const STAGE_TIPS: Record<string, string[]> = {
+  connecting: [
+    "Connecting securely to your site…",
+    "Checking DNS and TLS reachability…",
+  ],
+  reading: [
+    "Finding pages worth analyzing…",
+    "Reading homepage and key landing pages…",
+  ],
+  understanding: [
+    "Understanding what this business sells…",
+    "Mapping products, services, and offers…",
+  ],
+  extracting: [
+    "Extracting offerings and pricing signals…",
+    "Looking for monetization opportunities…",
+  ],
+  audience: [
+    "Identifying who this site is built for…",
+    "Checking audience and intent signals…",
+  ],
+  content: [
+    "Reviewing content depth and topical coverage…",
+    "Looking for FAQ, guide, and blog gaps…",
+  ],
+  preparing: [
+    "Preparing your Growth Opportunity Report…",
+    "Organizing MoneyGap Categories™…",
+  ],
+  detecting_gaps: [
+    "Analyzing your conversion paths…",
+    "Checking AI visibility signals…",
+    "Finding Revenue and Offer gaps…",
+  ],
+  quantifying: [
+    "Scoring Trust, Content, and Technical gaps…",
+    "Comparing industry opportunity patterns…",
+  ],
+  action_plans: [
+    "Building your prioritized Fix Roadmap…",
+    "Preparing implementation prompts…",
+  ],
+  discovering_competitors: [
+    "Comparing industry opportunities…",
+    "Discovering competitive patterns…",
+  ],
+  profiling_competitors: [
+    "Profiling competitor businesses…",
+    "Looking for peer growth plays…",
+  ],
+  competitive_analysis: [
+    "Building competitive strategy notes…",
+    "Finalizing your Growth Report…",
+  ],
+};
+
+const STAGE_GROUPS = [
+  {
+    label: "Discovery",
+    ids: ["connecting", "reading"],
+  },
+  {
+    label: "Intelligence",
+    ids: ["understanding", "extracting", "audience", "content", "preparing"],
+  },
+  {
+    label: "Opportunity Detection",
+    ids: ["detecting_gaps", "quantifying"],
+  },
+  {
+    label: "Scoring",
+    ids: [
+      "action_plans",
+      "discovering_competitors",
+      "profiling_competitors",
+      "competitive_analysis",
+    ],
+  },
+] as const;
+
 type StageState = {
   id: string;
   label: string;
@@ -70,6 +150,12 @@ export function AnalysisProgress({
   const [pollError, setPollError] = useState<string | null>(null);
   const [stopping, setStopping] = useState(false);
   const [pausing, setPausing] = useState(false);
+  const [tipTick, setTipTick] = useState(0);
+
+  useEffect(() => {
+    const t = setInterval(() => setTipTick((n) => n + 1), 4000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -129,6 +215,18 @@ export function AnalysisProgress({
   const failed = data?.status === "failed";
   const running =
     data?.status === "running" || data?.status === "queued" || !data;
+
+  const activeStageId =
+    stages.find((s) => s.active)?.id ?? stages[0]?.id ?? "connecting";
+  const tipPool =
+    STAGE_TIPS[activeStageId] ??
+    STAGE_TIPS.detecting_gaps ??
+    ["Discovering Money Gaps™…"];
+  const tip = tipPool[tipTick % tipPool.length] ?? tipPool[0]!;
+  const activeGroup =
+    STAGE_GROUPS.find((g) =>
+      (g.ids as readonly string[]).includes(activeStageId),
+    )?.label ?? "Intelligence";
 
   async function stopScan() {
     setStopping(true);
@@ -204,6 +302,15 @@ export function AnalysisProgress({
               />
             </div>
           </div>
+
+          {running && !failed ? (
+            <div className="rounded-xl border border-accent/25 bg-accent-soft/40 px-3.5 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
+                {activeGroup}
+              </p>
+              <p className="mt-1 text-sm font-medium text-fg">{tip}</p>
+            </div>
+          ) : null}
 
           {running && !failed ? (
             <div className="flex gap-3 rounded-xl border border-border bg-bg-muted/60 px-3.5 py-3">

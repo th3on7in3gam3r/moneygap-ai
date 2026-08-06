@@ -34,11 +34,11 @@ export default async function WebsitesPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight">
-            Websites
+            My Websites™
           </h1>
           <p className="mt-1 text-sm text-fg-muted">
-            Track scores, open analytics, and manage MoneyGap Monitor™ per
-            property.
+            MoneyGap Score™, open gaps, and actions per property — report,
+            growth plan, or a new scan.
           </p>
         </div>
         <Button href="/dashboard/analyze" size="sm">
@@ -48,29 +48,45 @@ export default async function WebsitesPage() {
 
       {liveWithSchedules.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {liveWithSchedules.map(({ website, latestReport, schedule }) => (
-            <WebsiteCard
-              key={website.id}
-              website={website}
-              latestReport={
-                latestReport
-                  ? {
-                      id: latestReport.id,
-                      moneyGapScore: latestReport.moneyGapScore,
-                      revenueAtRisk: latestReport.revenueAtRisk,
-                    }
-                  : null
-              }
-              schedule={schedule}
-            />
-          ))}
+          {liveWithSchedules.map(
+            ({
+              website,
+              latestReport,
+              schedule,
+              openGapsCount,
+              completedImprovementsCount,
+              lastScanAt,
+            }) => (
+              <WebsiteCard
+                key={website.id}
+                website={website}
+                latestReport={
+                  latestReport
+                    ? {
+                        id: latestReport.id,
+                        moneyGapScore: latestReport.moneyGapScore,
+                        revenueAtRisk: latestReport.revenueAtRisk,
+                      }
+                    : null
+                }
+                openGapsCount={openGapsCount}
+                completedImprovementsCount={completedImprovementsCount}
+                lastScanAt={
+                  lastScanAt instanceof Date
+                    ? lastScanAt.toISOString()
+                    : (lastScanAt ?? null)
+                }
+                schedule={schedule}
+              />
+            ),
+          )}
         </div>
       ) : (
         <Card>
           <CardBody className="py-4">
             <EmptyState
               title="No websites yet?"
-              description="Run your first scan to add a site, track Money Gap scores, and enable monitoring."
+              description="Run your first scan to add a site, track MoneyGap Score™, and enable monitoring."
               actionLabel="Run your first scan"
               actionHref="/dashboard/analyze"
             />

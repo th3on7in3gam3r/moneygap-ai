@@ -37,6 +37,8 @@ export type PlanDefinition = {
   id: PlanId;
   name: string;
   description: string;
+  /** Blueprint persona label (display only — entitlements stay on PlanId). */
+  blueprintPersona: string;
   monthlyPriceCents: number;
   annualPriceCents: number;
   sortOrder: number;
@@ -50,6 +52,7 @@ export const PLAN_CATALOG: PlanDefinition[] = [
   {
     id: "free",
     name: "Free",
+    blueprintPersona: "Free User",
     description: "Explore MoneyGap reports and discover opportunities.",
     monthlyPriceCents: 0,
     annualPriceCents: 0,
@@ -70,6 +73,7 @@ export const PLAN_CATALOG: PlanDefinition[] = [
   {
     id: "starter",
     name: "Starter",
+    blueprintPersona: "Pro User",
     description: "For founders validating where revenue leaks begin.",
     monthlyPriceCents: 4900,
     annualPriceCents: 49000,
@@ -90,6 +94,7 @@ export const PLAN_CATALOG: PlanDefinition[] = [
   {
     id: "growth",
     name: "Growth",
+    blueprintPersona: "Growth OS User",
     description: "Full implementation toolkit for growing teams.",
     monthlyPriceCents: 14900,
     annualPriceCents: 149000,
@@ -119,6 +124,7 @@ export const PLAN_CATALOG: PlanDefinition[] = [
   {
     id: "professional",
     name: "Professional",
+    blueprintPersona: "Pro User · Developer integrations",
     description: "Higher limits plus scheduled growth reports.",
     monthlyPriceCents: 29900,
     annualPriceCents: 299000,
@@ -149,6 +155,7 @@ export const PLAN_CATALOG: PlanDefinition[] = [
   {
     id: "agency",
     name: "Agency",
+    blueprintPersona: "Agency User",
     description: "Multi-client agency workspace with white-label reports.",
     monthlyPriceCents: 49900,
     annualPriceCents: 499000,
@@ -181,6 +188,7 @@ export const PLAN_CATALOG: PlanDefinition[] = [
   {
     id: "enterprise",
     name: "Enterprise",
+    blueprintPersona: "Agency User · Enterprise",
     description: "Highest limits with API access and enterprise controls.",
     monthlyPriceCents: 99900,
     annualPriceCents: 999000,
@@ -222,4 +230,9 @@ export function resolvePlanId(plan: string): PlanId {
 export function getPlanDefinition(planId: string): PlanDefinition {
   const id = resolvePlanId(planId);
   return PLAN_CATALOG.find((p) => p.id === id) ?? PLAN_CATALOG[0]!;
+}
+
+/** Blueprint persona string for UI (never used for entitlement checks). */
+export function blueprintPersonaForPlan(planId: string): string {
+  return getPlanDefinition(planId).blueprintPersona;
 }

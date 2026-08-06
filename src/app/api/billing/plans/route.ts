@@ -1,5 +1,6 @@
 import {
   ensureBillingPlansSeeded,
+  getPlanDefinition,
   listBillingPlans,
   PLAN_CATALOG,
 } from "@/lib/billing";
@@ -8,16 +9,20 @@ export async function GET() {
   try {
     await ensureBillingPlansSeeded();
     const rows = await listBillingPlans();
-    const plans = (rows.length ? rows : PLAN_CATALOG).map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description,
-      monthlyPriceCents: p.monthlyPriceCents,
-      annualPriceCents: p.annualPriceCents,
-      sortOrder: "sortOrder" in p ? p.sortOrder : 0,
-      limits: p.limits,
-      features: p.features,
-    }));
+    const plans = (rows.length ? rows : PLAN_CATALOG).map((p) => {
+      const def = getPlanDefinition(p.id);
+      return {
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        blueprintPersona: def.blueprintPersona,
+        monthlyPriceCents: p.monthlyPriceCents,
+        annualPriceCents: p.annualPriceCents,
+        sortOrder: "sortOrder" in p ? p.sortOrder : 0,
+        limits: p.limits,
+        features: p.features,
+      };
+    });
     plans.sort(
       (a, b) =>
         (typeof a.sortOrder === "number" ? a.sortOrder : 0) -
@@ -32,6 +37,7 @@ export async function GET() {
           id: p.id,
           name: p.name,
           description: p.description,
+          blueprintPersona: p.blueprintPersona,
           monthlyPriceCents: p.monthlyPriceCents,
           annualPriceCents: p.annualPriceCents,
           sortOrder: p.sortOrder,

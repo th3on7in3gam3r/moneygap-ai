@@ -40,6 +40,11 @@ const TOOLS: {
     intro: "Use as a Cascade task in Windsurf.",
   },
   {
+    tool: "kiro",
+    title: "Kiro IDE prompt",
+    intro: "Paste into Kiro IDE as an agent / coding task with repo context.",
+  },
+  {
     tool: "lovable",
     title: "Lovable brief",
     intro: "Product/UI-oriented brief for Lovable (review before apply).",

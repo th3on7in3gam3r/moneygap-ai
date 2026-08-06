@@ -4,6 +4,8 @@ import { IntelligenceReport } from "@/components/intelligence/report-view";
 import type { CompetitorProfileData, OpportunityFix } from "@/db/schema";
 import { getBrandSettings } from "@/lib/agency/brand";
 import { getIntelligenceReport } from "@/lib/analysis/reports";
+import { planHasFeature } from "@/lib/billing/entitlements";
+import { getWorkspacePlanId } from "@/lib/billing/gate";
 
 export default async function IntelligenceReportPage({
   params,
@@ -23,10 +25,15 @@ export default async function IntelligenceReportPage({
   if (!report) notFound();
 
   const brand = await getBrandSettings(report.workspaceId);
+  const planId = await getWorkspacePlanId(report.workspaceId);
+  const canImplement = planHasFeature(planId, "action_center");
+  const showSoftUpgrade = !canImplement;
 
   return (
     <IntelligenceReport
       initialFocusId={focus ?? null}
+      canImplement={canImplement}
+      showSoftUpgrade={showSoftUpgrade}
       report={{
         id: report.id,
         title: report.title,

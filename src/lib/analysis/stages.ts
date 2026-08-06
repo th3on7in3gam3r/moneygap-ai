@@ -36,17 +36,17 @@ export const ANALYSIS_STAGES = [
   },
   {
     id: "detecting_gaps",
-    label: "Running Revenue & Conversion Intelligence…",
+    label: "Scoring MoneyGap Categories™…",
     progress: 76,
   },
   {
     id: "quantifying",
-    label: "Running SEO, Content & Trust Intelligence…",
+    label: "Deepening category findings…",
     progress: 86,
   },
   {
     id: "action_plans",
-    label: "Building Growth Roadmap & scoring…",
+    label: "Building Fix Roadmap & prompts…",
     progress: 88,
   },
   {

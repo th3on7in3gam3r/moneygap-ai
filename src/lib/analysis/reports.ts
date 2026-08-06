@@ -7,6 +7,7 @@ import {
   reports,
   websiteAnalyses,
 } from "@/db/schema";
+import { assertWebsiteAccess } from "@/lib/monitor/access";
 
 export async function getIntelligenceReport(reportId: string, userId: string) {
   const report = await db.query.reports.findFirst({
@@ -173,6 +174,7 @@ export async function listUserWebsites(userId: string) {
       website: NonNullable<(typeof analyses)[0]["website"]>;
       latestReport: (typeof analyses)[0]["report"];
       latestAnalysisId: string;
+      lastScanAt: Date | null;
     }
   >();
 
@@ -183,11 +185,119 @@ export async function listUserWebsites(userId: string) {
         website: a.website,
         latestReport: a.report,
         latestAnalysisId: a.id,
+        lastScanAt: a.completedAt ?? a.createdAt ?? null,
       });
     }
   }
 
-  return [...bySite.values()];
+  const reportIds = [...bySite.values()]
+    .map((s) => s.latestReport?.id)
+    .filter((id): id is string => Boolean(id));
+
+  const openByReport = new Map<string, number>();
+  const completedByReport = new Map<string, number>();
+  if (reportIds.length > 0) {
+    const oppRows = await db.query.moneyGapOpportunities.findMany({
+      where: inArray(moneyGapOpportunities.reportId, reportIds),
+      columns: { reportId: true, implementationStatus: true },
+    });
+    for (const row of oppRows) {
+      if (row.implementationStatus === "completed") {
+        completedByReport.set(
+          row.reportId,
+          (completedByReport.get(row.reportId) ?? 0) + 1,
+        );
+      } else {
+        openByReport.set(
+          row.reportId,
+          (openByReport.get(row.reportId) ?? 0) + 1,
+        );
+      }
+    }
+  }
+
+  return [...bySite.values()].map((s) => ({
+    ...s,
+    openGapsCount: s.latestReport
+      ? (openByReport.get(s.latestReport.id) ?? 0)
+      : 0,
+    completedImprovementsCount: s.latestReport
+      ? (completedByReport.get(s.latestReport.id) ?? 0)
+      : 0,
+  }));
+}
+
+/** Property hub for My Websites™ — workspace-scoped. */
+export async function getWebsiteWorkspace(
+  userId: string,
+  websiteId: string,
+) {
+  const access = await assertWebsiteAccess(websiteId, userId);
+  if (!access) return null;
+
+  const { website } = access;
+
+  const analyses = await db.query.websiteAnalyses.findMany({
+    where: eq(websiteAnalyses.websiteId, websiteId),
+    with: { report: true },
+    orderBy: [desc(websiteAnalyses.createdAt)],
+    limit: 40,
+  });
+
+  const siteReports = await db.query.reports.findMany({
+    where: and(
+      eq(reports.websiteId, websiteId),
+      eq(reports.type, "intelligence"),
+    ),
+    orderBy: [desc(reports.createdAt)],
+    limit: 40,
+  });
+
+  const latestReport =
+    analyses.find((a) => a.report)?.report ?? siteReports[0] ?? null;
+
+  let opportunities: (typeof moneyGapOpportunities.$inferSelect)[] = [];
+  let openGapsCount = 0;
+  let completedImprovementsCount = 0;
+
+  if (latestReport) {
+    opportunities = await db.query.moneyGapOpportunities.findMany({
+      where: eq(moneyGapOpportunities.reportId, latestReport.id),
+      orderBy: [desc(moneyGapOpportunities.priorityScore)],
+    });
+    for (const o of opportunities) {
+      if (o.implementationStatus === "completed") {
+        completedImprovementsCount += 1;
+      } else {
+        openGapsCount += 1;
+      }
+    }
+  }
+
+  return {
+    website,
+    latestReport,
+    openGapsCount,
+    completedImprovementsCount,
+    scanHistory: analyses.map((a) => ({
+      id: a.id,
+      status: a.status,
+      scanProfile: a.scanProfile ?? null,
+      createdAt: a.createdAt,
+      completedAt: a.completedAt,
+      reportId: a.reportId,
+      moneyGapScore: a.report?.moneyGapScore ?? null,
+      revenueAtRisk: a.report?.revenueAtRisk ?? null,
+    })),
+    reports: siteReports.map((r) => ({
+      id: r.id,
+      title: r.title,
+      moneyGapScore: r.moneyGapScore,
+      revenueAtRisk: r.revenueAtRisk,
+      createdAt: r.createdAt,
+    })),
+    opportunities,
+  };
 }
 
 export async function listReportProjects(reportId: string) {

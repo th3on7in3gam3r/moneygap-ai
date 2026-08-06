@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { ConnectivityDiagnosticsPanel } from "@/components/analysis/connectivity-diagnostics-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
+import { GOAL_OPTIONS } from "@/lib/onboarding/constants";
 import {
   clearSandboxHandoff,
   readSandboxHandoff,
@@ -33,6 +34,9 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
   const [estimate, setEstimate] = useState<EstimateResult | null>(null);
   const [profiles, setProfiles] = useState<ProfileOption[]>([]);
   const [scanProfile, setScanProfile] = useState<ScanProfile>("standard");
+  const [businessName, setBusinessName] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [businessGoal, setBusinessGoal] = useState("");
   const [sandboxBanner, setSandboxBanner] = useState<{
     url: string;
     score: number;
@@ -87,7 +91,13 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
       const res = await fetch("/api/analysis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: estimate?.url ?? url, scanProfile }),
+        body: JSON.stringify({
+          url: estimate?.url ?? url,
+          scanProfile,
+          ...(businessName.trim() ? { businessName: businessName.trim() } : {}),
+          ...(industry.trim() ? { industry: industry.trim() } : {}),
+          ...(businessGoal.trim() ? { businessGoal: businessGoal.trim() } : {}),
+        }),
       });
       const data = (await res.json()) as {
         analysisId?: string;
@@ -168,6 +178,67 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
               disabled={submitting || estimating}
               className="mt-2 h-12 w-full rounded-xl border border-border bg-bg px-4 text-sm text-fg outline-none transition placeholder:text-fg-subtle focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
             />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label
+                htmlFor="business-name"
+                className="text-xs font-medium text-fg-muted"
+              >
+                Business name{" "}
+                <span className="text-fg-subtle">(optional)</span>
+              </label>
+              <input
+                id="business-name"
+                type="text"
+                value={businessName}
+                onChange={(e) => setBusinessName(e.target.value)}
+                disabled={submitting || estimating}
+                placeholder="Acme Inc"
+                className="mt-1.5 h-10 w-full rounded-xl border border-border bg-bg px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="industry"
+                className="text-xs font-medium text-fg-muted"
+              >
+                Industry <span className="text-fg-subtle">(optional)</span>
+              </label>
+              <input
+                id="industry"
+                type="text"
+                value={industry}
+                onChange={(e) => setIndustry(e.target.value)}
+                disabled={submitting || estimating}
+                placeholder="SaaS, e-commerce…"
+                className="mt-1.5 h-10 w-full rounded-xl border border-border bg-bg px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="business-goal"
+                className="text-xs font-medium text-fg-muted"
+              >
+                Business goal{" "}
+                <span className="text-fg-subtle">(optional)</span>
+              </label>
+              <select
+                id="business-goal"
+                value={businessGoal}
+                onChange={(e) => setBusinessGoal(e.target.value)}
+                disabled={submitting || estimating}
+                className="mt-1.5 h-10 w-full rounded-xl border border-border bg-bg px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
+              >
+                <option value="">Select a goal</option>
+                {GOAL_OPTIONS.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {estimate ? (

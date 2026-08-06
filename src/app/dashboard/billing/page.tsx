@@ -10,6 +10,7 @@ type PlanRow = {
   id: string;
   name: string;
   description: string;
+  blueprintPersona?: string;
   monthlyPriceCents: number;
   annualPriceCents: number;
   limits: {
@@ -261,6 +262,11 @@ export default function BillingPage() {
                 {isCurrent && <Badge tone="accent">Current</Badge>}
               </CardHeader>
               <CardBody className="space-y-3">
+                {plan.blueprintPersona ? (
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">
+                    {plan.blueprintPersona}
+                  </p>
+                ) : null}
                 <p className="text-sm text-fg-muted">{plan.description}</p>
                 <p className="font-display text-3xl font-semibold tracking-tight">
                   {formatMoney(price)}

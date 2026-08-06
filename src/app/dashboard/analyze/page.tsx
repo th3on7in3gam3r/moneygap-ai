@@ -22,9 +22,10 @@ export default async function AnalyzePage({
           Analyze New Website
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-fg-muted">
-          Paste a public URL. MoneyGap AI will crawl key pages, understand the business, and build a
-          Website Intelligence Report. Depending on site size, a full scan can take up to 10–15
-          minutes.
+          Paste a public URL. MoneyGap AI crawls key pages, scores MoneyGap
+          Categories™, builds a Growth Opportunity Report with a prioritized Fix
+          Roadmap, and generates implementation prompts. A full scan can take up
+          to 10–15 minutes.
         </p>
       </div>
       <AnalyzeUrlForm initialUrl={params.url ?? ""} />

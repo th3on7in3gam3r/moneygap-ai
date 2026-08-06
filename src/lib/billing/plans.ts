@@ -7,6 +7,7 @@ export {
   PLAN_CATALOG,
   resolvePlanId,
   getPlanDefinition,
+  blueprintPersonaForPlan,
   type PlanId,
   type FeatureKey,
   type PlanDefinition,

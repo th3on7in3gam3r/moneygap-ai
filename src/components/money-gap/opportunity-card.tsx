@@ -4,6 +4,11 @@ import { useState } from "react";
 import type { OpportunityFix } from "@/db/schema";
 import { OpportunityActionCenter } from "@/components/action-center/opportunity-action-center";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  goldenCategoryLabel,
+  moduleToGoldenCategory,
+} from "@/lib/moneygap/categories";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import { Check, Copy } from "lucide-react";
 
@@ -177,18 +182,59 @@ export function OpportunityCard({
   opportunity,
   defaultOpen = false,
   reportId,
+  canImplement = false,
   onAskAdvisor,
 }: {
   opportunity: OpportunityCardData;
   defaultOpen?: boolean;
   reportId?: string;
+  /** When true, deep-link Action Center / Developer Mode instead of billing. */
+  canImplement?: boolean;
   onAskAdvisor?: (opportunityId: string) => void;
 }) {
   const [copiedTitle, setCopiedTitle] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const index = opportunity.opportunityIndex ?? opportunity.priorityScore;
   const detection = opportunity.detectionStatus?.replace("_", " ") ?? null;
   const impl = opportunity.implementationStatus;
   const lifecycle = opportunity.lifecycleStatus;
+  const goldenLabel = goldenCategoryLabel(
+    moduleToGoldenCategory(opportunity.moduleId),
+  );
+  const recipeId = `recipe-${opportunity.id}`;
+  const ideHref = `/dashboard/ide-prompt?opportunity=${encodeURIComponent(opportunity.id)}${
+    reportId ? `&reportId=${encodeURIComponent(reportId)}` : ""
+  }`;
+  const implementHref = canImplement
+    ? reportId
+      ? `/dashboard/developer-mode?reportId=${encodeURIComponent(reportId)}`
+      : "/dashboard/money-gaps"
+    : "/dashboard/billing";
+  const implementLabel = canImplement
+    ? "Open Developer Mode"
+    : "Upgrade to Implement";
+  const impactStars =
+    opportunity.expectedRoi != null
+      ? Math.max(1, Math.min(5, Math.round(opportunity.expectedRoi)))
+      : opportunity.severity === "critical"
+        ? 5
+        : opportunity.severity === "high"
+          ? 4
+          : opportunity.severity === "medium"
+            ? 3
+            : 2;
+
+  function openRecipe(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setOpen(true);
+    requestAnimationFrame(() => {
+      document.getElementById(recipeId)?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    });
+  }
 
   async function copyTitle(e: React.MouseEvent) {
     e.preventDefault();
@@ -204,7 +250,8 @@ export function OpportunityCard({
 
   return (
     <details
-      open={defaultOpen}
+      open={open}
+      onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}
       className="group rounded-2xl border border-border bg-bg-elevated open:border-border-strong focus-within:ring-2 focus-within:ring-ring"
     >
       <summary
@@ -215,7 +262,7 @@ export function OpportunityCard({
           <Badge tone={severityTone[opportunity.severity] ?? "neutral"}>
             {opportunity.severity}
           </Badge>
-          <Badge tone="neutral">{opportunity.moduleId ?? opportunity.category}</Badge>
+          <Badge tone="neutral">{goldenLabel}</Badge>
           {detection && <Badge tone="accent">{detection}</Badge>}
           <Badge
             tone={
@@ -249,7 +296,8 @@ export function OpportunityCard({
             </Badge>
           )}
           <span className="ml-auto text-[11px] tabular-nums text-fg-subtle">
-            Opportunity Index™ {index}
+            Priority #{index} · Impact {"★".repeat(impactStars)}
+            {"☆".repeat(Math.max(0, 5 - impactStars))}
           </span>
         </div>
         <div className="mt-3 flex items-start gap-2">
@@ -289,6 +337,26 @@ export function OpportunityCard({
           <span className="text-xs text-fg-subtle" aria-label={`Confidence ${opportunity.confidence} percent`}>
             {opportunity.confidence}%
           </span>
+        </div>
+        <div
+          className="mt-4 flex flex-wrap gap-2"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onClick={openRecipe}
+          >
+            View Growth Recipe
+          </Button>
+          <Button href={ideHref} size="sm" variant="secondary">
+            Generate Fix Prompt
+          </Button>
+          <Button href={implementHref} size="sm">
+            {implementLabel}
+          </Button>
         </div>
       </summary>
 
@@ -403,31 +471,30 @@ export function OpportunityCard({
           </section>
         )}
 
-        <section>
+        <section id={recipeId}>
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-accent">
+            Growth Recipe™
+          </p>
           <h4 className="text-xs font-semibold uppercase tracking-[0.1em] text-fg-subtle">
-            1. What is missing?
+            1. Problem
           </h4>
           <p className="mt-2 text-sm leading-relaxed text-fg">{opportunity.whatsMissing}</p>
         </section>
 
         <section>
           <h4 className="text-xs font-semibold uppercase tracking-[0.1em] text-fg-subtle">
-            2. Why does it matter?
+            2. Opportunity
           </h4>
           <p className="mt-2 text-sm leading-relaxed text-fg-muted">{opportunity.whyItMatters}</p>
-        </section>
-
-        <section>
-          <h4 className="text-xs font-semibold uppercase tracking-[0.1em] text-fg-subtle">
-            3. Business impact
-          </h4>
-          <p className="mt-2 text-sm leading-relaxed text-fg-muted">{opportunity.businessImpact}</p>
+          <p className="mt-2 text-sm leading-relaxed text-fg-muted">
+            {opportunity.businessImpact}
+          </p>
         </section>
 
         <section>
           <div className="flex items-center gap-2">
             <h4 className="text-xs font-semibold uppercase tracking-[0.1em] text-fg-subtle">
-              4. Estimated Opportunity
+              3. Estimated opportunity
             </h4>
             <EstimateBadge />
           </div>
@@ -484,7 +551,7 @@ export function OpportunityCard({
 
         <section>
           <h4 className="text-xs font-semibold uppercase tracking-[0.1em] text-fg-subtle">
-            5. Why is it missing?
+            4. Why is it missing?
           </h4>
           <ul className="mt-2 space-y-1.5">
             {(opportunity.likelyCauses ?? []).map((cause) => (
@@ -498,13 +565,28 @@ export function OpportunityCard({
 
         <section>
           <h4 className="mb-3 text-xs font-semibold uppercase tracking-[0.1em] text-fg-subtle">
-            6. How do we fix it?
+            5. Recommended fix
           </h4>
           <p className="mb-3 text-xs text-fg-muted">
             Pick how to execute in <span className="font-medium text-fg">How to fix</span>{" "}
             above (Action Center, checklist, Developer Mode, Automation, Hub, or Advisor).
           </p>
           <FixPlan fixes={opportunity.fixes ?? []} />
+        </section>
+
+        <section className="rounded-xl border border-accent/30 bg-accent-soft/40 px-4 py-3">
+          <h4 className="text-xs font-semibold uppercase tracking-[0.1em] text-accent">
+            6. AI implementation prompt
+          </h4>
+          <p className="mt-2 text-sm text-fg-muted">
+            Generate Cursor, Claude, ChatGPT, Kiro, and other IDE-ready prompts for
+            this Money Gap™.
+          </p>
+          <div className="mt-3">
+            <Button href={ideHref} size="sm">
+              Open IDE Prompt
+            </Button>
+          </div>
         </section>
 
         <section className="grid gap-3 sm:grid-cols-3">

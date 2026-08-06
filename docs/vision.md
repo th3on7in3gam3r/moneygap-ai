@@ -31,6 +31,10 @@ If a finding cannot connect to that chain in plain English, it does not belong i
 
 > What is preventing this business from reaching its full growth potential, and how do we fix it?
 
+## Technical architecture
+
+How the Growth OS™ foundation blueprint maps onto the shipped stack (auth, schema, scanner, scores, billing, APIs, deferred work): [Technical Architecture Blueprint™](./technical-architecture-blueprint.md).
+
 ## Product layers
 
 1. **Website Intelligence** — understand the business (Phase 2)

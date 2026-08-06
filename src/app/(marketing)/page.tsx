@@ -79,19 +79,21 @@ export default function HomePage() {
               MoneyGap<span className="text-accent"> AI</span>
             </p>
             <h1 className="animate-rise-delay-1 mt-5 max-w-xl text-2xl font-medium leading-snug tracking-tight text-fg sm:text-3xl">
-              Find the revenue your website is leaving on the table.
+              Find the Money Your Website Is Leaving Behind.
             </h1>
             <p className="animate-rise-delay-2 mt-5 max-w-lg text-base leading-relaxed text-fg-muted sm:text-lg">
-              Run a free live diagnostic in the terminal (same engine as{" "}
-              <code className="rounded bg-bg-muted px-1.5 py-0.5 font-mono text-sm text-fg">
-                npx moneygap-scan
-              </code>
-              ) — then Start Free Trial to unlock Fix Paths™.
+              MoneyGap AI analyzes your website and discovers hidden revenue,
+              conversion, trust, content, AI visibility, and technical
+              opportunities.
             </p>
             <div className="animate-rise-delay-3 mt-8 flex flex-wrap items-center gap-3">
-              <StartFreeButton label="Start Free Trial" size="lg" />
-              <Button href="/features" variant="secondary" size="lg">
-                Explore features
+              <StartFreeButton
+                label="Analyze My Website"
+                size="lg"
+                forceRedirectUrl="/dashboard/analyze"
+              />
+              <Button href="/labs" variant="secondary" size="lg">
+                See Example Report
               </Button>
             </div>
           </div>

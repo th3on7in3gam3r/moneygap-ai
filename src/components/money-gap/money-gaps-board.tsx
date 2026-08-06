@@ -2,12 +2,17 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import type { ConfidenceIntelJson, OpportunityFix } from "@/db/schema";
 import { OpportunityCard } from "@/components/money-gap/opportunity-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
+import {
+  GOLDEN_CATEGORIES,
+  type GoldenCategoryId,
+  moduleToGoldenCategory,
+} from "@/lib/moneygap/categories";
 import { formatCurrency } from "@/lib/utils";
 
 export type MoneyGapBoardItem = {
@@ -76,6 +81,9 @@ export function MoneyGapsBoard({
 
   const focusOpportunity = searchParams.get("opportunity")?.trim() || "";
   const websiteParam = searchParams.get("website")?.trim() || "";
+  const [categoryFilter, setCategoryFilter] = useState<"all" | GoldenCategoryId>(
+    "all",
+  );
 
   const defaultWebsiteId = useMemo(() => {
     if (websites.length === 0) return "all";
@@ -115,9 +123,17 @@ export function MoneyGapsBoard({
   ]);
 
   const filtered = useMemo(() => {
-    if (websiteId === "all") return opportunities;
-    return opportunities.filter((o) => o.websiteId === websiteId);
-  }, [opportunities, websiteId]);
+    let rows = opportunities;
+    if (websiteId !== "all") {
+      rows = rows.filter((o) => o.websiteId === websiteId);
+    }
+    if (categoryFilter !== "all") {
+      rows = rows.filter(
+        (o) => moduleToGoldenCategory(o.moduleId) === categoryFilter,
+      );
+    }
+    return rows;
+  }, [opportunities, websiteId, categoryFilter]);
 
   const totalImpact = useMemo(
     () =>
@@ -268,6 +284,42 @@ export function MoneyGapsBoard({
           />
         </div>
       ) : null}
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setCategoryFilter("all")}
+          className={`rounded-lg px-2.5 py-1 text-xs font-medium ${
+            categoryFilter === "all"
+              ? "bg-accent-soft text-accent"
+              : "text-fg-muted hover:bg-bg-muted"
+          }`}
+        >
+          All categories
+        </button>
+        {GOLDEN_CATEGORIES.map((cat) => {
+          const n = opportunities.filter(
+            (o) =>
+              (websiteId === "all" || o.websiteId === websiteId) &&
+              moduleToGoldenCategory(o.moduleId) === cat.id,
+          ).length;
+          return (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => setCategoryFilter(cat.id)}
+              className={`rounded-lg px-2.5 py-1 text-xs font-medium ${
+                categoryFilter === cat.id
+                  ? "bg-accent-soft text-accent"
+                  : "text-fg-muted hover:bg-bg-muted"
+              }`}
+            >
+              {cat.shortLabel}
+              {n > 0 ? ` (${n})` : ""}
+            </button>
+          );
+        })}
+      </div>
 
       {filtered.length === 0 ? (
         <Card>

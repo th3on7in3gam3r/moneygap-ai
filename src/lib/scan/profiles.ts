@@ -14,7 +14,7 @@ export const SCAN_PROFILES: Record<ScanProfile, ScanProfileConfig> = {
   },
   standard: {
     id: "standard",
-    label: "Standard Scan",
+    label: "Standard Growth Scan",
     description: "General audit with sitemap and internal links (up to 50 pages).",
     crawlerMode: "standard",
     maxPages: 50,
@@ -25,7 +25,7 @@ export const SCAN_PROFILES: Record<ScanProfile, ScanProfileConfig> = {
   },
   deep: {
     id: "deep",
-    label: "Deep Scan",
+    label: "Deep Intelligence Scan",
     description: "Resumable crawl of discovered pages (up to 5,000).",
     crawlerMode: "deep",
     maxPages: 5_000,

@@ -13,6 +13,9 @@ export const maxDuration = 300;
 const createSchema = z.object({
   url: z.string().min(1),
   scanProfile: z.enum(["quick", "standard", "deep", "enterprise"]).optional(),
+  businessName: z.string().max(200).optional(),
+  industry: z.string().max(200).optional(),
+  businessGoal: z.string().max(120).optional(),
 });
 
 export async function POST(req: Request) {
@@ -72,6 +75,9 @@ export async function POST(req: Request) {
         .update(websites)
         .set({
           url: validated.value.href,
+          ...(parsed.data.businessName?.trim()
+            ? { name: parsed.data.businessName.trim() }
+            : {}),
           status: "queued",
           updatedAt: new Date(),
         })
@@ -81,7 +87,8 @@ export async function POST(req: Request) {
         .insert(websites)
         .values({
           workspaceId: workspace.id,
-          name: validated.value.domain,
+          name:
+            parsed.data.businessName?.trim() || validated.value.domain,
           url: validated.value.href,
           domain: validated.value.domain,
           status: "queued",
@@ -89,6 +96,18 @@ export async function POST(req: Request) {
         .returning();
       websiteId = site.id;
     }
+
+    const entryContext = {
+      ...(parsed.data.businessName?.trim()
+        ? { businessName: parsed.data.businessName.trim() }
+        : {}),
+      ...(parsed.data.industry?.trim()
+        ? { industry: parsed.data.industry.trim() }
+        : {}),
+      ...(parsed.data.businessGoal?.trim()
+        ? { businessGoal: parsed.data.businessGoal.trim() }
+        : {}),
+    };
 
     const [analysis] = await db
       .insert(websiteAnalyses)
@@ -102,6 +121,10 @@ export async function POST(req: Request) {
         progress: 0,
         scanProfile: parsed.data.scanProfile ?? "standard",
         scanPhase: "queued",
+        scanMeta:
+          Object.keys(entryContext).length > 0
+            ? { entryContext }
+            : undefined,
       })
       .returning();
 

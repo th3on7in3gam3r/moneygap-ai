@@ -2810,7 +2810,8 @@ export type DeveloperBlueprintTool =
   | "claude"
   | "gemini"
   | "copilot"
-  | "windsurf";
+  | "windsurf"
+  | "kiro";
 
 export type DeveloperRepoStatus = "synced" | "analyzed" | "error" | "stale";
 export type DeveloperPlanStatus = "draft" | "ready" | "archived";

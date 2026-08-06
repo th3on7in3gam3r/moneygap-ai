@@ -35,6 +35,8 @@ Soft-fail: if the engine fails after Phase 2 intelligence succeeds, the understa
 | AI Intelligence™ | Missing AI assistants, personalization, AI content/ops leverage |
 | Competitive Intelligence™ | Peer-pattern gaps in Phase 3; **Phase 4** deep named-competitor crawl + strategy (`docs/competitive-intelligence.md`) |
 
+Customer-facing **MoneyGap Categories™** (7) roll these modules up for reports and Money Gaps filters — see [`golden-categories.md`](./golden-categories.md).
+
 ## Finding model (shared schema)
 
 Every module returns findings with:

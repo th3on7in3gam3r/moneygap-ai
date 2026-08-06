@@ -38,10 +38,20 @@ export const GOAL_OPTIONS: {
     | "custom"
     | "subscribers";
 }[] = [
-  { id: "increase_revenue", label: "Increase Revenue", goalType: "revenue" },
+  { id: "increase_revenue", label: "Increase sales", goalType: "revenue" },
+  { id: "generate_leads", label: "Generate more leads", goalType: "leads" },
   { id: "improve_seo", label: "Improve SEO", goalType: "seo" },
-  { id: "generate_leads", label: "Generate Leads", goalType: "leads" },
-  { id: "improve_conversion", label: "Improve Conversion", goalType: "conversions" },
+  { id: "improve_conversion", label: "Improve conversions", goalType: "conversions" },
+  {
+    id: "improve_ai_visibility",
+    label: "Increase AI visibility",
+    goalType: "custom",
+  },
+  {
+    id: "grow_brand_authority",
+    label: "Grow brand authority",
+    goalType: "authority",
+  },
   { id: "build_trust", label: "Build Trust", goalType: "authority" },
   { id: "reduce_churn", label: "Reduce Churn", goalType: "custom" },
   { id: "improve_performance", label: "Improve Website Performance", goalType: "custom" },
