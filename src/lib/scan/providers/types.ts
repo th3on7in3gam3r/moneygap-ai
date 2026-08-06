@@ -3,21 +3,15 @@
  * without changing dashboard APIs.
  */
 
-import type { DiscoveryResult, ScrapedPage } from "moneygap-crawler";
+import type { DiscoveryResult, OnProgress, ScrapedPage } from "moneygap-crawler";
 import type { ScanProfile } from "../types";
 
 export interface CrawlerProvider {
   discover(input: {
     url: string;
     profile: ScanProfile;
-    onProgress?: (event: {
-      phase: string;
-      pagesDiscovered: number;
-      pagesProcessed: number;
-      pagesRemaining: number;
-      currentUrl?: string;
-      message?: string;
-    }) => void | Promise<void>;
+    /** Same ProgressEvent shape as moneygap-crawler (currentUrl is string | null). */
+    onProgress?: OnProgress;
   }): Promise<DiscoveryResult>;
   extractPage(url: string): Promise<ScrapedPage | null>;
 }
