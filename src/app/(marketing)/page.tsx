@@ -76,9 +76,9 @@ const HOME_FAQ = [
 export default function HomePage() {
   return (
     <>
-      <section className="relative overflow-hidden bg-hero">
+      <section className="relative overflow-x-clip bg-hero">
         <div className="pointer-events-none absolute inset-0 bg-grid" />
-        <div className="relative mx-auto grid max-w-6xl gap-12 px-5 pb-20 pt-16 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:pb-28 lg:pt-24">
+        <div className="relative mx-auto flex max-w-6xl flex-col gap-10 px-5 pb-20 pt-16 sm:px-8 lg:grid lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-12 lg:pb-28 lg:pt-24">
           <div>
             <p className="animate-rise font-display text-5xl font-semibold tracking-tight text-fg sm:text-6xl lg:text-[4.25rem] lg:leading-[1.02]">
               MoneyGap<span className="text-accent"> AI</span>
@@ -92,7 +92,7 @@ export default function HomePage() {
               growth audit that ranks Money Gaps™ by impact and ships Fix
               Paths™ — not another static audit PDF.
             </p>
-            <div className="animate-rise-delay-3 mt-8 flex flex-wrap items-center gap-3">
+            <div className="animate-rise-delay-3 mt-8 hidden flex-wrap items-center gap-3 lg:flex">
               <StartFreeButton
                 label="Analyze My Website"
                 size="lg"
@@ -104,8 +104,19 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="animate-rise-delay-2">
+          <div id="sandbox" className="animate-rise-delay-2 min-w-0 w-full">
             <SandboxTerminal />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 lg:hidden">
+            <StartFreeButton
+              label="Analyze My Website"
+              size="lg"
+              forceRedirectUrl="/dashboard/analyze"
+            />
+            <Button href="/labs" variant="secondary" size="lg">
+              See Example Report
+            </Button>
           </div>
         </div>
       </section>
