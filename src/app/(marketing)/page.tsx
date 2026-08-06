@@ -109,6 +109,40 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section
+        id="answer-capsule"
+        aria-labelledby="answer-capsule-heading"
+        className="border-t border-border bg-bg-elevated py-14 sm:py-16"
+      >
+        <div className="mx-auto max-w-3xl px-5 sm:px-8">
+          <h2
+            id="answer-capsule-heading"
+            className="font-display text-2xl font-semibold tracking-tight text-fg sm:text-3xl"
+          >
+            MoneyGap AI in plain language
+          </h2>
+          <div className="mt-5 space-y-4 text-base leading-relaxed text-fg-muted">
+            <p>
+              MoneyGap AI is a developer-friendly conversion tool and codebase
+              growth audit. Paste a public URL and it looks for Money Gaps™ —
+              concrete misses in visibility, conversion, trust, content, and AI
+              discovery that quietly leave revenue on the table.
+            </p>
+            <p>
+              Instead of another static audit PDF, you get ranked opportunities
+              with AI Estimates of impact and Fix Paths™ you can review before
+              shipping. Founders, growth teams, and engineers share one backlog:
+              find the leak, prioritize it, close it, then re-scan.
+            </p>
+            <p>
+              Start with the free homepage sandbox or{" "}
+              <code className="text-sm text-fg">npx moneygap-scan</code>, then
+              unlock the full MoneyGap Engine™ when you are ready to execute.
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section className="border-t border-border py-20 sm:py-24">
         <div className="mx-auto max-w-6xl px-5 sm:px-8">
           <SectionHeading
@@ -116,22 +150,69 @@ export default function HomePage() {
             title="A Growth Operating System™ — not another audit PDF."
             description="MoneyGap AI analyzes public websites, surfaces Money Gaps™ across SEO, conversion, trust, content, and AI visibility, then helps you prioritize and execute with Fix Paths™, Copilot, and Growth Academy™."
           />
-          <p className="mt-6 max-w-2xl text-sm text-fg-muted">
-            Teams use it as a developer-friendly conversion tool and a codebase
-            growth audit — from the free CLI sandbox to full Fix Paths™. Explore{" "}
-            <Link href="/labs" className="text-accent hover:underline">
-              Open Audits
-            </Link>
-            ,{" "}
-            <Link href="/about" className="text-accent hover:underline">
-              About
-            </Link>
-            , and{" "}
-            <Link href="/features" className="text-accent hover:underline">
-              Features
-            </Link>
-            .
-          </p>
+          <div className="mt-8 max-w-3xl space-y-5 text-base leading-relaxed text-fg-muted">
+            <p>
+              Most revenue leaks do not show up as a red error in analytics.
+              Checkout routing breaks on mobile only. Trust signals are thin on
+              high-intent pages. Crawl blockers hide product URLs from search and
+              AI systems. Buyer-intent content never ships. MoneyGap AI is built
+              to name those misses, estimate why they matter, and give operators
+              a path to fix them — without pretending estimates are guarantees.
+            </p>
+            <p>
+              Under the hood, the MoneyGap Engine™ crawls and scores the property
+              across modules tied to the path from traffic to leads to revenue.
+              Each finding carries confidence, an Estimated Opportunity (labeled
+              as an AI Estimate), and priority via Opportunity Index™ so roadmap
+              debates stay grounded in impact instead of vanity metrics. You
+              choose how to execute: Action Center checklists, Developer Mode,
+              automation hooks, or Copilot guidance — always with human review
+              before auto-acting on recommendations.
+            </p>
+            <p>
+              Teams use MoneyGap AI as both a conversion tool and a technical
+              growth audit. Growth leads get ranked Money Gaps™ and Fix Paths™.
+              Engineering gets evidence-backed crawlability, schema, and
+              performance-signal checks instead of vague “SEO tickets.” Agencies
+              and operators get a shared Growth Operating System™ they can
+              re-run after each ship, not a one-off PDF that goes stale. Explore{" "}
+              <Link href="/features" className="text-accent hover:underline">
+                Features
+              </Link>{" "}
+              for the full score and engine map,{" "}
+              <Link href="/labs" className="text-accent hover:underline">
+                Open Audits
+              </Link>{" "}
+              for example reports, and{" "}
+              <Link href="/about" className="text-accent hover:underline">
+                About
+              </Link>{" "}
+              for how we think about transparency.
+            </p>
+            <p>
+              Closing the loop matters as much as finding the gap. After you
+              ship a Fix Path™, re-scan to see what moved. Growth Academy™
+              playbooks map education to the same categories the product scores —
+              SEO, conversion, trust, and AI visibility — so learning stays
+              attached to the backlog.{" "}
+              <Link href="/academy" className="text-accent hover:underline">
+                Growth Academy
+              </Link>{" "}
+              and the free CLI sandbox keep the path from first look to full
+              workspace intentionally short: diagnose publicly, then deepen
+              scoring and Fix Paths™ when you Start free. Pricing stays
+              aligned with that ramp — start free, then scale when capture
+              compounds — so the product stays useful before you commit to a
+              paid plan.
+            </p>
+            <p>
+              In short: MoneyGap AI helps businesses identify revenue leaks by
+              turning a public site into a prioritized list of Money Gaps™,
+              pairing each with an AI Estimate and a Fix Path™, and keeping
+              humans in the loop until the leak is closed and verified. Figures
+              are decision aids — review findings before you act.
+            </p>
+          </div>
         </div>
       </section>
 
