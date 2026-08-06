@@ -71,10 +71,32 @@ export function detectAuthRedirect(
   return { detected: false, provider: null, detail: "" };
 }
 
+/**
+ * Clerk development instances redirect browser-like clients to
+ * /v1/client/handshake when the `__clerk_db_jwt` / dev-browser cookie is missing.
+ * That is not a real login wall — public HTML is still served to bot UAs.
+ */
+export function isClerkDevBrowserHandshake(toUrl: string): boolean {
+  try {
+    const to = new URL(toUrl);
+    const host = to.hostname.toLowerCase();
+    const isClerkHost =
+      /\.clerk\.accounts\.dev$/i.test(host) || /(^|\.)clerk\./i.test(host);
+    if (!isClerkHost) return false;
+    if (!/\/v1\/client\/handshake/i.test(to.pathname)) return false;
+    return (
+      /[?&]__clerk_hs_reason=dev-browser-missing/i.test(to.search) ||
+      /[?&]redirect_url=/i.test(to.search)
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function authGateMessage(provider: string | null, domain?: string): string {
   const where = domain ? ` (${domain})` : "";
   if (provider === "Clerk") {
-    return `This site${where} redirects to Clerk login before serving a public page. MoneyGap can only analyze publicly reachable pages — sign-in walls aren’t crawlable. Use a public marketing URL, or allowlist bot access for anonymous visitors.`;
+    return `This site${where} redirects to Clerk login before serving a public page. MoneyGap can only analyze publicly reachable pages — sign-in walls aren’t crawlable. Use a public marketing URL, or allowlist bot access for anonymous visitors. If Clerk is in development mode on a production domain, switch to Clerk production keys so anonymous crawlers are not sent through the handshake.`;
   }
   if (provider) {
     return `This site${where} redirects to ${provider} authentication before serving a public page. MoneyGap analyzes public URLs only — try a public landing page, or open anonymous access for bots.`;

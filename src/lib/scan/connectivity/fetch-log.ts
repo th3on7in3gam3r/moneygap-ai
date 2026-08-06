@@ -16,6 +16,16 @@ export type LoggedFetchResult =
     };
 
 const DEFAULT_UA = "MoneyGapAI-Connectivity/1.0 (+https://moneygap-ai.com)";
+/**
+ * Prefer Accept wildcard (* / *). Clerk development handshake treats text/html
+ * Accept as a browser and 307s to accounts.dev even for public marketing pages.
+ */
+export const CONNECTIVITY_ACCEPT = "*/*";
+/** Bot retry headers after a Clerk development handshake. */
+export const CONNECTIVITY_BOT_HEADERS = {
+  "User-Agent": DEFAULT_UA,
+  Accept: CONNECTIVITY_ACCEPT,
+} as const;
 const MAX_BODY_CHARS = 256_000;
 
 export type LoggedFetchOptions = {
@@ -48,8 +58,8 @@ export async function loggedFetch(
       signal: controller.signal,
       cache: "no-store",
       headers: {
+        Accept: CONNECTIVITY_ACCEPT,
         "User-Agent": DEFAULT_UA,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         ...(opts.headers ?? {}),
       },
     });

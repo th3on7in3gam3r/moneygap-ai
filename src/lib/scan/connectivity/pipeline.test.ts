@@ -128,7 +128,36 @@ describe("stageHomepageGet (mocked fetch)", () => {
     assert.equal(r.ok, false);
     assert.equal(r.errorCode, "auth");
     assert.match(r.hardError ?? "", /Clerk/i);
-    assert.equal(calls, 1, "must not follow the Clerk handshake chain");
+    // First attempt + one bot-UA retry against the same URL (handshake again).
+    assert.equal(calls, 2, "retries once with bot UA then fails");
+  });
+
+  it("recovers from Clerk development handshake with bot UA retry", async () => {
+    let calls = 0;
+    globalThis.fetch = async (_url, init) => {
+      calls += 1;
+      const headers = init?.headers as Record<string, string> | undefined;
+      const accept = String(headers?.Accept ?? "");
+      if (accept === "*/*" || /MoneyGapAI-Bot/i.test(String(headers?.["User-Agent"] ?? ""))) {
+        return new Response("<html><body>ok</body></html>", {
+          status: 200,
+          headers: { "content-type": "text/html" },
+        });
+      }
+      return new Response("", {
+        status: 307,
+        headers: {
+          location:
+            "https://funny-shark-73.clerk.accounts.dev/v1/client/handshake?redirect_url=https%3A%2F%2Fwww.example.com%2F&__clerk_hs_reason=dev-browser-missing",
+        },
+      });
+    };
+    const log: ConnectivityFetchRecord[] = [];
+    const r = await stageHomepageGet("https://www.example.com/", log);
+    assert.equal(r.ok, true);
+    assert.equal(r.homepage, "200");
+    // Default Accept is now */*, so first request succeeds without handshake.
+    assert.ok(calls >= 1);
   });
 
   it("classifies abort as timeout without retry", async () => {

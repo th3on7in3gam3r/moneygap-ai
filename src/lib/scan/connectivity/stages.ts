@@ -1,7 +1,7 @@
 import { connect as netConnect } from "node:net";
 import { connect as tlsConnect } from "node:tls";
-import { authGateMessage, detectAuthRedirect } from "./auth-gate";
-import { loggedFetch } from "./fetch-log";
+import { authGateMessage, detectAuthRedirect, isClerkDevBrowserHandshake } from "./auth-gate";
+import { CONNECTIVITY_BOT_HEADERS, loggedFetch } from "./fetch-log";
 import { classifyNetworkError } from "./classify-error";
 import { detectCloudflareOrWaf } from "./waf";
 import type {
@@ -231,6 +231,8 @@ export async function stageHomepageGet(
   let current = startUrl;
   const redirectHops: string[] = [];
   let redirectCount = 0;
+  let usedBotUa = false;
+  let clerkDevHandshakeWarned = false;
 
   for (let i = 0; i <= MAX_REDIRECTS; i++) {
     const result = await loggedFetch(current, {
@@ -238,6 +240,7 @@ export async function stageHomepageGet(
       redirect: "manual",
       timeoutMs: GET_TIMEOUT_MS,
       fetchLog,
+      headers: usedBotUa ? { ...CONNECTIVITY_BOT_HEADERS } : undefined,
     });
 
     if (!result.ok) {
@@ -328,6 +331,20 @@ export async function stageHomepageGet(
 
       const auth = detectAuthRedirect(current, nextUrl);
       if (auth.detected) {
+        // Clerk development handshake: retry once with bot UA (public HTML still served).
+        if (!usedBotUa && isClerkDevBrowserHandshake(nextUrl)) {
+          usedBotUa = true;
+          clerkDevHandshakeWarned = true;
+          redirectHops.pop();
+          redirectCount = Math.max(0, redirectCount - 1);
+          stages.push({
+            id: "homepage",
+            status: "warn",
+            detail: "Clerk development handshake — retrying with bot UA",
+            elapsedMs: Date.now() - started,
+          });
+          continue;
+        }
         return authGateFail(
           started,
           current,
@@ -343,6 +360,10 @@ export async function stageHomepageGet(
 
     const waf = detectCloudflareOrWaf(response.headers, bodyText);
     const redirectStr = redirectHops.length ? redirectHops.join(" → ") : null;
+    const clerkWarn = clerkDevHandshakeWarned
+      ? "Clerk development handshake detected — retried with bot UA. Prefer Clerk production keys on live domains so anonymous crawlers are not redirected."
+      : null;
+    const softWarn = [waf.warning, clerkWarn].filter(Boolean).join(" ") || null;
 
     // Soft success: 401/403 — reachable but gated
     if (status === 401 || status === 403) {
@@ -361,7 +382,7 @@ export async function stageHomepageGet(
         bodyText,
         cloudflareOrWaf: waf.detected || status === 403,
         wafWarning:
-          waf.warning ??
+          softWarn ??
           `Homepage returned HTTP ${status} (reachable but may block bots).`,
         hardError: null,
         elapsedMs: Date.now() - started,
@@ -384,7 +405,7 @@ export async function stageHomepageGet(
         statusCode: status,
         bodyText,
         cloudflareOrWaf: waf.detected,
-        wafWarning: waf.warning,
+        wafWarning: softWarn,
         hardError: null,
         elapsedMs: Date.now() - started,
         stages,
