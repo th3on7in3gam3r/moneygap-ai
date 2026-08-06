@@ -18,7 +18,7 @@ import type {
   StorageProvider,
 } from "./types";
 
-const HARD_PAGE_CEILING = 50;
+const HARD_PAGE_CEILING = 5_000;
 
 function parseClaimRows(
   result: unknown,
@@ -36,8 +36,8 @@ function parseClaimRows(
 }
 
 export const defaultCrawlerProvider: CrawlerProvider = {
-  async discover({ url, profile }) {
-    return runScanDiscovery({ url, profile });
+  async discover({ url, profile, onProgress }) {
+    return runScanDiscovery({ url, profile, onProgress });
   },
   async extractPage(url) {
     const record = await extractSinglePage(url, {

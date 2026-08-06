@@ -34,9 +34,9 @@ export async function runIncrementalDiscover(analysisId: string): Promise<void> 
 
   await defaultProgressProvider.update(analysisId, {
     scanPhase: "discovering",
-    stage: "Discovering pages",
-    progress: 10,
-    scanMeta: { scanStage: "discover" },
+    stage: "Connecting…",
+    progress: 8,
+    scanMeta: { scanStage: "connecting" },
   });
 
   let jobId = analysis.crawlJobId;
@@ -59,9 +59,68 @@ export async function runIncrementalDiscover(analysisId: string): Promise<void> 
       .where(eq(websiteAnalyses.id, analysisId));
   }
 
+  await defaultProgressProvider.update(analysisId, {
+    scanPhase: "discovering",
+    stage: "Checking robots.txt…",
+    progress: 10,
+    scanMeta: { scanStage: "robots" },
+  });
+
+  let discoverProgressFloor = 10;
   const discovery = await defaultCrawlerProvider.discover({
     url: analysis.url,
     profile,
+    onProgress: async (event) => {
+      const phase = event.phase;
+      const raw = (event.message ?? "").replace(/^\[Scanner\]\s*/i, "").trim();
+      let stage = raw || "Discovering pages…";
+      let scanStage = "discovery";
+      // Every heartbeat nudges progress so the UI never sits static on sitemap.
+      discoverProgressFloor = Math.min(18, discoverProgressFloor + 0.4);
+      let progress = Math.round(discoverProgressFloor);
+      if (phase === "robots") {
+        stage = raw || "Checking robots.txt…";
+        progress = Math.max(progress, 10);
+        scanStage = "robots";
+      } else if (phase === "sitemap") {
+        stage =
+          raw ||
+          (event.pagesDiscovered > 1
+            ? `Found ${event.pagesDiscovered} URLs…`
+            : "Looking for sitemap…");
+        progress = Math.max(progress, 12);
+        scanStage = "sitemap";
+      } else if (phase === "discover" || phase === "queue") {
+        stage = raw || `Found ${event.pagesDiscovered} pages…`;
+        progress = Math.max(progress, 16);
+        scanStage = "discovery";
+      }
+      await defaultProgressProvider.update(analysisId, {
+        scanPhase: "discovering",
+        stage,
+        progress,
+        pagesDiscovered: event.pagesDiscovered,
+        currentUrl: event.currentUrl ?? null,
+        scanMeta: { scanStage },
+      });
+    },
+  });
+
+  await defaultProgressProvider.update(analysisId, {
+    scanPhase: "discovering",
+    stage:
+      discovery.urls.length > 0
+        ? `Found ${discovery.urls.length} pages — building queue…`
+        : "Building crawl queue from homepage…",
+    progress: 14,
+    pagesDiscovered: discovery.urls.length,
+    scanMeta: {
+      scanStage: "queue",
+      framework: discovery.framework,
+      jsRequired: discovery.jsRequired,
+      sitemapFound: discovery.sitemapFound,
+      warnings: discovery.warnings,
+    },
   });
 
   await db.delete(websitePages).where(eq(websitePages.analysisId, analysisId));
@@ -75,17 +134,18 @@ export async function runIncrementalDiscover(analysisId: string): Promise<void> 
 
   await defaultProgressProvider.update(analysisId, {
     scanPhase: "processing",
-    stage: `Reading pages (0/${discovery.urls.length})`,
-    progress: 15,
+    stage: `Reading page 0 of ${discovery.urls.length}…`,
+    progress: 16,
     pagesDiscovered: discovery.urls.length,
     pagesCompleted: 0,
     pagesFailed: 0,
     scanMeta: {
-      scanStage: "read_pages",
+      scanStage: "crawling",
       framework: discovery.framework,
       jsRequired: discovery.jsRequired,
       sitemapFound: discovery.sitemapFound,
       warnings: discovery.warnings,
+      tickScheduleError: null,
     },
   });
 
@@ -94,17 +154,28 @@ export async function runIncrementalDiscover(analysisId: string): Promise<void> 
     .set({ status: "processing", updatedAt: new Date() })
     .where(eq(crawlJobs.id, jobId));
 
-  const deadline = Date.now() + 50_000;
-  while (Date.now() < deadline) {
-    const { done } = await processScanTick(analysisId);
-    if (done) return;
-    const row = await db.query.websiteAnalyses.findFirst({
-      where: eq(websiteAnalyses.id, analysisId),
-      columns: { scanPhase: true },
-    });
-    if (row?.scanPhase === "paused" || row?.scanPhase === "cancelled") return;
+  let finished = false;
+  try {
+    const deadline = Date.now() + 50_000;
+    while (Date.now() < deadline) {
+      const { done } = await processScanTick(analysisId);
+      if (done) {
+        finished = true;
+        return;
+      }
+      const row = await db.query.websiteAnalyses.findFirst({
+        where: eq(websiteAnalyses.id, analysisId),
+        columns: { scanPhase: true },
+      });
+      if (row?.scanPhase === "paused" || row?.scanPhase === "cancelled") {
+        finished = true;
+        return;
+      }
+    }
+  } finally {
+    // Always hand off to ticks so a thrown/timed-out discover loop cannot orphan the queue.
+    if (!finished) scheduleScanTickAsync(analysisId);
   }
-  scheduleScanTickAsync(analysisId);
 }
 
 async function updateReadProgress(input: {
@@ -143,7 +214,7 @@ async function updateReadProgress(input: {
 
   await defaultProgressProvider.update(input.analysisId, {
     scanPhase: "processing",
-    stage: `Reading pages (${completed}/${discovered})`,
+    stage: `Reading page ${completed} of ${discovered}…`,
     progress,
     pagesDiscovered: discovered,
     pagesCompleted: completed,
@@ -151,7 +222,7 @@ async function updateReadProgress(input: {
     estimatedRemainingMs: etaMs,
     currentUrl: input.currentUrl,
     scanMeta: {
-      scanStage: "read_pages",
+      scanStage: "crawling",
       elapsedMs: Date.now() - input.startedAt,
       queue: {
         queued: counts.queued ?? 0,

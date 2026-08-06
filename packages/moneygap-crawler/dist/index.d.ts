@@ -156,7 +156,9 @@ declare function extractSinglePage(url: string, opts?: {
  * Discovery-only: robots + sitemaps + nav harvest + prioritize.
  * Does not extract page content.
  */
-declare function discoverOnly(input: CrawlConfigInput): Promise<DiscoveryResult>;
+declare function discoverOnly(input: CrawlConfigInput, opts?: {
+    onProgress?: OnProgress;
+}): Promise<DiscoveryResult>;
 
 declare function toScrapedPage(page: PageRecord): ScrapedPage;
 declare function toScrapedPages(pages: PageRecord[]): ScrapedPage[];
@@ -175,10 +177,20 @@ declare class MemoryCache {
     clear(): void;
 }
 
+type SitemapDiscoverProgress = {
+    mapsTried: number;
+    mapsOk: number;
+    urlsFound: number;
+    currentUrl: string | null;
+    message: string;
+};
 declare function parseSitemapXml(xml: string, baseUrl: string): {
     urls: string[];
     childSitemaps: string[];
 };
+/** Clamp robots Crawl-delay to avoid multi-minute freezes between pages. */
+declare function clampCrawlDelayMs(delayMs: number, maxMs?: number): number;
+declare function buildSitemapSeeds(origin: string, extraSitemapUrls?: string[]): string[];
 declare function discoverSitemapUrls(origin: string, opts: {
     userAgent: string;
     timeoutMs: number;
@@ -187,6 +199,9 @@ declare function discoverSitemapUrls(origin: string, opts: {
     extraSitemapUrls?: string[];
     maxSitemaps?: number;
     maxUrls?: number;
+    /** Wall-clock budget for the whole discover phase. */
+    budgetMs?: number;
+    onProgress?: (p: SitemapDiscoverProgress) => void | Promise<void>;
 }): Promise<string[]>;
 
 type RobotsGate = {
@@ -241,4 +256,4 @@ declare function isTransientError(statusCode?: number, message?: string): boolea
 /** Lazy Playwright cleanup — avoid static export of the playwright renderer. */
 declare function closeBrowser(): Promise<void>;
 
-export { type CrawlConfig, type CrawlConfigInput, CrawlConfigSchema, type CrawlMode, CrawlModeSchema, type CrawlResult, type DiscoveryResult, type FrameworkId, InMemoryCrawlQueue, type OnProgress, type PageRecord, type PageType, PageTypeSchema, type ProgressEvent, type ProgressPhase, type QueueState, QueueStateSchema, type ScrapedPage, backoffMs, classifyPageType, closeBrowser, crawlSite, detectFramework, discoverOnly, discoverSitemapUrls, extractSinglePage, isTransientError, loadPageHtml, loadRobots, normalizeCrawlUrl, parseSitemapXml, prioritizeUrls, resolveUrl, sameOrigin, toScrapedPage, toScrapedPages };
+export { type CrawlConfig, type CrawlConfigInput, CrawlConfigSchema, type CrawlMode, CrawlModeSchema, type CrawlResult, type DiscoveryResult, type FrameworkId, InMemoryCrawlQueue, type OnProgress, type PageRecord, type PageType, PageTypeSchema, type ProgressEvent, type ProgressPhase, type QueueState, QueueStateSchema, type ScrapedPage, backoffMs, buildSitemapSeeds, clampCrawlDelayMs, classifyPageType, closeBrowser, crawlSite, detectFramework, discoverOnly, discoverSitemapUrls, extractSinglePage, isTransientError, loadPageHtml, loadRobots, normalizeCrawlUrl, parseSitemapXml, prioritizeUrls, resolveUrl, sameOrigin, toScrapedPage, toScrapedPages };

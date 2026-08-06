@@ -8,10 +8,9 @@ shapes are unchanged.
 
 ```
 POST /api/scan/estimate → profile picker
-POST /api/analysis (+ scanProfile)
+POST /api/analysis (+ scanProfile) | onboarding/start-scan
   → websiteAnalyses + after(runAnalysisPipeline)
-     quick: crawlWebsite → finishPipelineWithPages
-     other: runIncrementalDiscover → processScanTick loop
+     all profiles: runIncrementalDiscover → processScanTick loop
             → scheduleScanTick (fire-and-forget POST /api/scan/tick)
             → reclaim stale processing → concurrent extract
             → runPostCrawlAnalysis when queue drained
@@ -33,13 +32,12 @@ Also: `paused`, `cancelled`, `failed`, `waiting`, `retrying`.
 - Reschedules via **fire-and-forget** `after(scheduleScanTick)` (5s AbortSignal on the HTTP call — never awaits nested ticks).
 - When drained → post-crawl analysis.
 
-### Caps (quick / standard)
+### Caps
 
-- `maxPages`: quick **30**, standard **50** (hard enqueue ceiling 50 for those paths)
-- `maxDepth`: **2**
-- `concurrency`: **5**
-
-Deep / enterprise keep higher caps but use the same reclaim / watchdog / concurrency machinery.
+- `maxPages`: quick **25**, standard **100**, deep **500**, enterprise **5_000**
+  (hard enqueue ceiling **5000**)
+- `maxDepth`: quick/standard **2**; deep/enterprise higher
+- `concurrency`: **5** (enterprise **8**)
 
 ### Control APIs
 

@@ -10,6 +10,14 @@ export interface CrawlerProvider {
   discover(input: {
     url: string;
     profile: ScanProfile;
+    onProgress?: (event: {
+      phase: string;
+      pagesDiscovered: number;
+      pagesProcessed: number;
+      pagesRemaining: number;
+      currentUrl?: string;
+      message?: string;
+    }) => void | Promise<void>;
   }): Promise<DiscoveryResult>;
   extractPage(url: string): Promise<ScrapedPage | null>;
 }

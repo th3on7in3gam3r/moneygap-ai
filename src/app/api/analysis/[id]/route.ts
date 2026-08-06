@@ -91,6 +91,17 @@ export async function GET(
       typeof (analysis.scanMeta as { currentUrl?: unknown }).currentUrl === "string"
         ? (analysis.scanMeta as { currentUrl: string }).currentUrl
         : null,
+    tickScheduleError:
+      analysis.scanMeta &&
+      typeof (analysis.scanMeta as { tickScheduleError?: unknown })
+        .tickScheduleError === "string"
+        ? (analysis.scanMeta as { tickScheduleError: string }).tickScheduleError
+        : null,
+    scanStage:
+      analysis.scanMeta &&
+      typeof (analysis.scanMeta as { scanStage?: unknown }).scanStage === "string"
+        ? (analysis.scanMeta as { scanStage: string }).scanStage
+        : null,
     stages: ANALYSIS_STAGES.map((s, index) => {
       const done =
         analysis.status === "completed" ||
@@ -122,7 +133,14 @@ function resolveAnalysisStageIndex(stage: string, progress: number): number {
   if (byLabel >= 0) return byLabel;
 
   const lower = stage.toLowerCase();
-  if (lower.startsWith("reading pages")) {
+  if (
+    lower.startsWith("reading page") ||
+    lower.startsWith("reading pages") ||
+    lower.includes("looking for sitemap") ||
+    lower.includes("checking robots") ||
+    lower.includes("building crawl queue") ||
+    (lower.includes("found ") && lower.includes("pages"))
+  ) {
     return ANALYSIS_STAGES.findIndex((s) => s.id === "reading");
   }
   if (

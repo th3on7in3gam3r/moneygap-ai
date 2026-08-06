@@ -7,10 +7,14 @@ with higher app-level caps and concurrency.
 
 | Profile | maxPages | Crawler mode | Execution |
 |---------|----------|--------------|-----------|
-| **quick** | 25 | `quick` | Single in-process `crawlWebsite` then Engine |
-| **standard** | 250 | `standard` | Discover → batched ticks (≈10 pages/tick) |
-| **deep** | 5,000 | `deep` | Same tick loop; pause / resume / cancel |
-| **enterprise** | 50,000 soft cap | `deep` | Larger batches + higher concurrency |
+| **quick** | 25 | `quick` | Incremental discover → ticks → Engine |
+| **standard** | 100 | `standard` | Same durable tick pipeline |
+| **deep** | 500 | `deep` | Same tick loop; pause / resume / cancel |
+| **enterprise** | 5,000 soft cap | `deep` | Larger batches + higher concurrency |
+
+All user-facing profiles (including onboarding Quick) use
+`runIncrementalDiscover` + `/api/scan/tick`. See
+[crawl-engine-fault-tolerance.md](./crawl-engine-fault-tolerance.md).
 
 ## Pre-scan estimator
 

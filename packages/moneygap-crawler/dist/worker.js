@@ -517,7 +517,7 @@ function isTransientError(statusCode, message) {
 
 // src/renderers/fetch-static.ts
 var DEFAULT_TIMEOUT_MS = 15e3;
-async function fetchText(url, opts) {
+async function fetchBytes(url, opts) {
   const started = Date.now();
   const timeoutMs = opts.timeoutMs > 0 ? opts.timeoutMs : DEFAULT_TIMEOUT_MS;
   const controller = new AbortController();
@@ -529,7 +529,8 @@ async function fetchText(url, opts) {
       signal: controller.signal,
       headers: {
         "User-Agent": opts.userAgent,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        Accept: "application/xml,text/xml,application/gzip,*/*;q=0.8",
+        "Accept-Encoding": "identity"
       }
     });
     const buf = await res.arrayBuffer();
@@ -548,14 +549,13 @@ async function fetchText(url, opts) {
         fetchMs: Date.now() - started
       };
     }
-    const text = new TextDecoder("utf-8", { fatal: false }).decode(buf);
     const headers = {};
     res.headers.forEach((v, k) => {
       headers[k.toLowerCase()] = v;
     });
     return {
       ok: true,
-      text,
+      bytes: new Uint8Array(buf),
       statusCode: res.status,
       finalUrl: res.url || url,
       headers,
@@ -571,6 +571,26 @@ async function fetchText(url, opts) {
   } finally {
     clearTimeout(timer);
   }
+}
+async function fetchText(url, opts) {
+  const binary = await fetchBytes(url, opts);
+  if (!binary.ok) {
+    return {
+      ok: false,
+      error: binary.error,
+      statusCode: binary.statusCode,
+      fetchMs: binary.fetchMs
+    };
+  }
+  const text = new TextDecoder("utf-8", { fatal: false }).decode(binary.bytes);
+  return {
+    ok: true,
+    text,
+    statusCode: binary.statusCode,
+    finalUrl: binary.finalUrl,
+    headers: binary.headers,
+    fetchMs: binary.fetchMs
+  };
 }
 
 // src/renderers/playwright.ts
@@ -708,12 +728,25 @@ async function loadRobots(origin, opts) {
 }
 
 // src/sitemaps/index.ts
+import { gunzipSync } from "zlib";
 import { XMLParser } from "fast-xml-parser";
 var parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: "@_",
   trimValues: true
 });
+var COMMON_SITEMAP_PATHS = [
+  "/sitemap.xml",
+  "/sitemap_index.xml",
+  "/post-sitemap.xml",
+  "/page-sitemap.xml",
+  "/category-sitemap.xml",
+  "/news-sitemap.xml",
+  "/image-sitemap.xml",
+  "/sitemap.xml.gz",
+  "/sitemap_index.xml.gz"
+];
+var SITEMAP_DISCOVER_BUDGET_MS = 25e3;
 function asArray(v) {
   if (v == null) return [];
   return Array.isArray(v) ? v : [v];
@@ -748,35 +781,107 @@ function parseSitemapXml(xml, baseUrl) {
   }
   return { urls, childSitemaps };
 }
+function looksGzip(url, headers) {
+  if (/\.gz(\?|$)/i.test(url)) return true;
+  const enc = headers["content-encoding"] ?? "";
+  const ctype = headers["content-type"] ?? "";
+  return /gzip/i.test(enc) || /gzip|application\/x-gzip/i.test(ctype);
+}
+function bytesToXml(bytes, url, headers) {
+  if (looksGzip(url, headers) || bytes.length >= 2 && bytes[0] === 31 && bytes[1] === 139) {
+    try {
+      return gunzipSync(Buffer.from(bytes)).toString("utf-8");
+    } catch {
+    }
+  }
+  return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+}
+function clampCrawlDelayMs(delayMs, maxMs = 2e3) {
+  if (!Number.isFinite(delayMs) || delayMs <= 0) return 0;
+  return Math.min(Math.max(0, delayMs), maxMs);
+}
+function buildSitemapSeeds(origin, extraSitemapUrls) {
+  const base = origin.replace(/\/$/, "");
+  const seeds = [
+    ...extraSitemapUrls ?? [],
+    ...COMMON_SITEMAP_PATHS.map((p) => `${base}${p}`)
+  ];
+  const seen = /* @__PURE__ */ new Set();
+  const out = [];
+  for (const s of seeds) {
+    const key = s.split("#")[0].toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+  return out;
+}
 async function discoverSitemapUrls(origin, opts) {
   const maxSitemaps = opts.maxSitemaps ?? 10;
   const maxUrls = opts.maxUrls ?? 2e3;
-  const seeds = [
-    ...opts.extraSitemapUrls ?? [],
-    `${origin.replace(/\/$/, "")}/sitemap.xml`,
-    `${origin.replace(/\/$/, "")}/sitemap_index.xml`
-  ];
+  const budgetMs = opts.budgetMs ?? SITEMAP_DISCOVER_BUDGET_MS;
+  const started = Date.now();
+  const seeds = buildSitemapSeeds(origin, opts.extraSitemapUrls);
   const seenMaps = /* @__PURE__ */ new Set();
   const queue = [...seeds];
   const found = /* @__PURE__ */ new Set();
+  let mapsOk = 0;
+  const emit = async (message, currentUrl = null) => {
+    console.info("[Scanner]", message, {
+      mapsTried: seenMaps.size,
+      mapsOk,
+      urlsFound: found.size,
+      currentUrl
+    });
+    await opts.onProgress?.({
+      mapsTried: seenMaps.size,
+      mapsOk,
+      urlsFound: found.size,
+      currentUrl,
+      message
+    });
+  };
+  await emit(`Looking for sitemap\u2026 (${seeds.length} seed locations)`, null);
   while (queue.length > 0 && seenMaps.size < maxSitemaps && found.size < maxUrls) {
+    if (Date.now() - started >= budgetMs) {
+      await emit(
+        `Sitemap budget reached \u2014 continuing with ${found.size} URLs`,
+        null
+      );
+      break;
+    }
     const mapUrl = queue.shift();
     if (seenMaps.has(mapUrl)) continue;
     seenMaps.add(mapUrl);
+    await emit(
+      found.size > 0 ? `Found ${found.size} URLs\u2026` : `Looking for sitemap\u2026 (${seenMaps.size}/${maxSitemaps})`,
+      mapUrl
+    );
     const cacheKey = `sitemap:${mapUrl}`;
     let xml = opts.cache.get(cacheKey);
     if (xml == null) {
-      const res = await fetchText(mapUrl, {
-        timeoutMs: opts.timeoutMs,
+      const remaining = Math.max(1e3, budgetMs - (Date.now() - started));
+      const perFetch = Math.min(opts.timeoutMs, remaining);
+      const res = await fetchBytes(mapUrl, {
+        timeoutMs: perFetch,
         maxBytes: 5e6,
         userAgent: opts.userAgent,
         maxRedirects: 5
       });
-      if (!res.ok || res.statusCode >= 400) continue;
-      xml = res.text;
+      if (!res.ok || (res.statusCode ?? 0) >= 400) {
+        if (!/\.gz(\?|$)/i.test(mapUrl) && /\.xml(\?|$)/i.test(mapUrl)) {
+          const gzUrl = mapUrl.replace(/\.xml(\?|$)/i, ".xml.gz$1");
+          if (!seenMaps.has(gzUrl)) queue.push(gzUrl);
+        }
+        continue;
+      }
+      xml = bytesToXml(res.bytes, mapUrl, res.headers);
+      if (!xml.trim()) continue;
       opts.cache.set(cacheKey, xml, opts.cacheTtlMs);
     }
     const { urls, childSitemaps } = parseSitemapXml(xml, mapUrl);
+    if (urls.length === 0 && childSitemaps.length === 0) continue;
+    mapsOk += 1;
     for (const u of urls) {
       found.add(u);
       if (found.size >= maxUrls) break;
@@ -784,7 +889,12 @@ async function discoverSitemapUrls(origin, opts) {
     for (const child of childSitemaps) {
       if (!seenMaps.has(child)) queue.push(child);
     }
+    await emit(`Found ${found.size} URLs\u2026`, mapUrl);
   }
+  await emit(
+    found.size > 0 ? `Found ${found.size} URLs from ${mapsOk} sitemap(s)` : "No sitemap URLs \u2014 using homepage link discovery",
+    null
+  );
   return Array.from(found);
 }
 
@@ -862,24 +972,37 @@ async function crawlSite(input, opts) {
     cache: globalCrawlCache,
     cacheTtlMs: config.cacheTtlMs
   });
-  const delayMs = Math.max(config.crawlDelayMs, robots.crawlDelayMs);
+  const delayMs = clampCrawlDelayMs(
+    Math.max(config.crawlDelayMs, robots.crawlDelayMs)
+  );
   await tracker.emit({
     phase: "sitemap",
     pagesDiscovered: 1,
     pagesProcessed: 0,
     pagesRemaining: 1,
-    message: "Discovering sitemaps"
+    message: "Looking for sitemap\u2026"
   });
   let sitemapUrls = [];
   try {
     sitemapUrls = await discoverSitemapUrls(origin, {
       userAgent: config.userAgent,
-      timeoutMs: 15e3,
+      timeoutMs: 1e4,
       cache: globalCrawlCache,
       cacheTtlMs: config.cacheTtlMs,
       extraSitemapUrls: robots.sitemaps,
       maxSitemaps: config.mode === "deep" ? 25 : 8,
-      maxUrls: config.mode === "deep" ? 5e3 : 800
+      maxUrls: config.mode === "deep" ? 5e3 : 800,
+      budgetMs: 25e3,
+      onProgress: async (p) => {
+        await tracker.emit({
+          phase: "sitemap",
+          pagesDiscovered: Math.max(1, p.urlsFound),
+          pagesProcessed: 0,
+          pagesRemaining: Math.max(1, p.urlsFound),
+          currentUrl: p.currentUrl ?? void 0,
+          message: p.message
+        });
+      }
     });
   } catch (err) {
     tracker.warn(

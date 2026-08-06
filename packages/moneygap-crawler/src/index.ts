@@ -2,7 +2,7 @@ export { crawlSite, extractSinglePage, loadPageHtml } from "./crawl.js";
 export { discoverOnly } from "./discovery-only.js";
 export { toScrapedPage, toScrapedPages } from "./adapters/scraped-page.js";
 export { detectFramework } from "./framework-detectors/index.js";
-export { parseSitemapXml, discoverSitemapUrls } from "./sitemaps/index.js";
+export { parseSitemapXml, discoverSitemapUrls, clampCrawlDelayMs, buildSitemapSeeds } from "./sitemaps/index.js";
 export { loadRobots } from "./robots/index.js";
 export { classifyPageType, prioritizeUrls } from "./discovery/prioritize.js";
 export { normalizeCrawlUrl, sameOrigin, resolveUrl } from "./discovery/normalize.js";

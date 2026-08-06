@@ -18,7 +18,7 @@ import {
   shouldUsePlaywright,
 } from "./renderers/playwright.js";
 import { loadRobots } from "./robots/index.js";
-import { discoverSitemapUrls } from "./sitemaps/index.js";
+import { discoverSitemapUrls, clampCrawlDelayMs } from "./sitemaps/index.js";
 import {
   CrawlConfigSchema,
   type CrawlConfigInput,
@@ -65,26 +65,39 @@ export async function crawlSite(
     cacheTtlMs: config.cacheTtlMs,
   });
 
-  const delayMs = Math.max(config.crawlDelayMs, robots.crawlDelayMs);
+  const delayMs = clampCrawlDelayMs(
+    Math.max(config.crawlDelayMs, robots.crawlDelayMs),
+  );
 
   await tracker.emit({
     phase: "sitemap",
     pagesDiscovered: 1,
     pagesProcessed: 0,
     pagesRemaining: 1,
-    message: "Discovering sitemaps",
+    message: "Looking for sitemap…",
   });
 
   let sitemapUrls: string[] = [];
   try {
     sitemapUrls = await discoverSitemapUrls(origin, {
       userAgent: config.userAgent,
-      timeoutMs: 15_000,
+      timeoutMs: 10_000,
       cache: globalCrawlCache,
       cacheTtlMs: config.cacheTtlMs,
       extraSitemapUrls: robots.sitemaps,
       maxSitemaps: config.mode === "deep" ? 25 : 8,
       maxUrls: config.mode === "deep" ? 5000 : 800,
+      budgetMs: 25_000,
+      onProgress: async (p) => {
+        await tracker.emit({
+          phase: "sitemap",
+          pagesDiscovered: Math.max(1, p.urlsFound),
+          pagesProcessed: 0,
+          pagesRemaining: Math.max(1, p.urlsFound),
+          currentUrl: p.currentUrl ?? undefined,
+          message: p.message,
+        });
+      },
     });
   } catch (err) {
     tracker.warn(

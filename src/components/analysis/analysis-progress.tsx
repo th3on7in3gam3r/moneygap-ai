@@ -122,6 +122,8 @@ type StatusPayload = {
   pagesFailed?: number;
   estimatedRemainingMs?: number | null;
   currentUrl?: string | null;
+  tickScheduleError?: string | null;
+  scanStage?: string | null;
 };
 
 export function AnalysisProgress({
@@ -339,6 +341,12 @@ export function AnalysisProgress({
                 ) : null}
                 {data?.currentUrl ? (
                   <p className="truncate text-fg-subtle">{data.currentUrl}</p>
+                ) : null}
+                {data?.tickScheduleError ? (
+                  <p className="text-gap" role="alert">
+                    Crawl continuation issue: {data.tickScheduleError} Ask your
+                    admin to set APP_URL and CRON_SECRET, then retry the scan.
+                  </p>
                 ) : null}
               </div>
             </div>

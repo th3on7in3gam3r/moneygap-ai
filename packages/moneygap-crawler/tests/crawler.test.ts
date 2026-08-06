@@ -5,7 +5,12 @@ import { classifyPageType, prioritizeUrls } from "../src/discovery/prioritize.js
 import { detectFramework } from "../src/framework-detectors/index.js";
 import { extractPageRecord } from "../src/extractors/html.js";
 import { backoffMs, InMemoryCrawlQueue, isTransientError } from "../src/queue/memory.js";
-import { parseSitemapXml } from "../src/sitemaps/index.js";
+import {
+  buildSitemapSeeds,
+  clampCrawlDelayMs,
+  parseSitemapXml,
+  SITEMAP_DISCOVER_BUDGET_MS,
+} from "../src/sitemaps/index.js";
 import type { PageRecord } from "../src/types/index.js";
 
 describe("normalize", () => {
@@ -57,6 +62,26 @@ describe("sitemap parse", () => {
       </sitemapindex>`;
     const b = parseSitemapXml(index, "https://acme.com/sitemap_index.xml");
     expect(b.childSitemaps[0]).toContain("sitemap-pages.xml");
+  });
+
+  it("soft-fails invalid XML", () => {
+    const bad = parseSitemapXml("<not-xml", "https://acme.com/sitemap.xml");
+    expect(bad.urls).toEqual([]);
+    expect(bad.childSitemaps).toEqual([]);
+  });
+
+  it("builds common WordPress-style seeds and clamps crawl-delay", () => {
+    const seeds = buildSitemapSeeds("https://blog.example.com", [
+      "https://blog.example.com/custom-sitemap.xml",
+    ]);
+    expect(seeds[0]).toContain("custom-sitemap.xml");
+    expect(seeds.some((s) => s.endsWith("/post-sitemap.xml"))).toBe(true);
+    expect(seeds.some((s) => s.endsWith("/page-sitemap.xml"))).toBe(true);
+    expect(seeds.some((s) => s.endsWith("/sitemap.xml.gz"))).toBe(true);
+    expect(SITEMAP_DISCOVER_BUDGET_MS).toBe(25_000);
+    expect(clampCrawlDelayMs(60_000)).toBe(2_000);
+    expect(clampCrawlDelayMs(500)).toBe(500);
+    expect(clampCrawlDelayMs(-1)).toBe(0);
   });
 });
 

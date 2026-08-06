@@ -11,7 +11,7 @@ import {
   websitePages,
   websites,
 } from "@/db/schema";
-import { buildCrawlCorpus, crawlWebsite, type ScrapedPage } from "@/lib/analysis/firecrawl";
+import { buildCrawlCorpus, type ScrapedPage } from "@/lib/analysis/firecrawl";
 import type { IntelligenceResult } from "@/lib/analysis/openai";
 import { generateWebsiteIntelligence } from "@/lib/analysis/openai";
 import { persistMoneyGapEngineResult } from "@/lib/analysis/persist-money-gaps";
@@ -24,7 +24,7 @@ import {
 } from "@/lib/analysis/stages";
 import { log } from "@/lib/observability/logger";
 import { trackProductMetric } from "@/lib/observability/metrics";
-import { getScanProfile, isScanProfile } from "@/lib/scan/profiles";
+import { isScanProfile } from "@/lib/scan/profiles";
 import type { ScanProfile } from "@/lib/scan/types";
 import { MONEYGAP_ENGINE_VERSION, TRUST_ENGINE_VERSION } from "@/lib/trust";
 
@@ -170,14 +170,12 @@ export async function failStalePreReportAnalysis(analysisId: string) {
   const clock = analysis.startedAt ?? analysis.createdAt;
   const ageMs = Date.now() - clock.getTime();
 
-  // Incremental profiles can run well past a single serverless window.
+  // All product profiles use incremental ticks and can outlive one serverless window.
   const incremental =
-    analysis.scanProfile != null &&
-    analysis.scanProfile !== "quick" &&
-    (analysis.scanPhase === "discovering" ||
-      analysis.scanPhase === "processing" ||
-      analysis.scanPhase === "waiting" ||
-      analysis.scanPhase === "analyzing");
+    analysis.scanPhase === "discovering" ||
+    analysis.scanPhase === "processing" ||
+    analysis.scanPhase === "waiting" ||
+    analysis.scanPhase === "analyzing";
   const budgetMs = incremental
     ? Math.max(
         PRE_REPORT_STALE_MS,
@@ -707,81 +705,19 @@ export async function runAnalysisPipeline(analysisId: string) {
     const profileId: ScanProfile = isScanProfile(analysis.scanProfile)
       ? analysis.scanProfile
       : "standard";
-    const profile = getScanProfile(profileId);
 
-    // Incremental profiles: discover + serverless ticks; post-crawl runs from tick.
-    if (profileId !== "quick") {
-      await db
-        .update(websiteAnalyses)
-        .set({
-          scanProfile: profileId,
-          scanPhase: "discovering",
-          status: "running",
-        })
-        .where(eq(websiteAnalyses.id, analysisId));
-      const { runIncrementalDiscover } = await import("@/lib/scan/batch");
-      await runIncrementalDiscover(analysisId);
-      return;
-    }
-
-    await setStage(analysisId, "reading");
-    await db
-      .update(websiteAnalyses)
-      .set({ scanProfile: "quick", scanPhase: "processing" })
-      .where(eq(websiteAnalyses.id, analysisId));
-
-    const pages = await crawlWebsite(analysis.url, {
-      mode: profile.crawlerMode,
-      maxPages: profile.maxPages,
-      onProgress: async (event) => {
-        const label =
-          event.pagesProcessed > 0
-            ? `Reading pages (${event.pagesProcessed} processed, ${event.pagesRemaining} remaining)`
-            : `Reading pages (${event.phase})`;
-        const progress = Math.min(
-          30,
-          18 +
-            Math.round(
-              (event.pagesProcessed /
-                Math.max(1, Math.max(event.pagesDiscovered, event.pagesProcessed))) *
-                12,
-            ),
-        );
-        await updateAnalysisStageLabel(analysisId, label, progress);
-      },
-    });
-
-    const afterCrawl = await db.query.websiteAnalyses.findFirst({
-      where: eq(websiteAnalyses.id, analysisId),
-      columns: { status: true },
-    });
-    if (afterCrawl?.status === "failed") {
-      log("info", "analysis_aborted_after_crawl", { analysisId });
-      return;
-    }
-
-    await db.delete(websitePages).where(eq(websitePages.analysisId, analysisId));
-    await db.insert(websitePages).values(
-      pages.map((page) => ({
-        analysisId,
-        url: page.url,
-        pageType: page.pageType,
-        title: page.title,
-        markdown: page.markdown,
-        metadata: page.metadata,
-      })),
-    );
-
+    // All profiles use durable incremental discover + ticks (never one-shot crawl).
     await db
       .update(websiteAnalyses)
       .set({
-        scanPhase: "analyzing",
-        pagesDiscovered: pages.length,
-        pagesCompleted: pages.length,
+        scanProfile: profileId,
+        scanPhase: "discovering",
+        status: "running",
       })
       .where(eq(websiteAnalyses.id, analysisId));
-
-    await finishPipelineWithPages(analysisId, analysis, pages, startedAtMs);
+    const { runIncrementalDiscover } = await import("@/lib/scan/batch");
+    await runIncrementalDiscover(analysisId);
+    return;
   } catch (err) {
     log("error", "analysis_failed", {
       analysisId,
