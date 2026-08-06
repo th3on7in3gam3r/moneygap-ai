@@ -5,6 +5,7 @@ import type { OpportunityFix } from "@/db/schema";
 import { OpportunityActionCenter } from "@/components/action-center/opportunity-action-center";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import type { FixPathId } from "@/lib/fix-paths";
 import {
   goldenCategoryLabel,
   moduleToGoldenCategory,
@@ -194,6 +195,7 @@ export function OpportunityCard({
 }) {
   const [copiedTitle, setCopiedTitle] = useState(false);
   const [open, setOpen] = useState(defaultOpen);
+  const [fixPathRequest, setFixPathRequest] = useState<FixPathId | null>(null);
   const index = opportunity.opportunityIndex ?? opportunity.priorityScore;
   const detection = opportunity.detectionStatus?.replace("_", " ") ?? null;
   const impl = opportunity.implementationStatus;
@@ -202,9 +204,6 @@ export function OpportunityCard({
     moduleToGoldenCategory(opportunity.moduleId),
   );
   const recipeId = `recipe-${opportunity.id}`;
-  const ideHref = `/dashboard/ide-prompt?opportunity=${encodeURIComponent(opportunity.id)}${
-    reportId ? `&reportId=${encodeURIComponent(reportId)}` : ""
-  }`;
   const implementHref = canImplement
     ? reportId
       ? `/dashboard/developer-mode?reportId=${encodeURIComponent(reportId)}`
@@ -213,6 +212,11 @@ export function OpportunityCard({
   const implementLabel = canImplement
     ? "Open Developer Mode"
     : "Upgrade to Implement";
+
+  function openIdePromptDrawer() {
+    setOpen(true);
+    setFixPathRequest("developer_ai");
+  }
   const impactStars =
     opportunity.expectedRoi != null
       ? Math.max(1, Math.min(5, Math.round(opportunity.expectedRoi)))
@@ -351,9 +355,24 @@ export function OpportunityCard({
           >
             View Growth Recipe
           </Button>
-          <Button href={ideHref} size="sm" variant="secondary">
-            Generate Fix Prompt
-          </Button>
+          {reportId ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={openIdePromptDrawer}
+            >
+              Generate Fix Prompt
+            </Button>
+          ) : (
+            <Button
+              href={`/dashboard/ide-prompt?opportunityId=${encodeURIComponent(opportunity.id)}`}
+              size="sm"
+              variant="secondary"
+            >
+              Generate Fix Prompt
+            </Button>
+          )}
           <Button href={implementHref} size="sm">
             {implementLabel}
           </Button>
@@ -366,6 +385,8 @@ export function OpportunityCard({
             reportId={reportId}
             opportunity={opportunity}
             onAskAdvisor={onAskAdvisor}
+            openFixPathRequest={fixPathRequest}
+            onOpenFixPathRequestHandled={() => setFixPathRequest(null)}
           />
         )}
 
@@ -583,9 +604,18 @@ export function OpportunityCard({
             this Money Gap™.
           </p>
           <div className="mt-3">
-            <Button href={ideHref} size="sm">
-              Open IDE Prompt
-            </Button>
+            {reportId ? (
+              <Button type="button" size="sm" onClick={openIdePromptDrawer}>
+                Open IDE Prompt
+              </Button>
+            ) : (
+              <Button
+                href={`/dashboard/ide-prompt?opportunityId=${encodeURIComponent(opportunity.id)}`}
+                size="sm"
+              >
+                Open IDE Prompt
+              </Button>
+            )}
           </div>
         </section>
 

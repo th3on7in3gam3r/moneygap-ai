@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AssetSection } from "@/db/schema";
 import {
   ActionCenterBar,
   AssetDrawer,
+  AutomationFixDrawer,
   ChecklistDrawer,
+  IdePromptDrawer,
+  IntegrationsFixDrawer,
 } from "@/components/action-center/drawers";
 import { checklistForPlaybook } from "@/lib/advisor/checklists";
 import {
@@ -20,7 +23,6 @@ import {
   type UpgradePayload,
 } from "@/components/billing/upgrade-prompt";
 import { recommendFixPaths, type FixPathId } from "@/lib/fix-paths";
-import { useRouter } from "next/navigation";
 import { OpportunityCollabPanel } from "@/components/team/opportunity-collab-panel";
 
 export function OpportunityActionCenter({
@@ -28,6 +30,8 @@ export function OpportunityActionCenter({
   opportunity,
   onAskAdvisor,
   onStatusChange,
+  openFixPathRequest = null,
+  onOpenFixPathRequestHandled,
 }: {
   reportId: string;
   opportunity: {
@@ -41,8 +45,10 @@ export function OpportunityActionCenter({
   };
   onAskAdvisor?: (opportunityId: string) => void;
   onStatusChange?: (status: string, followUp?: string | null) => void;
+  /** Parent (e.g. card CTA) can request opening a How to fix overlay. */
+  openFixPathRequest?: FixPathId | null;
+  onOpenFixPathRequestHandled?: () => void;
 }) {
-  const router = useRouter();
   const playbook = useMemo(
     () =>
       resolvePlaybook({
@@ -82,6 +88,47 @@ export function OpportunityActionCenter({
 
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
+
+  const [ideOpen, setIdeOpen] = useState(false);
+  const [automationOpen, setAutomationOpen] = useState(false);
+  const [integrationsOpen, setIntegrationsOpen] = useState(false);
+
+  function onFixPath(pathId: FixPathId) {
+    const def = fixPaths.paths.find((p) => p.id === pathId);
+    if (!def) return;
+
+    if (pathId === "developer_ai") {
+      setIdeOpen(true);
+      return;
+    }
+    if (pathId === "automation") {
+      setAutomationOpen(true);
+      return;
+    }
+    if (pathId === "integrations") {
+      setIntegrationsOpen(true);
+      return;
+    }
+
+    if (pathId === "action_assets") {
+      void onAction("build");
+      return;
+    }
+    if (pathId === "checklist") {
+      void onAction("checklist");
+      return;
+    }
+    if (pathId === "advisor") {
+      void onAction("ask_advisor");
+    }
+  }
+
+  useEffect(() => {
+    if (!openFixPathRequest) return;
+    onFixPath(openFixPathRequest);
+    onOpenFixPathRequestHandled?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional one-shot request from parent
+  }, [openFixPathRequest]);
 
   async function patchStatus(implementationStatus: string) {
     setBusy(true);
@@ -264,28 +311,6 @@ export function OpportunityActionCenter({
     }
   }
 
-  function onFixPath(pathId: FixPathId) {
-    const def = fixPaths.paths.find((p) => p.id === pathId);
-    if (!def) return;
-
-    if (def.kind === "navigate" && def.href) {
-      router.push(def.href({ opportunityId: opportunity.id, reportId }));
-      return;
-    }
-
-    if (pathId === "action_assets") {
-      void onAction("build");
-      return;
-    }
-    if (pathId === "checklist") {
-      void onAction("checklist");
-      return;
-    }
-    if (pathId === "advisor") {
-      void onAction("ask_advisor");
-    }
-  }
-
   return (
     <>
       <div className="space-y-2">
@@ -338,16 +363,17 @@ export function OpportunityActionCenter({
         status={status}
       />
       <p className="text-xs text-fg-subtle">
-        Prefer shortcuts? Use Action Center buttons above, or open{" "}
-        <Link
-          href={`/dashboard/ide-prompt?opportunityId=${encodeURIComponent(opportunity.id)}&reportId=${encodeURIComponent(reportId)}`}
+        Prefer shortcuts? Use Action Center buttons above, or{" "}
+        <button
+          type="button"
           className="text-accent underline-offset-2 hover:underline"
+          onClick={() => setIdeOpen(true)}
         >
-          IDE Prompt
-        </Link>
+          open IDE Prompt
+        </button>
         {" / "}
         <Link
-          href={`/dashboard/developer-mode?opportunityId=${opportunity.id}`}
+          href={`/dashboard/developer-mode?opportunityId=${encodeURIComponent(opportunity.id)}`}
           className="text-accent underline-offset-2 hover:underline"
         >
           Developer Mode
@@ -381,6 +407,26 @@ export function OpportunityActionCenter({
         onClose={() => setChecklistOpen(false)}
         onCreateProject={createProject}
         creating={creatingProject}
+      />
+
+      <IdePromptDrawer
+        open={ideOpen}
+        opportunityId={opportunity.id}
+        reportId={reportId}
+        onClose={() => setIdeOpen(false)}
+      />
+
+      <AutomationFixDrawer
+        open={automationOpen}
+        opportunityId={opportunity.id}
+        opportunityTitle={opportunity.title}
+        onClose={() => setAutomationOpen(false)}
+      />
+
+      <IntegrationsFixDrawer
+        open={integrationsOpen}
+        opportunityTitle={opportunity.title}
+        onClose={() => setIntegrationsOpen(false)}
       />
     </>
   );

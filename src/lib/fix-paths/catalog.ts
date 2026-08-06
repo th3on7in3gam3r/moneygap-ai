@@ -10,9 +10,9 @@ export type FixPathDef = {
   id: FixPathId;
   title: string;
   description: string;
-  /** If set, navigate externally; otherwise handled in Action Center */
+  /** Shareable deep link; Action Center opens overlays instead of navigating. */
   href?: (ctx: { opportunityId: string; reportId: string }) => string;
-  kind: "local" | "navigate";
+  kind: "local" | "navigate" | "overlay";
 };
 
 export const FIX_PATH_CATALOG: FixPathDef[] = [
@@ -32,7 +32,7 @@ export const FIX_PATH_CATALOG: FixPathDef[] = [
     id: "developer_ai",
     title: "Code + AI (Cursor / Claude / …)",
     description: "Copy IDE prompts for Cursor, Claude, and more—then implement in your editor.",
-    kind: "navigate",
+    kind: "overlay",
     href: ({ opportunityId, reportId }) =>
       `/dashboard/ide-prompt?opportunityId=${encodeURIComponent(opportunityId)}&reportId=${encodeURIComponent(reportId)}`,
   },
@@ -40,7 +40,7 @@ export const FIX_PATH_CATALOG: FixPathDef[] = [
     id: "automation",
     title: "Automation workflow",
     description: "Generate a draft workflow in Automation Studio™ (never auto-publishes).",
-    kind: "navigate",
+    kind: "overlay",
     href: ({ opportunityId }) =>
       `/dashboard/automation?opportunityId=${encodeURIComponent(opportunityId)}`,
   },
@@ -48,7 +48,7 @@ export const FIX_PATH_CATALOG: FixPathDef[] = [
     id: "integrations",
     title: "Connect tools (Hub)",
     description: "Connect CRM, email, or automation vendors in Integration Hub™.",
-    kind: "navigate",
+    kind: "overlay",
     href: () => "/dashboard/integrations",
   },
   {

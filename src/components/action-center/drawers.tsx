@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { AssetSection } from "@/db/schema";
+import { IdePromptPanel } from "@/components/developer/ide-prompt-panel";
 import { Button } from "@/components/ui/button";
 import {
   UpgradePrompt,
@@ -161,6 +162,241 @@ export function ChecklistDrawer({
           </Button>
           <Button type="button" size="sm" variant="secondary" onClick={onClose}>
             Close
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function IdePromptDrawer({
+  open,
+  opportunityId,
+  reportId,
+  onClose,
+}: {
+  open: boolean;
+  opportunityId: string;
+  reportId: string;
+  onClose: () => void;
+}) {
+  if (!open) return null;
+
+  const fullHref = `/dashboard/ide-prompt?opportunityId=${encodeURIComponent(opportunityId)}&reportId=${encodeURIComponent(reportId)}`;
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ide-prompt-drawer-title"
+        className="flex h-full w-full max-w-2xl flex-col border-l border-border bg-bg-elevated shadow-2xl"
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-accent">
+              How to fix · Code + AI
+            </p>
+            <h3
+              id="ide-prompt-drawer-title"
+              className="mt-1 font-display text-lg font-semibold text-fg"
+            >
+              IDE Prompt
+            </h3>
+            <p className="mt-1 text-xs text-fg-subtle">
+              Copy into Cursor / Claude — review before applying. Never auto-publishes.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg px-2 py-1 text-sm text-fg-muted hover:bg-bg-muted"
+          >
+            Close
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          <IdePromptPanel
+            opportunityId={opportunityId}
+            reportId={reportId}
+            compact
+            showEmptyHint={false}
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2 border-t border-border px-5 py-4">
+          <Button type="button" size="sm" variant="secondary" onClick={onClose}>
+            Done
+          </Button>
+          <Button href={fullHref} size="sm" variant="ghost">
+            Open full page
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function AutomationFixDrawer({
+  open,
+  opportunityId,
+  opportunityTitle,
+  onClose,
+}: {
+  open: boolean;
+  opportunityId: string;
+  opportunityTitle: string;
+  onClose: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  if (!open) return null;
+
+  const studioHref = `/dashboard/automation?opportunityId=${encodeURIComponent(opportunityId)}`;
+
+  async function generateDraft() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/automation/workflows", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opportunityId }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setMessage(body.error ?? "Could not create draft workflow.");
+        return;
+      }
+      setMessage(
+        "Draft workflow created — open Automation Studio to review. Never auto-publishes.",
+      );
+    } catch {
+      setMessage("Could not create draft workflow.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="automation-fix-drawer-title"
+        className="flex h-full w-full max-w-md flex-col border-l border-border bg-bg-elevated shadow-2xl"
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-accent">
+              How to fix · Automation
+            </p>
+            <h3
+              id="automation-fix-drawer-title"
+              className="mt-1 font-display text-lg font-semibold text-fg"
+            >
+              Draft workflow
+            </h3>
+            <p className="mt-1 text-xs text-fg-subtle">
+              Creates an Action Project draft only — never auto-publishes.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg px-2 py-1 text-sm text-fg-muted hover:bg-bg-muted"
+          >
+            Close
+          </button>
+        </div>
+        <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+          <p className="text-sm font-medium text-fg">{opportunityTitle}</p>
+          <p className="text-sm leading-relaxed text-fg-muted">
+            Generate a draft automation workflow scoped to this MoneyGap, then
+            review it in Automation Studio™ before anything runs.
+          </p>
+          {message && (
+            <p className="rounded-xl border border-border bg-bg px-3 py-2 text-xs text-fg-muted">
+              {message}
+            </p>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2 border-t border-border px-5 py-4">
+          <Button
+            type="button"
+            size="sm"
+            disabled={busy}
+            onClick={() => void generateDraft()}
+          >
+            {busy ? "Generating…" : "Generate draft workflow"}
+          </Button>
+          <Button href={studioHref} size="sm" variant="secondary">
+            Open Automation Studio
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={onClose}>
+            Done
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function IntegrationsFixDrawer({
+  open,
+  opportunityTitle,
+  onClose,
+}: {
+  open: boolean;
+  opportunityTitle: string;
+  onClose: () => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="integrations-fix-drawer-title"
+        className="flex h-full w-full max-w-md flex-col border-l border-border bg-bg-elevated shadow-2xl"
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-accent">
+              How to fix · Integrations
+            </p>
+            <h3
+              id="integrations-fix-drawer-title"
+              className="mt-1 font-display text-lg font-semibold text-fg"
+            >
+              Connect tools
+            </h3>
+            <p className="mt-1 text-xs text-fg-subtle">
+              OAuth and credentials stay in Integration Hub™ for security.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg px-2 py-1 text-sm text-fg-muted hover:bg-bg-muted"
+          >
+            Close
+          </button>
+        </div>
+        <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+          <p className="text-sm font-medium text-fg">{opportunityTitle}</p>
+          <p className="text-sm leading-relaxed text-fg-muted">
+            Connect CRM, email, analytics, or GitHub so Fix Paths and drafts can
+            use live data. Nothing publishes automatically from the Hub.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 border-t border-border px-5 py-4">
+          <Button href="/dashboard/integrations" size="sm">
+            Open Integration Hub
+          </Button>
+          <Button type="button" size="sm" variant="secondary" onClick={onClose}>
+            Stay on report
           </Button>
         </div>
       </div>
