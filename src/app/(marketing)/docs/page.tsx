@@ -11,7 +11,6 @@ import {
 import {
   breadcrumbJsonLd,
   buildPageMetadata,
-  faqPageJsonLd,
   jsonLdScript,
 } from "@/lib/seo";
 
@@ -83,7 +82,6 @@ export default function DocsMarketingPage() {
               { name: "Home", path: "/" },
               { name: "Docs", path: "/docs" },
             ]),
-            faqPageJsonLd(DOCS_FAQ),
           ]),
         }}
       />

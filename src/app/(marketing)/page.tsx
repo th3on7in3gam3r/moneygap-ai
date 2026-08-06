@@ -26,6 +26,11 @@ export const metadata: Metadata = {
 
 const HOME_FAQ = [
   {
+    question: "What is MoneyGap AI?",
+    answer:
+      "MoneyGap AI is a developer-friendly conversion tool and codebase growth audit. It surfaces Money Gaps™ — visibility, conversion, trust, and AI discovery misses that leave revenue on the table — then ships Fix Paths™ you can implement with human review.",
+  },
+  {
     question: "What is a Money Gap™?",
     answer:
       "A Money Gap™ is a concrete miss on your site — visibility, conversion, trust, content, or AI discovery — that leaves revenue on the table. MoneyGap AI surfaces them with an AI Estimate of impact and a Fix Path™ you can implement with human review.",
