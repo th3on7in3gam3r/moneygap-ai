@@ -213,7 +213,13 @@ export function OnboardingWizard() {
     const data = (await res.json()) as { onboarding?: WorkspaceOnboarding };
     if (data.onboarding) {
       setOnboarding(data.onboarding);
-      setStep(data.onboarding.currentStep);
+      // Caller owns UI step for set_step (avoids race with ?step= deep-links).
+      if (action !== "set_step" && data.onboarding.currentStep) {
+        setStep(data.onboarding.currentStep);
+      }
+      if (data.onboarding.primaryWebsiteUrl) {
+        setUrl(data.onboarding.primaryWebsiteUrl);
+      }
     }
     return data;
   }
@@ -407,9 +413,14 @@ export function OnboardingWizard() {
   }
 
   async function runScanEstimate() {
-    const target = url || onboarding?.primaryWebsiteUrl;
+    const target = url.trim() || onboarding?.primaryWebsiteUrl;
     if (!target) {
-      setToast(makeFlashToast("Add a website URL first.", "error"));
+      setToast(
+        makeFlashToast(
+          "Enter your website URL in the field above the scan profiles.",
+          "error",
+        ),
+      );
       return;
     }
     setEstimating(true);
@@ -446,6 +457,16 @@ export function OnboardingWizard() {
   }
 
   async function startScan() {
+    const target = url.trim() || onboarding?.primaryWebsiteUrl;
+    if (!target) {
+      setToast(
+        makeFlashToast(
+          "Enter your website URL in the field above the scan profiles.",
+          "error",
+        ),
+      );
+      return;
+    }
     setBusy(true);
     setToast(makeFlashToast("Checking that the website is reachable…", "info"));
     try {
@@ -453,7 +474,7 @@ export function OnboardingWizard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          url: url || onboarding?.primaryWebsiteUrl,
+          url: target,
           scanProfile,
         }),
       });
@@ -822,7 +843,40 @@ export function OnboardingWizard() {
             </ul>
 
             <div className="space-y-3 rounded-xl border border-border bg-bg-muted/40 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+                  Website to scan
+                </p>
+                <p className="mt-1 text-xs text-fg-muted">
+                  Paste the public URL here (same field as the earlier website
+                  step). Required before Estimate or Start AI scan.
+                </p>
+                <label className="mt-3 grid gap-1.5 text-xs font-medium text-fg-muted">
+                  Website URL
+                  <input
+                    className="rounded-xl border border-border bg-bg px-3 py-2.5 text-sm text-fg"
+                    placeholder="https://example.com"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    autoComplete="url"
+                  />
+                </label>
+                {!url.trim() && !onboarding?.primaryWebsiteUrl ? (
+                  <p className="mt-2 text-xs text-gap">
+                    No URL saved yet — enter one above, or{" "}
+                    <button
+                      type="button"
+                      className="font-medium text-accent underline-offset-2 hover:underline"
+                      onClick={() => void go("website")}
+                    >
+                      go back to the website step
+                    </button>
+                    .
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
                     Scan profile
