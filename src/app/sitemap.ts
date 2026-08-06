@@ -15,6 +15,12 @@ import { db } from "@/db";
 import { gaTags } from "@/db/schema";
 import { absoluteUrl } from "@/lib/seo";
 
+/**
+ * Dynamic /sitemap.xml for moneygap-ai.com (Next.js MetadataRoute).
+ * robots.ts already points crawlers here. Submitting the sitemap URL in
+ * Google Search Console / Bing Webmaster is a human dashboard step — never
+ * auto-publish.
+ */
 const STATIC_PATHS: {
   path: string;
   changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"];
@@ -43,14 +49,18 @@ const STATIC_PATHS: {
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const generatedAt = new Date();
+
   const staticRoutes: MetadataRoute.Sitemap = STATIC_PATHS.map((r) => ({
     url: absoluteUrl(r.path),
+    lastModified: generatedAt,
     changeFrequency: r.changeFrequency,
     priority: r.priority,
   }));
 
   const docRoutes: MetadataRoute.Sitemap = listPublicDocs().map((d) => ({
     url: absoluteUrl(`/docs/${d.slug}`),
+    lastModified: generatedAt,
     changeFrequency: "monthly" as const,
     priority: 0.55,
   }));
@@ -59,11 +69,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const withGuides = frameworksWithPublished(publishedGuides);
   const guideFrameworkRoutes: MetadataRoute.Sitemap = withGuides.map((f) => ({
     url: absoluteUrl(`/guides/${f.slug}`),
+    lastModified: generatedAt,
     changeFrequency: "weekly" as const,
     priority: 0.7,
   }));
   const guideTopicRoutes: MetadataRoute.Sitemap = publishedGuides.map((g) => ({
     url: absoluteUrl(`/guides/${g.frameworkId}/${g.topicId}`),
+    lastModified: generatedAt,
     changeFrequency: "weekly" as const,
     priority: 0.65,
   }));
@@ -71,6 +83,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const curatedLabRoutes: MetadataRoute.Sitemap = CURATED_LAB_ARTICLES.map(
     (a) => ({
       url: absoluteUrl(`/labs/compare/${a.slug}`),
+      lastModified: generatedAt,
       changeFrequency: "monthly" as const,
       priority: 0.6,
     }),
@@ -86,6 +99,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.55,
     }));
   } catch {
+    // Soft-fail: keep sitemap useful without public audits.
     auditRoutes = [];
   }
 
@@ -99,25 +113,28 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     const articleRoutes = articles.map((a) => ({
       url: absoluteUrl(`/academy/${a.slug}`),
-      lastModified: a.updatedAt ?? a.publishedAt ?? undefined,
+      lastModified: a.updatedAt ?? a.publishedAt ?? generatedAt,
       changeFrequency: "weekly" as const,
       priority: 0.7,
     }));
 
     const categoryRoutes = categories.map((c) => ({
       url: absoluteUrl(`/academy/c/${c.slug}`),
+      lastModified: generatedAt,
       changeFrequency: "weekly" as const,
       priority: 0.65,
     }));
 
     const authorRoutes = authors.map((a) => ({
       url: absoluteUrl(`/academy/author/${a.slug}`),
+      lastModified: generatedAt,
       changeFrequency: "monthly" as const,
       priority: 0.5,
     }));
 
     const tagRoutes = tags.map((t) => ({
       url: absoluteUrl(`/academy/tag/${t.slug}`),
+      lastModified: generatedAt,
       changeFrequency: "weekly" as const,
       priority: 0.45,
     }));
@@ -135,6 +152,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ...articleRoutes,
     ];
   } catch {
+    // Soft-fail academy DB: still return marketing + guides + docs URLs.
     return [
       ...staticRoutes,
       ...docRoutes,
