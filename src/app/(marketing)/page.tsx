@@ -84,12 +84,13 @@ export default function HomePage() {
               MoneyGap<span className="text-accent"> AI</span>
             </p>
             <h1 className="animate-rise-delay-1 mt-5 max-w-xl text-2xl font-medium leading-snug tracking-tight text-fg sm:text-3xl">
-              Find the Money Your Website Is Leaving Behind.
+              Find website revenue leaks growth teams miss — then close them
+              with Fix Paths™.
             </h1>
             <p className="animate-rise-delay-2 mt-5 max-w-lg text-base leading-relaxed text-fg-muted sm:text-lg">
-              MoneyGap AI analyzes your website and discovers hidden revenue,
-              conversion, trust, content, AI visibility, and technical
-              opportunities.
+              MoneyGap AI is the developer-friendly conversion tool and codebase
+              growth audit that ranks Money Gaps™ by impact and ships Fix
+              Paths™ — not another static audit PDF.
             </p>
             <div className="animate-rise-delay-3 mt-8 flex flex-wrap items-center gap-3">
               <StartFreeButton
