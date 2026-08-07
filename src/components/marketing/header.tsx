@@ -212,7 +212,7 @@ export function MarketingFooter() {
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-5 py-4 text-xs text-fg-subtle sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
             <span>© {new Date().getFullYear()} MoneyGap AI</span>
-            <FooterGrowthBadge href="/dashboard/badge" />
+            <FooterGrowthBadge />
           </div>
           <span>AI Business Growth OS</span>
         </div>
