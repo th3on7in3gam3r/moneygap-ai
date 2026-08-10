@@ -18,7 +18,12 @@ export function log(
 
 export async function withRetry<T>(
   fn: () => Promise<T>,
-  opts: { attempts?: number; baseMs?: number; label?: string } = {},
+  opts: {
+    attempts?: number;
+    baseMs?: number;
+    label?: string;
+    shouldRetry?: (err: unknown) => boolean;
+  } = {},
 ): Promise<T> {
   const attempts = opts.attempts ?? 3;
   const baseMs = opts.baseMs ?? 400;
@@ -28,15 +33,16 @@ export async function withRetry<T>(
       return await fn();
     } catch (err) {
       lastErr = err;
+      const retryable = opts.shouldRetry ? opts.shouldRetry(err) : true;
       log("warn", "retry", {
         label: opts.label ?? "op",
         attempt: i + 1,
         attempts,
+        retryable,
         error: err instanceof Error ? err.message : String(err),
       });
-      if (i < attempts - 1) {
-        await new Promise((r) => setTimeout(r, baseMs * Math.pow(2, i)));
-      }
+      if (!retryable || i >= attempts - 1) break;
+      await new Promise((r) => setTimeout(r, baseMs * Math.pow(2, i)));
     }
   }
   throw lastErr;

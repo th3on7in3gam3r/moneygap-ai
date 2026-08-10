@@ -87,6 +87,8 @@ export type EngineContext = {
   corpus: string;
   /** Compact Knowledge Graph guidance for module prompts (optional). */
   kgContext?: string;
+  /** Envelope deadline / cancel signal for in-flight module LLM calls. */
+  signal?: AbortSignal;
 };
 
 export type ModuleDefinition = {

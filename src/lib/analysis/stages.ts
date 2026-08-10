@@ -46,7 +46,7 @@ export const ANALYSIS_STAGES = [
   },
   {
     id: "action_plans",
-    label: "Building Fix Roadmap & prompts…",
+    label: "Building Fix Roadmap…",
     progress: 88,
   },
   {

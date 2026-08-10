@@ -27,6 +27,7 @@ import { generateWebsiteIntelligence } from "@/lib/analysis/openai";
 import { persistMoneyGapEngineResult } from "@/lib/analysis/persist-money-gaps";
 import { persistCompetitiveIntelligence } from "@/lib/analysis/competitive/persist";
 import { claimPostCrawlAnalysis } from "@/lib/analysis/post-crawl-guard";
+import { isMoneyGapClaimFresh } from "@/lib/analysis/roadmap-errors";
 import {
   ANALYSIS_STAGES,
   MISSING_KEYS_ERROR,
@@ -410,8 +411,8 @@ export async function runMoneyGapEngineOnly(analysisId: string) {
     scoreBreakdown: analysis.report.scoreBreakdown ?? null,
   });
 
-  // Stay on Growth Roadmap when resuming — do not rewind UI to earlier stages.
-  await setStage(analysisId, "action_plans");
+  // Stay on category scoring when resuming — persistMoneyGapEngineResult owns stage labels.
+  await setStage(analysisId, "detecting_gaps");
 
   const result = await persistMoneyGapEngineResult({
     analysisId,
@@ -460,6 +461,7 @@ export async function resumeStuckAnalysis(analysisId: string) {
       startedAt: true,
       createdAt: true,
       websiteId: true,
+      scanMeta: true,
     },
   });
 
@@ -508,6 +510,29 @@ export async function resumeStuckAnalysis(analysisId: string) {
     return { ok: true as const, reason: "already_engines_done" as const };
   }
 
+  // Do not stack a second Money Gap engine while a claimed run is still progressing.
+  if (!moneyGapDone) {
+    const meta = (analysis.scanMeta as Record<string, unknown>) ?? {};
+    const claimedAt =
+      typeof meta.moneyGapClaimedAt === "number" ? meta.moneyGapClaimedAt : null;
+    const lastProgressAt =
+      typeof meta.moneyGapLastProgressAt === "number"
+        ? meta.moneyGapLastProgressAt
+        : typeof meta.lastProgressAt === "number"
+          ? meta.lastProgressAt
+          : null;
+    if (isMoneyGapClaimFresh({ claimedAt, lastProgressAt })) {
+      log("info", "analysis_resume_engine_in_flight", {
+        analysisId,
+        claimedAt,
+        lastProgressAt,
+        ageMs:
+          lastProgressAt != null ? Date.now() - lastProgressAt : null,
+      });
+      return { ok: false as const, reason: "engine_in_flight" as const };
+    }
+  }
+
   log("info", "analysis_resume_stuck", {
     analysisId,
     status: analysis.status,
@@ -523,8 +548,8 @@ export async function resumeStuckAnalysis(analysisId: string) {
         .update(websiteAnalyses)
         .set({
           status: "running",
-          stage: "Building Growth Roadmap & scoring…",
-          progress: 88,
+          stage: "Scoring MoneyGap Categories™…",
+          progress: 76,
           startedAt: new Date(),
           error: null,
         })
@@ -1177,8 +1202,6 @@ async function finishPipelineWithPages(
       .where(eq(websiteAnalyses.id, analysisId));
 
     await setStage(analysisId, "detecting_gaps");
-    await setStage(analysisId, "quantifying");
-    await setStage(analysisId, "action_plans");
 
     let partial = false;
     const moneyGap = await persistMoneyGapEngineResult({
@@ -1195,9 +1218,11 @@ async function finishPipelineWithPages(
         analysisId,
         reportId: report.id,
         error: moneyGap.error,
-        errorClass: "AI_PROVIDER_ERROR",
+        errorClass: "ROADMAP_PERSIST_ERROR",
         severity: "WARNING",
       });
+    } else if (moneyGap.partial) {
+      partial = true;
     }
 
     await setStage(analysisId, "discovering_competitors");

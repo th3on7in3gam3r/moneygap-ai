@@ -9,8 +9,10 @@ import type {
   ModuleId,
   MoneyGapFinding,
 } from "@/lib/analysis/engine/types";
+import { estimateTokenCount } from "@/lib/analysis/corpus";
+import { MODULE_CORPUS_MAX_CHARS } from "@/lib/analysis/roadmap-errors";
 import { MONEY_GAP_ENGINE_ERROR } from "@/lib/analysis/stages";
-import { withRetry } from "@/lib/observability/logger";
+import { log, withRetry } from "@/lib/observability/logger";
 
 function extractOutputText(response: OpenAI.Responses.Response): string {
   if (typeof response.output_text === "string" && response.output_text.trim()) {
@@ -61,6 +63,30 @@ function normalizeFinding(
   };
 }
 
+function mergeAbortSignals(
+  ...signals: Array<AbortSignal | undefined>
+): AbortSignal {
+  const active = signals.filter((s): s is AbortSignal => Boolean(s));
+  if (active.length === 0) return AbortSignal.timeout(90_000);
+  if (active.length === 1) return active[0]!;
+  if (typeof AbortSignal.any === "function") {
+    return AbortSignal.any(active);
+  }
+  const controller = new AbortController();
+  for (const signal of active) {
+    if (signal.aborted) {
+      controller.abort(signal.reason);
+      break;
+    }
+    signal.addEventListener(
+      "abort",
+      () => controller.abort(signal.reason),
+      { once: true },
+    );
+  }
+  return controller.signal;
+}
+
 export async function runIntelligenceModule(
   def: ModuleDefinition,
   ctx: EngineContext,
@@ -68,19 +94,42 @@ export async function runIntelligenceModule(
   model: string,
 ): Promise<MoneyGapFinding[]> {
   const MODULE_TIMEOUT_MS = 90_000;
+  if (ctx.signal?.aborted) {
+    throw Object.assign(new Error("Money Gap engine deadline exceeded"), {
+      name: "AbortError",
+    });
+  }
+  const corpusExcerpt = ctx.corpus.slice(0, MODULE_CORPUS_MAX_CHARS);
+  const intelJson = JSON.stringify(ctx.intelligence);
+  const input = `Website: ${ctx.url} (${ctx.domain})
+
+Business intelligence JSON:
+${intelJson}
+
+Crawled website content (compact excerpt):
+${corpusExcerpt}`;
+
+  log("info", "llm_request_budget", {
+    stage: `moneygap_module_${def.id}`,
+    model,
+    moduleId: def.id,
+    inputChars: input.length,
+    estimatedTokens: estimateTokenCount(input),
+    corpusChars: corpusExcerpt.length,
+  });
+
   const response = await withRetry(
-    () =>
-      client.responses.create(
+    () => {
+      if (ctx.signal?.aborted) {
+        throw Object.assign(new Error("Money Gap engine deadline exceeded"), {
+          name: "AbortError",
+        });
+      }
+      return client.responses.create(
         {
           model,
           instructions: buildModuleInstructions(def, ctx.kgContext),
-          input: `Website: ${ctx.url} (${ctx.domain})
-
-Business intelligence JSON:
-${JSON.stringify(ctx.intelligence)}
-
-Crawled website content (excerpt):
-${ctx.corpus.slice(0, 45000)}`,
+          input,
           text: {
             format: {
               type: "json_schema",
@@ -92,10 +141,22 @@ ${ctx.corpus.slice(0, 45000)}`,
         },
         {
           timeout: MODULE_TIMEOUT_MS,
-          signal: AbortSignal.timeout(MODULE_TIMEOUT_MS),
+          signal: mergeAbortSignals(
+            AbortSignal.timeout(MODULE_TIMEOUT_MS),
+            ctx.signal,
+          ),
         },
-      ),
-    { attempts: 3, label: `openai_module_${def.id}` },
+      );
+    },
+    {
+      attempts: 2,
+      label: `openai_module_${def.id}`,
+      shouldRetry: (err) => {
+        if (err instanceof Error && err.name === "AbortError") return false;
+        if (/deadline exceeded/i.test(String(err))) return false;
+        return true;
+      },
+    },
   );
 
   const text = extractOutputText(response);

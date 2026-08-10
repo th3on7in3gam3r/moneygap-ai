@@ -10,6 +10,12 @@ import {
   type CrawlabilityReportSnapshot,
   type PrivacyReportSnapshot,
 } from "@/db/schema";
+import { estimateTokenCount } from "@/lib/analysis/corpus";
+import {
+  claimMoneyGapEngine,
+  releaseMoneyGapClaim,
+  touchMoneyGapProgress,
+} from "@/lib/analysis/money-gap-claim";
 import type { IntelligenceResult } from "@/lib/analysis/openai";
 import { runMoneyGapEngine } from "@/lib/analysis/money-gap-engine";
 import {
@@ -17,6 +23,11 @@ import {
   normalizeFixes,
   sortOpportunities,
 } from "@/lib/analysis/opportunity-rollups";
+import {
+  classifyRoadmapError,
+  getMoneyGapEngineDeadlineMs,
+  MAX_PERSISTED_OPPORTUNITIES,
+} from "@/lib/analysis/roadmap-errors";
 import { MONEY_GAP_ENGINE_ERROR } from "@/lib/analysis/stages";
 import {
   createConfidenceSnapshot,
@@ -49,6 +60,20 @@ import {
   TRUST_ENGINE_VERSION,
 } from "@/lib/trust";
 
+function roadmapActionCount(roadmap: {
+  today?: unknown[];
+  thisWeek?: unknown[];
+  thisMonth?: unknown[];
+  nextQuarter?: unknown[];
+}): number {
+  return (
+    (roadmap.today?.length ?? 0) +
+    (roadmap.thisWeek?.length ?? 0) +
+    (roadmap.thisMonth?.length ?? 0) +
+    (roadmap.nextQuarter?.length ?? 0)
+  );
+}
+
 async function loadStoredOverride(
   reportId: string,
 ): Promise<ClassificationOverride | null> {
@@ -73,7 +98,27 @@ export async function persistMoneyGapEngineResult(input: {
   domain: string;
   intelligence: IntelligenceResult;
   corpus: string;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
+}): Promise<{ ok: true; partial?: boolean } | { ok: false; error: string }> {
+  const startedAtMs = Date.now();
+  const claim = await claimMoneyGapEngine(input.analysisId);
+  if (!claim.claimed) {
+    log("info", "money_gap_engine_skipped", {
+      analysisId: input.analysisId,
+      reason: claim.reason,
+    });
+    if (
+      claim.reason === "engine_completed" ||
+      claim.reason === "already_complete"
+    ) {
+      return { ok: true, partial: false };
+    }
+    if (claim.reason === "already_claimed" || claim.reason === "lost_race") {
+      // Another worker owns the stage — do not fail the scan.
+      return { ok: true, partial: true };
+    }
+    return { ok: false, error: `Money Gap claim failed: ${claim.reason}` };
+  }
+
   const heartbeat = async (label: string, progress?: number) => {
     try {
       const current = await db.query.websiteAnalyses.findFirst({
@@ -91,13 +136,30 @@ export async function persistMoneyGapEngineResult(input: {
           ...(progress != null ? { progress } : {}),
         })
         .where(eq(websiteAnalyses.id, input.analysisId));
+      await touchMoneyGapProgress(input.analysisId, {});
     } catch {
       /* soft-fail heartbeat */
     }
   };
 
+  let partial = false;
+
   try {
-    await heartbeat("Running opportunity modules…", 88);
+    const deadlineMs = getMoneyGapEngineDeadlineMs();
+    const deadlineAtMs = startedAtMs + deadlineMs;
+    const model = process.env.OPENAI_MODEL || "gpt-4o";
+
+    log("info", "ROADMAP_GENERATION_START", {
+      analysisId: input.analysisId,
+      reportId: input.reportId,
+      deadlineMs,
+      inputChars: input.corpus.length,
+      estimatedTokens: estimateTokenCount(input.corpus),
+      model,
+    });
+
+    // Category scoring — keep UI off "Building Fix Roadmap" until modules finish.
+    await heartbeat("Scoring MoneyGap Categories™…", 76);
 
     let kgContext: string | undefined;
     try {
@@ -126,15 +188,40 @@ export async function persistMoneyGapEngineResult(input: {
       });
     }
 
-    const engineResult = await runMoneyGapEngine({
-      url: input.url,
-      domain: input.domain,
-      intelligence: input.intelligence,
-      corpus: input.corpus,
-      kgContext,
-    });
+    const engineResult = await runMoneyGapEngine(
+      {
+        url: input.url,
+        domain: input.domain,
+        intelligence: input.intelligence,
+        corpus: input.corpus,
+        kgContext,
+      },
+      {
+        deadlineAtMs,
+        onProgress: async (p) => {
+          const label =
+            p.modulesCompleted === 0
+              ? "Scoring MoneyGap Categories™…"
+              : `Scoring MoneyGap Categories™… ${p.modulesCompleted} of ${p.modulesTotal}`;
+          const progress = Math.min(
+            86,
+            76 +
+              Math.round(
+                (p.modulesCompleted / Math.max(1, p.modulesTotal)) * 10,
+              ),
+          );
+          await heartbeat(label, progress);
+          await touchMoneyGapProgress(input.analysisId, {
+            moneyGapModulesCompleted: p.modulesCompleted,
+            moneyGapModulesTotal: p.modulesTotal,
+          });
+        },
+      },
+    );
 
-    await heartbeat("Scoring Growth Roadmap…", 89);
+    if (engineResult.partial) partial = true;
+
+    await heartbeat("Deepening category findings…", 86);
 
     let crawlabilitySnapshot: CrawlabilityReportSnapshot | null = null;
     let crawlabilityGaps: ReturnType<typeof crawlabilityFindingsToMoneyGaps> = [];
@@ -181,6 +268,7 @@ export async function persistMoneyGapEngineResult(input: {
         findingCount: crawl.findings.length,
       };
     } catch (err) {
+      partial = true;
       log("warn", "crawlability_audit_soft_fail", {
         analysisId: input.analysisId,
         error: err instanceof Error ? err.message : String(err),
@@ -230,11 +318,14 @@ export async function persistMoneyGapEngineResult(input: {
         trackingDetected: privacy.trackingDetected,
       };
     } catch (err) {
+      partial = true;
       log("warn", "privacy_audit_soft_fail", {
         analysisId: input.analysisId,
         error: err instanceof Error ? err.message : String(err),
       });
     }
+
+    await heartbeat("Building Fix Roadmap…", 88);
 
     let findings = [
       ...engineResult.opportunities,
@@ -277,6 +368,7 @@ export async function persistMoneyGapEngineResult(input: {
       businessModelGapReport = kg.businessModelGapReport;
       patternMatchReport = kg.patternMatchReport;
     } catch (err) {
+      partial = true;
       log("warn", "knowledge_graph_soft_fail", {
         analysisId: input.analysisId,
         error: err instanceof Error ? err.message : String(err),
@@ -296,10 +388,22 @@ export async function persistMoneyGapEngineResult(input: {
       });
     }
 
-    const sorted = sortOpportunities(trust.findings);
+    const sortedAll = sortOpportunities(trust.findings);
+    const sorted = sortedAll.slice(0, MAX_PERSISTED_OPPORTUNITIES);
+    if (sortedAll.length > sorted.length) partial = true;
+
     const rollups = computeOpportunityRollups({
       ...engineResult,
       opportunities: sorted,
+    });
+
+    const actionCount = roadmapActionCount(engineResult.growthRoadmap);
+    log("info", "ROADMAP_PERSIST_START", {
+      analysisId: input.analysisId,
+      reportId: input.reportId,
+      actionCount,
+      opportunityCount: sorted.length,
+      model,
     });
 
     const reportRowForWs = await db.query.reports.findFirst({
@@ -407,7 +511,12 @@ export async function persistMoneyGapEngineResult(input: {
       }
     }
 
-    await heartbeat("Saving Growth Roadmap & opportunities…", 90);
+    await heartbeat(
+      actionCount > 0
+        ? `Building Fix Roadmap… ${actionCount} actions prepared`
+        : "Building Fix Roadmap…",
+      90,
+    );
 
     await db
       .update(reports)
@@ -430,6 +539,15 @@ export async function persistMoneyGapEngineResult(input: {
         moneyGapEngineError: null,
       })
       .where(eq(reports.id, input.reportId));
+
+    log("info", "ROADMAP_PERSIST_COMPLETE", {
+      analysisId: input.analysisId,
+      reportId: input.reportId,
+      actionCount,
+      opportunityCount: sorted.length,
+      durationMs: Date.now() - startedAtMs,
+      partial,
+    });
 
     // Opportunity Intelligence™ + Growth Graph™ (soft-fail)
     try {
@@ -472,34 +590,39 @@ export async function persistMoneyGapEngineResult(input: {
         });
       }
     } catch (err) {
+      partial = true;
       log("warn", "opportunity_intelligence_hook_soft_fail", {
         analysisId: input.analysisId,
         error: err instanceof Error ? err.message : String(err),
       });
     }
 
-    log("info", "money_gap_engine_persisted", {
+    log("info", "ROADMAP_STAGE_COMPLETE", {
       analysisId: input.analysisId,
       reportId: input.reportId,
-      findings: sorted.length,
-      qaIssues: trust.qaReport.issues.length,
+      durationMs: Date.now() - startedAtMs,
+      actionCount,
+      opportunityCount: sorted.length,
+      modulesFailed: engineResult.modulesFailed,
+      partial,
+      model,
       engineVersion: MONEYGAP_ENGINE_VERSION,
       trustVersion: TRUST_ENGINE_VERSION,
-      confidenceIntelCount: confidencePayloads.length,
-      hasIndustryPlaybook: Boolean(industryPlaybook),
-      hasIndustryGapReport: Boolean(industryGapReport),
-      hasRevenueArchitecture: Boolean(revenueArchitecture),
-      hasBusinessModelGapReport: Boolean(businessModelGapReport),
-      hasPatternMatchReport: Boolean(patternMatchReport),
-      crawlabilityScore: crawlabilitySnapshot?.score ?? null,
-      privacyScore: privacySnapshot?.score ?? null,
     });
 
-    return { ok: true };
+    await releaseMoneyGapClaim(input.analysisId, {
+      partial,
+      severity: partial ? "WARNING" : "INFO",
+    });
+
+    return { ok: true, partial };
   } catch (err) {
+    const errorClass = classifyRoadmapError(err);
     log("error", "persistMoneyGapEngineResult", {
       analysisId: input.analysisId,
+      errorClass,
       error: err instanceof Error ? err.message : String(err),
+      durationMs: Date.now() - startedAtMs,
     });
     const message =
       err instanceof Error && err.message === MONEY_GAP_ENGINE_ERROR
@@ -513,6 +636,12 @@ export async function persistMoneyGapEngineResult(input: {
         moneyGapEngineError: message,
       })
       .where(eq(reports.id, input.reportId));
+
+    await releaseMoneyGapClaim(input.analysisId, {
+      errorClass,
+      severity: "FATAL",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
 
     return { ok: false, error: message };
   }

@@ -220,12 +220,27 @@ function resolveAnalysisStageIndex(stage: string, progress: number): number {
   }
   if (
     lower.includes("opportunity module") ||
+    lower.includes("scoring moneygap") ||
     lower.includes("scoring growth roadmap") ||
+    lower.includes("deepening category") ||
     lower.includes("crawlability") ||
     lower.includes("saving growth roadmap") ||
-    lower.includes("growth roadmap")
+    lower.includes("building fix roadmap") ||
+    lower.includes("growth roadmap") ||
+    lower.includes("opportunity intelligence")
   ) {
-    return ANALYSIS_STAGES.findIndex((s) => s.id === "action_plans");
+    if (
+      lower.includes("building fix roadmap") ||
+      lower.includes("saving growth roadmap") ||
+      lower.includes("growth roadmap") ||
+      lower.includes("opportunity intelligence")
+    ) {
+      return ANALYSIS_STAGES.findIndex((s) => s.id === "action_plans");
+    }
+    if (lower.includes("deepening category")) {
+      return ANALYSIS_STAGES.findIndex((s) => s.id === "quantifying");
+    }
+    return ANALYSIS_STAGES.findIndex((s) => s.id === "detecting_gaps");
   }
 
   let best = 0;

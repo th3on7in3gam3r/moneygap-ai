@@ -52,14 +52,16 @@ const STAGE_TIPS: Record<string, string[]> = {
     "Analyzing your conversion paths…",
     "Checking AI visibility signals…",
     "Finding Revenue and Offer gaps…",
+    "Scoring MoneyGap Categories™…",
   ],
   quantifying: [
     "Scoring Trust, Content, and Technical gaps…",
     "Comparing industry opportunity patterns…",
+    "Deepening category findings…",
   ],
   action_plans: [
     "Building your prioritized Fix Roadmap…",
-    "Preparing implementation prompts…",
+    "Saving Growth Roadmap & opportunities…",
   ],
   discovering_competitors: [
     "Comparing industry opportunities…",
