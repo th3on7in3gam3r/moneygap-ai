@@ -124,11 +124,12 @@ plus WordPress / Shopify / Next.js fixtures where feasible.
 
 ## Enterprise-scale recommendations
 
-1. Move heavy crawl ticks to a **Render background worker** with Postgres
-   `FOR UPDATE SKIP LOCKED` (Neon HTTP cannot hold interactive locks).
+1. **Done in product path:** Move heavy page reads to the **Render background worker**
+   (`moneygap-crawl-worker`) with Postgres `FOR UPDATE SKIP LOCKED`. Enable with
+   `CRAWL_WORKER_ENABLED=1` / `SCAN_EXECUTION=worker` (see [scan-jobs.md](./scan-jobs.md)).
 2. Separate discover / read / analyze queues with independent autoscaling.
 3. Persist per-URL fetch traces for support (already partially in `scanMeta`).
 4. Keep Quick at ~25 pages for interactive UX; use deep/enterprise on worker
    path with higher caps.
 5. Optional Firecrawl / third-party fetch for JS-heavy sites when Playwright is
-   disabled in serverless.
+   disabled on the web service.

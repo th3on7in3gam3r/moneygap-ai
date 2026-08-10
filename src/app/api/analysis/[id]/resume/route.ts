@@ -28,9 +28,27 @@ export async function POST(
     return Response.json({ error: "Cannot resume this scan." }, { status: 400 });
   }
 
-  after(() => {
-    void scheduleScanTick(id);
+  const analysis = await db.query.websiteAnalyses.findFirst({
+    where: and(eq(websiteAnalyses.id, id), eq(websiteAnalyses.userId, userId)),
+    columns: { scanMeta: true, crawlJobId: true },
   });
+  const execution =
+    analysis?.scanMeta &&
+    typeof (analysis.scanMeta as { execution?: unknown }).execution === "string"
+      ? (analysis.scanMeta as { execution: string }).execution
+      : null;
+
+  if (execution === "worker" && analysis?.crawlJobId) {
+    const { crawlJobs } = await import("@/db/schema");
+    await db
+      .update(crawlJobs)
+      .set({ status: "queued", updatedAt: new Date() })
+      .where(eq(crawlJobs.id, analysis.crawlJobId));
+  } else {
+    after(() => {
+      void scheduleScanTick(id);
+    });
+  }
 
   return Response.json({ ok: true, scanPhase: "processing" });
 }

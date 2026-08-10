@@ -17,6 +17,7 @@ const isPublicOAuthCallback = createRouteMatcher([
 /** Internal crawl/cron endpoints authenticate via CRON_SECRET, not Clerk. */
 const isInternalCronRoute = createRouteMatcher([
   "/api/scan/tick",
+  "/api/scan/complete",
   "/api/cron(.*)",
 ]);
 

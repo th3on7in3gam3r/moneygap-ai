@@ -329,8 +329,10 @@ export function AnalysisProgress({
                   </span>{" "}
                   {data?.scanPhase === "discovering" ||
                   data?.scanPhase === "processing"
-                    ? "Reading pages in small batches so the crawl stays reliable on serverless."
-                    : "Leave this tab open while we crawl pages, score gaps, and build your report."}
+                    ? "Reading pages in small batches so the crawl stays reliable."
+                    : data?.scanPhase === "waiting"
+                      ? "Your crawl is queued on the MoneyGap crawl worker — this tab can stay open while pages are read."
+                      : "Leave this tab open while we crawl pages, score gaps, and build your report."}
                 </p>
                 {typeof data?.pagesDiscovered === "number" &&
                 data.pagesDiscovered > 0 ? (
@@ -360,7 +362,8 @@ export function AnalysisProgress({
                   <p className="text-gap" role="alert">
                     Crawl continuation issue: {data.tickScheduleError} We are
                     retrying automatically. If this persists, ask your admin to
-                    set APP_URL and CRON_SECRET, then retry the scan.
+                    set APP_URL and CRON_SECRET (or enable CRAWL_WORKER_ENABLED
+                    with the Render crawl worker), then retry the scan.
                   </p>
                 ) : null}
               </div>

@@ -194,6 +194,11 @@ export async function kickStalledScanIfNeeded(analysisId: string): Promise<{
   }
 
   const meta = (analysis.scanMeta as Record<string, unknown>) ?? {};
+  if (meta.execution === "worker") {
+    // Product crawls are drained by the Render worker — do not self-schedule ticks.
+    return { kicked: false, reason: "worker_execution" };
+  }
+
   const scanStage =
     typeof meta.scanStage === "string" ? meta.scanStage : "";
   // Do not kick while discover is still building the queue — empty-queue ticks

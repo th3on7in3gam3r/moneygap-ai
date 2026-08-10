@@ -1,9 +1,18 @@
+var __defProp = Object.defineProperty;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __esm = (fn, res) => function __init() {
   return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
 };
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
 
 // src/framework-detectors/index.ts
+var framework_detectors_exports = {};
+__export(framework_detectors_exports, {
+  detectFramework: () => detectFramework
+});
 function detectFramework(html) {
   const signals = [];
   const lower = html.slice(0, 2e5).toLowerCase();
@@ -1184,8 +1193,63 @@ async function crawlSite(input, opts) {
     warnings: tracker.getWarnings()
   };
 }
+async function loadPageHtml(url, opts) {
+  const homepage = normalizeCrawlUrl(url);
+  const res = await fetchText(homepage, {
+    timeoutMs: opts?.timeoutMs ?? 15e3,
+    maxBytes: opts?.maxBytes ?? 15e5,
+    userAgent: opts?.userAgent ?? "MoneyGapCrawler/0.1 (+https://moneygap-ai.com)",
+    maxRedirects: 8
+  });
+  if (!res.ok) return null;
+  let html = res.text;
+  let finalUrl = res.finalUrl;
+  let statusCode = res.statusCode;
+  let fetchMs = res.fetchMs;
+  let renderedWith = "cheerio";
+  if (shouldUsePlaywright(html, opts?.playwrightEnabled === true)) {
+    const pw = await renderWithPlaywright(homepage, {
+      timeoutMs: opts?.timeoutMs ?? 2e4,
+      userAgent: opts?.userAgent ?? "MoneyGapCrawler/0.1 (+https://moneygap-ai.com)"
+    });
+    if (pw) {
+      html = pw.html;
+      finalUrl = pw.finalUrl;
+      statusCode = pw.statusCode;
+      fetchMs = pw.fetchMs;
+      renderedWith = "playwright";
+    }
+    await closeBrowser();
+  }
+  const { detectFramework: detectFramework2 } = await Promise.resolve().then(() => (init_framework_detectors(), framework_detectors_exports));
+  return {
+    html,
+    finalUrl,
+    statusCode,
+    fetchMs,
+    renderedWith,
+    framework: detectFramework2(html).framework
+  };
+}
+async function extractSinglePage(url, opts) {
+  const loaded = await loadPageHtml(url, opts);
+  if (!loaded) return null;
+  const homepage = normalizeCrawlUrl(url);
+  return extractPageRecord({
+    url: homepage,
+    finalUrl: loaded.finalUrl,
+    html: loaded.html,
+    statusCode: loaded.statusCode,
+    pageType: "homepage",
+    fetchMs: loaded.fetchMs,
+    renderedWith: loaded.renderedWith,
+    homepageUrl: homepage
+  });
+}
 
 // src/worker.ts
+var MAX_PAGE_ATTEMPTS = 3;
+var EXTRACT_TIMEOUT_HINT_MS = 2e4;
 async function withPg(fn) {
   const url = process.env.DATABASE_URL;
   if (!url) {
@@ -1213,17 +1277,31 @@ async function claimJob() {
   await withPg(async (client) => {
     const res = await client.query(
       `UPDATE crawl_jobs
-       SET status = 'processing', started_at = NOW(), updated_at = NOW()
+       SET status = 'processing', started_at = COALESCE(started_at, NOW()), updated_at = NOW()
        WHERE id = (
          SELECT id FROM crawl_jobs
          WHERE status IN ('queued', 'retry')
-         ORDER BY created_at ASC
+         ORDER BY
+           CASE WHEN analysis_id IS NOT NULL THEN 0 ELSE 1 END,
+           created_at ASC
          LIMIT 1
          FOR UPDATE SKIP LOCKED
        )
-       RETURNING id, url, mode, max_pages, status`
+       RETURNING id, url, mode, max_pages, status, analysis_id`
     );
-    claimed = res.rows[0] ?? null;
+    const row = res.rows[0];
+    if (!row) {
+      claimed = null;
+      return;
+    }
+    claimed = {
+      id: String(row.id),
+      url: String(row.url),
+      mode: String(row.mode ?? "deep"),
+      max_pages: Number(row.max_pages ?? 200),
+      status: String(row.status),
+      analysis_id: row.analysis_id ? String(row.analysis_id) : null
+    };
   });
   return claimed;
 }
@@ -1241,10 +1319,349 @@ async function completeJob(id, ok, error, pageCount) {
     );
   });
 }
-async function tick() {
-  const job = await claimJob();
-  if (!job) return;
-  console.log(`crawl-worker: processing ${job.id} ${job.url}`);
+async function countQueuedPages(jobId) {
+  let n = 0;
+  await withPg(async (client) => {
+    const res = await client.query(
+      `SELECT count(*)::int AS n FROM crawl_pages
+       WHERE job_id = $1::uuid AND state IN ('queued', 'retry', 'processing')`,
+      [jobId]
+    );
+    n = Number(res.rows[0]?.n ?? 0);
+  });
+  return n;
+}
+async function reclaimStale(jobId) {
+  await withPg(async (client) => {
+    await client.query(
+      `UPDATE crawl_pages
+       SET state = CASE WHEN attempts >= $2 THEN 'failed' ELSE 'retry' END,
+           last_error = COALESCE(last_error, 'Stale processing reclaimed'),
+           updated_at = NOW()
+       WHERE job_id = $1::uuid
+         AND state = 'processing'
+         AND updated_at < NOW() - INTERVAL '20 seconds'`,
+      [jobId, MAX_PAGE_ATTEMPTS]
+    );
+  });
+}
+async function claimPageBatch(jobId, limit) {
+  let pages = [];
+  await withPg(async (client) => {
+    const res = await client.query(
+      `UPDATE crawl_pages AS p
+       SET
+         state = 'processing',
+         attempts = p.attempts + 1,
+         updated_at = NOW()
+       WHERE p.id IN (
+         SELECT id
+         FROM crawl_pages
+         WHERE job_id = $1::uuid
+           AND state IN ('queued', 'retry')
+         ORDER BY created_at ASC
+         LIMIT $2
+       )
+       AND p.state IN ('queued', 'retry')
+       RETURNING p.id, p.url, p.attempts`,
+      [jobId, limit]
+    );
+    pages = res.rows.map((r) => ({
+      id: String(r.id),
+      url: String(r.url),
+      attempts: Number(r.attempts ?? 0)
+    }));
+  });
+  return pages;
+}
+async function markPageCompleted(pageId, data) {
+  await withPg(async (client) => {
+    await client.query(
+      `UPDATE crawl_pages
+       SET state = 'completed',
+           title = $2,
+           markdown = $3,
+           page_type = $4,
+           metadata = $5::jsonb,
+           last_error = NULL,
+           updated_at = NOW()
+       WHERE id = $1::uuid`,
+      [
+        pageId,
+        data.title,
+        data.markdown,
+        data.pageType,
+        JSON.stringify(data.metadata)
+      ]
+    );
+  });
+}
+async function markPageFailed(pageId, error, retry) {
+  await withPg(async (client) => {
+    await client.query(
+      `UPDATE crawl_pages
+       SET state = $2,
+           last_error = $3,
+           updated_at = NOW()
+       WHERE id = $1::uuid`,
+      [pageId, retry ? "retry" : "failed", error]
+    );
+  });
+}
+async function mirrorWebsitePage(input) {
+  await withPg(async (client) => {
+    await client.query(
+      `INSERT INTO website_pages (analysis_id, url, page_type, title, markdown, metadata)
+       VALUES ($1::uuid, $2, $3, $4, $5, $6::jsonb)`,
+      [
+        input.analysisId,
+        input.url,
+        input.pageType,
+        input.title,
+        input.markdown,
+        JSON.stringify(input.metadata)
+      ]
+    );
+  });
+}
+async function updateAnalysisProgress(input) {
+  await withPg(async (client) => {
+    await client.query(
+      `UPDATE website_analyses
+       SET status = 'running',
+           stage = $2,
+           progress = $3,
+           pages_completed = $4,
+           pages_failed = $5,
+           pages_discovered = GREATEST(COALESCE(pages_discovered, 0), $6),
+           scan_phase = COALESCE($7, scan_phase, 'processing'),
+           scan_meta = COALESCE(scan_meta, '{}'::jsonb)
+             || jsonb_build_object(
+               'scanStage', 'crawling',
+               'execution', 'worker',
+               'currentUrl', to_jsonb($8::text),
+               'lastProgressAt', to_jsonb((EXTRACT(EPOCH FROM NOW()) * 1000)::bigint)
+             ),
+           error = NULL
+       WHERE id = $1::uuid`,
+      [
+        input.analysisId,
+        input.stage,
+        input.progress,
+        input.pagesCompleted,
+        input.pagesFailed,
+        input.pagesDiscovered,
+        input.scanPhase ?? "processing",
+        input.currentUrl
+      ]
+    );
+  });
+}
+async function failAnalysis(analysisId, message) {
+  await withPg(async (client) => {
+    await client.query(
+      `UPDATE website_analyses
+       SET status = 'failed',
+           scan_phase = 'failed',
+           stage = 'Failed',
+           error = $2,
+           completed_at = NOW()
+       WHERE id = $1::uuid`,
+      [analysisId, message]
+    );
+    await client.query(
+      `UPDATE websites
+       SET status = 'error', updated_at = NOW()
+       WHERE id = (SELECT website_id FROM website_analyses WHERE id = $1::uuid)`,
+      [analysisId]
+    );
+  });
+}
+async function countByState(jobId) {
+  const out = {};
+  await withPg(async (client) => {
+    const res = await client.query(
+      `SELECT state, count(*)::int AS n
+       FROM crawl_pages WHERE job_id = $1::uuid
+       GROUP BY state`,
+      [jobId]
+    );
+    for (const row of res.rows) {
+      out[String(row.state)] = Number(row.n ?? 0);
+    }
+  });
+  return out;
+}
+async function isAnalysisPaused(analysisId) {
+  let paused = false;
+  await withPg(async (client) => {
+    const res = await client.query(
+      `SELECT scan_phase FROM website_analyses WHERE id = $1::uuid`,
+      [analysisId]
+    );
+    const phase = String(res.rows[0]?.scan_phase ?? "");
+    paused = phase === "paused" || phase === "cancelled" || phase === "failed";
+  });
+  return paused;
+}
+async function notifyScanComplete(analysisId) {
+  const secret = process.env.CRON_SECRET?.trim();
+  const origin = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL || "").trim().replace(/\/$/, "");
+  if (!secret || !origin) {
+    console.error(
+      "crawl-worker: cannot notify scan complete \u2014 set APP_URL and CRON_SECRET",
+      { analysisId, hasSecret: Boolean(secret), hasOrigin: Boolean(origin) }
+    );
+    return;
+  }
+  const url = `${origin}/api/scan/complete`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "x-cron-secret": secret,
+        Authorization: `Bearer ${secret}`
+      },
+      body: JSON.stringify({ analysisId }),
+      signal: AbortSignal.timeout(15e3)
+    });
+    if (!res.ok) {
+      console.error("crawl-worker: scan complete HTTP", res.status, await res.text());
+    } else {
+      console.log("crawl-worker: post-crawl started", analysisId);
+    }
+  } catch (err) {
+    console.error("crawl-worker: scan complete notify failed", err);
+  }
+}
+async function processProductJob(job) {
+  const analysisId = job.analysis_id;
+  const concurrency = Math.min(
+    8,
+    Math.max(1, Number(process.env.CRAWL_CONCURRENCY || 10))
+  );
+  const deadline = Date.now() + Number(process.env.CRAWL_MAX_RUNTIME_MS || 15 * 6e4);
+  console.log(
+    `crawl-worker: product drain ${job.id} analysis=${analysisId} concurrency=${concurrency}`
+  );
+  while (Date.now() < deadline) {
+    if (await isAnalysisPaused(analysisId)) {
+      console.log("crawl-worker: analysis paused/cancelled \u2014 releasing job", analysisId);
+      await withPg(async (client) => {
+        await client.query(
+          `UPDATE crawl_jobs SET status = 'queued', updated_at = NOW() WHERE id = $1::uuid`,
+          [job.id]
+        );
+      });
+      return;
+    }
+    await reclaimStale(job.id);
+    const batch = await claimPageBatch(job.id, concurrency);
+    if (batch.length === 0) {
+      const counts2 = await countByState(job.id);
+      const remaining = (counts2.queued ?? 0) + (counts2.retry ?? 0) + (counts2.processing ?? 0);
+      if (remaining > 0) {
+        await new Promise((r) => setTimeout(r, 500));
+        continue;
+      }
+      const completed2 = counts2.completed ?? 0;
+      if (completed2 === 0) {
+        await failAnalysis(
+          analysisId,
+          "We couldn't analyze this website. Please confirm the URL is publicly accessible."
+        );
+        await completeJob(job.id, false, "zero completed pages", 0);
+        return;
+      }
+      await completeJob(job.id, true, void 0, completed2);
+      await updateAnalysisProgress({
+        analysisId,
+        stage: "Understanding business",
+        progress: 32,
+        pagesCompleted: completed2,
+        pagesFailed: counts2.failed ?? 0,
+        pagesDiscovered: completed2 + (counts2.failed ?? 0),
+        currentUrl: null,
+        scanPhase: "analyzing"
+      });
+      await notifyScanComplete(analysisId);
+      return;
+    }
+    await Promise.all(
+      batch.map(async (page) => {
+        try {
+          const record = await extractSinglePage(page.url, {
+            playwrightEnabled: process.env.PLAYWRIGHT_ENABLED === "1",
+            timeoutMs: EXTRACT_TIMEOUT_HINT_MS
+          });
+          if (!record || record.markdown.trim().length < 40) {
+            await markPageFailed(
+              page.id,
+              "thin or empty content",
+              page.attempts < MAX_PAGE_ATTEMPTS
+            );
+            return;
+          }
+          const scraped = toScrapedPage({
+            ...record,
+            pageType: classifyPageType(record.finalUrl || record.url, job.url)
+          });
+          const pageType = scraped.pageType;
+          await markPageCompleted(page.id, {
+            title: scraped.title,
+            markdown: scraped.markdown,
+            pageType,
+            metadata: scraped.metadata
+          });
+          await mirrorWebsitePage({
+            analysisId,
+            url: scraped.url,
+            pageType,
+            title: scraped.title,
+            markdown: scraped.markdown,
+            metadata: scraped.metadata
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          await markPageFailed(
+            page.id,
+            msg,
+            page.attempts < MAX_PAGE_ATTEMPTS
+          );
+        }
+      })
+    );
+    const counts = await countByState(job.id);
+    const completed = counts.completed ?? 0;
+    const failed = counts.failed ?? 0;
+    const discovered = completed + failed + (counts.queued ?? 0) + (counts.retry ?? 0) + (counts.processing ?? 0);
+    const progress = Math.min(
+      30,
+      15 + Math.round(completed / Math.max(1, discovered) * 15)
+    );
+    await updateAnalysisProgress({
+      analysisId,
+      stage: `Reading page ${completed} of ${discovered}\u2026`,
+      progress,
+      pagesCompleted: completed,
+      pagesFailed: failed,
+      pagesDiscovered: discovered,
+      currentUrl: batch[0]?.url ?? null,
+      scanPhase: "processing"
+    });
+  }
+  console.warn("crawl-worker: product job runtime budget hit \u2014 requeue", job.id);
+  await withPg(async (client) => {
+    await client.query(
+      `UPDATE crawl_jobs SET status = 'queued', updated_at = NOW() WHERE id = $1::uuid`,
+      [job.id]
+    );
+  });
+}
+async function processLegacyDeepJob(job) {
+  console.log(`crawl-worker: legacy crawl ${job.id} ${job.url}`);
   try {
     const result = await crawlSite({
       url: job.url,
@@ -1272,14 +1689,60 @@ async function tick() {
         );
       }
     });
-    await completeJob(job.id, result.scraped.length > 0, void 0, result.scraped.length);
+    await completeJob(
+      job.id,
+      result.scraped.length > 0,
+      void 0,
+      result.scraped.length
+    );
+    if (job.analysis_id && result.scraped.length > 0) {
+      for (const page of result.scraped) {
+        await mirrorWebsitePage({
+          analysisId: job.analysis_id,
+          url: page.url,
+          pageType: page.pageType,
+          title: page.title,
+          markdown: page.markdown,
+          metadata: page.metadata
+        });
+      }
+      await notifyScanComplete(job.analysis_id);
+    }
   } catch (err) {
-    await completeJob(job.id, false, err instanceof Error ? err.message : String(err));
+    await completeJob(
+      job.id,
+      false,
+      err instanceof Error ? err.message : String(err)
+    );
+    if (job.analysis_id) {
+      await failAnalysis(
+        job.analysis_id,
+        err instanceof Error ? err.message : String(err)
+      );
+    }
   }
+}
+async function tick() {
+  const job = await claimJob();
+  if (!job) return;
+  if (job.analysis_id) {
+    const pending = await countQueuedPages(job.id);
+    if (pending > 0) {
+      await processProductJob(job);
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 2e3));
+    const again = await countQueuedPages(job.id);
+    if (again > 0) {
+      await processProductJob(job);
+      return;
+    }
+  }
+  await processLegacyDeepJob(job);
 }
 async function main() {
   const pollMs = Number(process.env.CRAWL_WORKER_POLL_MS || 5e3);
-  console.log(`crawl-worker: started (poll ${pollMs}ms)`);
+  console.log(`crawl-worker: started (poll ${pollMs}ms, product+legacy)`);
   for (; ; ) {
     try {
       await tick();
@@ -1293,6 +1756,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   void main();
 }
 export {
+  notifyScanComplete,
+  processProductJob,
   main as runCrawlWorker
 };
 //# sourceMappingURL=worker.js.map

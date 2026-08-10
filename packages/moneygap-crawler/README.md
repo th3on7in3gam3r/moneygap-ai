@@ -46,9 +46,18 @@ Progress callbacks update analysis stage labels during “Reading pages”.
 
 ## Deep worker
 
-Render service `moneygap-crawl-worker` runs `npm run worker --prefix packages/moneygap-crawler`, polling `crawl_jobs`.
+Render service `moneygap-crawl-worker` runs `npm run worker --prefix packages/moneygap-crawler`.
 
-Enqueue via `enqueueDeepCrawlJob()` in `src/lib/analysis/crawl-jobs.ts`.
+**Product Engine path:** after the web app discovers URLs into `crawl_pages`, the
+worker drains that queue (extract + `website_pages`), then calls
+`POST /api/scan/complete` so MoneyGap Engine scoring runs on the web service.
+
+Enable on web: `CRAWL_WORKER_ENABLED=1` + `SCAN_EXECUTION=worker`. Worker needs
+the same `DATABASE_URL`, plus `APP_URL` and `CRON_SECRET`.
+
+Enqueue legacy deep-only jobs via `enqueueDeepCrawlJob()` in
+`src/lib/analysis/crawl-jobs.ts`.
+
 
 ## Tests
 

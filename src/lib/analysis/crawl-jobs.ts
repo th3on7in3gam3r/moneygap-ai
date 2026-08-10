@@ -2,18 +2,19 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { crawlJobs } from "@/db/schema";
 
-/** Enqueue a Deep Scan for the Render crawl worker. */
+/** Enqueue a Deep Scan for the Render crawl worker (legacy / manual deep jobs). */
 export async function enqueueDeepCrawlJob(input: {
   url: string;
   analysisId?: string;
   maxPages?: number;
+  mode?: "quick" | "standard" | "deep";
 }): Promise<{ id: string }> {
   const [row] = await db
     .insert(crawlJobs)
     .values({
       url: input.url,
       analysisId: input.analysisId ?? null,
-      mode: "deep",
+      mode: input.mode ?? "deep",
       maxPages: input.maxPages ?? 200,
       status: "queued",
     })

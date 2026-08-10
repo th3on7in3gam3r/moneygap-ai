@@ -28,12 +28,21 @@ services:
         value: "3"
       - key: PLAYWRIGHT_ENABLED
         value: "0"
+      # Hand Engine page reads to moneygap-crawl-worker (set 0 to force /api/scan/tick).
+      - key: CRAWL_WORKER_ENABLED
+        value: "1"
+      - key: SCAN_EXECUTION
+        value: "worker"
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL
         value: gpt-4o
       - key: CRON_SECRET
         generateValue: true
+      - key: APP_URL
+        sync: false
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM
@@ -64,6 +73,21 @@ services:
         value: "900000"
       - key: PLAYWRIGHT_ENABLED
         value: "1"
+      - key: CRON_SECRET
+        fromService:
+          name: moneygap-ai
+          type: web
+          envVarKey: CRON_SECRET
+      - key: APP_URL
+        fromService:
+          name: moneygap-ai
+          type: web
+          envVarKey: APP_URL
+      - key: NEXT_PUBLIC_APP_URL
+        fromService:
+          name: moneygap-ai
+          type: web
+          envVarKey: NEXT_PUBLIC_APP_URL
 
   - type: cron
     name: moneygap-monitor

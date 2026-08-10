@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { crawlJobs, websiteAnalyses, websitePages } from "@/db/schema";
 import { PUBLIC_CRAWL_ERROR } from "@/lib/analysis/stages";
+import { isWorkerScanExecution } from "./execution";
 import { scheduleScanTickAsync } from "./continue";
 import { isQueueDrained, remainingQueueCount } from "./claim";
 import { getScanProfile } from "./profiles";
@@ -146,8 +147,38 @@ export async function runIncrementalDiscover(analysisId: string): Promise<void> 
       sitemapFound: discovery.sitemapFound,
       warnings: discovery.warnings,
       tickScheduleError: null,
+      execution: isWorkerScanExecution() ? "worker" : "ticks",
     },
   });
+
+  // Worker path: re-queue the crawl job for the long-lived Render worker and return.
+  // Ticks remain available as local/dev fallback (SCAN_EXECUTION=ticks).
+  if (isWorkerScanExecution()) {
+    await db
+      .update(crawlJobs)
+      .set({ status: "queued", updatedAt: new Date() })
+      .where(eq(crawlJobs.id, jobId));
+    await defaultProgressProvider.update(analysisId, {
+      scanPhase: "waiting",
+      stage: `Queued ${discovery.urls.length} pages for crawl worker…`,
+      progress: 16,
+      pagesDiscovered: discovery.urls.length,
+      scanMeta: {
+        scanStage: "crawling",
+        execution: "worker",
+        framework: discovery.framework,
+        jsRequired: discovery.jsRequired,
+        sitemapFound: discovery.sitemapFound,
+        warnings: discovery.warnings,
+      },
+    });
+    scanLog("SCAN", "Handed crawl queue to Render worker", {
+      analysisId,
+      jobId,
+      pages: discovery.urls.length,
+    });
+    return;
+  }
 
   await db
     .update(crawlJobs)

@@ -1,74 +1,79 @@
-# Scan Jobs (Serverless Pipeline)
+# Scan Jobs (Worker + Serverless Fallback)
 
 User-facing job IDs remain on **`websiteAnalyses`**. Durable page queue uses
 **`crawl_jobs` / `crawl_pages`**. MoneyGap Engine scoring, Clerk auth, and report
 shapes are unchanged.
 
-## Flow
+## Preferred production path — Render crawl worker
 
 ```
-POST /api/scan/estimate → profile picker
-POST /api/analysis (+ scanProfile) | onboarding/start-scan
-  → websiteAnalyses + after(runAnalysisPipeline)
-     all profiles: runIncrementalDiscover → processScanTick loop
-            → scheduleScanTick (fire-and-forget POST /api/scan/tick)
-            → reclaim stale processing → concurrent extract
-            → runPostCrawlAnalysis when queue drained
+POST /api/analysis (+ scanProfile)
+  → after(runAnalysisPipeline)
+     → runIncrementalDiscover (robots + sitemap + enqueue crawl_pages)
+     → set crawl_jobs.status = queued, scanMeta.execution = worker
+  → moneygap-crawl-worker (long-lived)
+     → FOR UPDATE SKIP LOCKED claim job
+     → drain crawl_pages (extract + mirror website_pages)
+     → POST /api/scan/complete (CRON_SECRET) → runPostCrawlAnalysis
 ```
 
-### Phases (`scanPhase`)
+Enable on the **web** service:
 
-`queued` → `discovering` → `processing` → `analyzing` → `completed`  
-Also: `paused`, `cancelled`, `failed`, `waiting`, `retrying`.
+```
+CRAWL_WORKER_ENABLED=1
+SCAN_EXECUTION=worker
+APP_URL=https://www.moneygap-ai.com
+CRON_SECRET=…
+DATABASE_URL=…   # same Neon DB as worker
+```
+
+Worker service `moneygap-crawl-worker` in [`render.yaml`](../render.yaml) needs the
+**same `DATABASE_URL`**, plus `APP_URL` + `CRON_SECRET` to call `/api/scan/complete`.
+
+## Fallback — serverless ticks (local / Vercel-only)
+
+When `CRAWL_WORKER_ENABLED` is unset/`0` or `SCAN_EXECUTION=ticks`:
+
+```
+runIncrementalDiscover → processScanTick loop (~50s)
+  → scheduleScanTick → POST /api/scan/tick
+  → runPostCrawlAnalysis when drained
+```
 
 ### Tick (`POST /api/scan/tick`)
 
-- Auth: `Authorization: Bearer $CRON_SECRET` (or internal secret header).
-- **Reclaims** `processing` rows older than 20s → `retry` (or `failed` after 3 attempts).
-- Claims up to `batchSize` pages (`queued` / `retry` → `processing`) with state-guarded UPDATE…RETURNING.
-- Extracts up to **5 pages concurrently**, each with a **15s** timeout.
-- Updates progress **after each page** (`pagesCompleted` / `pagesFailed` / `currentUrl`).
-- **Watchdog (20s)**: no progress → abort active extracts, requeue, continue.
-- Reschedules via **fire-and-forget** `after(scheduleScanTick)` (5s AbortSignal on the HTTP call — never awaits nested ticks).
-- When drained → post-crawl analysis.
+- Auth: `x-cron-secret` or `Authorization: Bearer $CRON_SECRET`
+- Reclaims stale `processing` rows, concurrent extracts, fire-and-forget reschedule
 
-### Caps
+### Complete (`POST /api/scan/complete`)
+
+- Auth: same cron secret
+- Invoked by the worker after page drain; starts `runPostCrawlAnalysis` via `after()`
+
+## Caps
 
 - `maxPages`: quick **25**, standard **100**, deep **500**, enterprise **5_000**
-  (hard enqueue ceiling **5000**)
-- `maxDepth`: quick/standard **2**; deep/enterprise higher
-- `concurrency`: **5** (enterprise **8**)
+- Worker `CRAWL_MAX_RUNTIME_MS` default **900000** (15 min); requeues if budget hit
 
-### Control APIs
+## Env cheat sheet
 
-| Endpoint | Role |
-|----------|------|
-| `GET /api/analysis/[id]` | Includes phase, counters, ETA, `currentUrl` |
-| `POST .../pause` | Sets `paused`; ticks no-op |
-| `POST .../resume` | Unpause + schedule tick |
-| `POST .../cancel` | Fail analysis + cancel crawl job/pages |
+| Var | Web | Worker |
+|-----|-----|--------|
+| `DATABASE_URL` | yes | yes (same) |
+| `CRAWL_WORKER_ENABLED=1` | yes | — |
+| `SCAN_EXECUTION=worker` | yes | — |
+| `CRON_SECRET` | yes | yes |
+| `APP_URL` | yes | yes |
+| `PLAYWRIGHT_ENABLED` | `0` | `1` |
+| `OPENAI_API_KEY` | yes (post-crawl) | — |
 
-## Providers
+## Smoke
 
-Interfaces in `src/lib/scan/providers/` (`CrawlerProvider`, `QueueProvider`,
-`StorageProvider`, `ProgressProvider`, `NotificationProvider`) with Neon /
-moneygap-crawler defaults. A future Render worker can implement the same
-contracts without UI changes.
+```bash
+npx tsx scripts/smoke-worker-crawl.ts
+SMOKE_URL=https://www.signaldeskblog.com npx tsx scripts/smoke-worker-crawl.ts
+```
 
-## Migration from single `after()` crawl
-
-Previously one Vercel invocation crawled the whole site. Standard+ profiles now
-checkpoint after each batch so invocations stay under ~60s. Quick keeps the
-previous in-process crawl for speed.
-
-## Env
-
-- `OPENAI_API_KEY` — required for post-crawl Engine
-- `CRON_SECRET` — **required** to authorize `/api/scan/tick` (missing → ticks stop after first ~50s loop; `scanMeta.tickScheduleError` set)
-- `APP_URL` / `NEXT_PUBLIC_APP_URL` — tick self-invoke origin
-- `FIRECRAWL_API_KEY` — optional fallback for empty Quick crawls
-- `PLAYWRIGHT_ENABLED=1` — optional JS render on extract (launch/content timed)
-
-## Fault-tolerance report
+## Fault-tolerance
 
 See [crawl-engine-fault-tolerance.md](./crawl-engine-fault-tolerance.md).
