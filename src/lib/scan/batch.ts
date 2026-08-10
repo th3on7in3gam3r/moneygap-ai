@@ -285,6 +285,12 @@ export async function processScanTick(analysisId: string): Promise<{
     return { done: true, processed: 0 };
   }
 
+  // Async Apify whole-site run — poll provider instead of page queue extract.
+  const { isApifyExecution, processApifyPoll } = await import("./crawlers");
+  if (isApifyExecution(analysis.scanMeta)) {
+    return processApifyPoll(analysisId);
+  }
+
   const profile = (analysis.scanProfile as ScanProfile) || "standard";
   const cfg = getScanProfile(profile);
   const jobId = analysis.crawlJobId;
@@ -329,6 +335,36 @@ export async function processScanTick(analysisId: string): Promise<{
       // Race: status-poll ticks can run before discover finishes enqueueing.
       // Never treat an empty pre-crawl queue as a permanent crawl failure.
       if (stillDiscovering) {
+        const metaAge =
+          typeof meta.lastProgressAt === "number"
+            ? Date.now() - meta.lastProgressAt
+            : analysis.startedAt
+              ? Date.now() - analysis.startedAt.getTime()
+              : 0;
+        // After 5 minutes stuck in discover with empty queue, fail cleanly.
+        if (metaAge > 5 * 60_000) {
+          await db
+            .update(websiteAnalyses)
+            .set({
+              status: "failed",
+              scanPhase: "failed",
+              stage: "Failed",
+              error: PUBLIC_CRAWL_ERROR,
+              completedAt: new Date(),
+              scanMeta: {
+                ...meta,
+                stageDiagnostics: [
+                  {
+                    stage: "read_pages",
+                    status: "failed",
+                    detail: "Discover stalled with empty queue",
+                  },
+                ],
+              },
+            })
+            .where(eq(websiteAnalyses.id, analysisId));
+          return { done: true, processed: 0 };
+        }
         scanWarn("CRAWLER", "Empty queue during discover — waiting for enqueue", {
           analysisId,
           scanPhase: analysis.scanPhase,

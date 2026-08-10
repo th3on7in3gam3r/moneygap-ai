@@ -26,6 +26,7 @@ const STAGE_TIPS: Record<string, string[]> = {
   reading: [
     "Finding pages worth analyzing…",
     "Reading homepage and key landing pages…",
+    "External crawl provider may be fetching pages…",
   ],
   understanding: [
     "Understanding what this business sells…",
@@ -124,6 +125,11 @@ type StatusPayload = {
   currentUrl?: string | null;
   tickScheduleError?: string | null;
   scanStage?: string | null;
+  crawlProvider?: string | null;
+  crawlStage?: string | null;
+  crawlElapsedMs?: number | null;
+  pagesRecovered?: number | null;
+  partial?: boolean | null;
 };
 
 export function AnalysisProgress({
@@ -327,18 +333,45 @@ export function AnalysisProgress({
                         : "Scan"}
                     :
                   </span>{" "}
-                  {data?.scanPhase === "discovering" ||
-                  data?.scanPhase === "processing"
-                    ? "Reading pages in small batches so the crawl stays reliable."
-                    : data?.scanPhase === "waiting"
-                      ? "Your crawl is queued on the MoneyGap crawl worker — this tab can stay open while pages are read."
-                      : "Leave this tab open while we crawl pages, score gaps, and build your report."}
+                  {data?.crawlProvider === "apify" &&
+                  data?.crawlStage === "recovering_pages"
+                    ? "Recovering a few difficult pages…"
+                    : data?.crawlProvider === "apify"
+                    ? "Apify is crawling your site asynchronously — progress updates as pages are discovered."
+                    : data?.crawlProvider === "firecrawl"
+                      ? data?.pagesRecovered
+                        ? "Recovering a few difficult pages…"
+                        : "Firecrawl is reading priority pages."
+                      : data?.crawlProvider === "scrapedo"
+                        ? "Rescuing difficult pages…"
+                        : data?.scanPhase === "discovering" ||
+                            data?.scanPhase === "processing"
+                          ? "Reading pages in small batches so the crawl stays reliable."
+                          : data?.scanPhase === "waiting"
+                            ? "Your crawl is queued on the MoneyGap crawl worker — this tab can stay open while pages are read."
+                            : "Leave this tab open while we crawl pages, score gaps, and build your report."}
                 </p>
+                {data?.crawlProvider ? (
+                  <p className="text-fg">
+                    Provider: {data.crawlProvider}
+                    {data.crawlStage ? ` · ${data.crawlStage}` : ""}
+                    {data.pagesRecovered
+                      ? ` · ${data.pagesRecovered} recovered`
+                      : ""}
+                    {data.partial ? " · partial" : ""}
+                    {data.crawlElapsedMs != null && data.crawlElapsedMs > 0
+                      ? ` · ${Math.round(data.crawlElapsedMs / 1000)}s elapsed`
+                      : ""}
+                  </p>
+                ) : null}
                 {typeof data?.pagesDiscovered === "number" &&
                 data.pagesDiscovered > 0 ? (
                   <p className="tabular-nums text-fg">
-                    Reading pages {data.pagesCompleted ?? 0} of{" "}
-                    {data.pagesDiscovered}
+                    {data.crawlStage === "recovering_pages"
+                      ? `Recovering pages… ${data.pagesCompleted ?? 0} ready`
+                      : data.crawlProvider === "apify"
+                        ? `${data.pagesCompleted ?? 0} of ${data.pagesDiscovered} pages analyzed`
+                        : `Reading pages ${data.pagesCompleted ?? 0} of ${data.pagesDiscovered}`}
                     {data.pagesFailed ? ` · ${data.pagesFailed} failed` : ""}
                     {data.estimatedRemainingMs != null &&
                     data.estimatedRemainingMs > 0
@@ -346,6 +379,12 @@ export function AnalysisProgress({
                         ? ` · ~${Math.max(5, Math.round(data.estimatedRemainingMs / 1000))}s remaining`
                         : ` · ~${Math.max(1, Math.round(data.estimatedRemainingMs / 60000))}m remaining`
                       : ""}
+                  </p>
+                ) : data?.crawlProvider === "apify" ? (
+                  <p className="text-fg">
+                    {data.stage && !data.stage.toLowerCase().includes("%")
+                      ? data.stage
+                      : "Apify crawl running…"}
                   </p>
                 ) : data?.scanPhase === "discovering" ||
                   data?.stage?.toLowerCase().includes("reading") ||

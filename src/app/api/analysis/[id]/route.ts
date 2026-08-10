@@ -110,6 +110,34 @@ export async function GET(
       typeof (analysis.scanMeta as { scanStage?: unknown }).scanStage === "string"
         ? (analysis.scanMeta as { scanStage: string }).scanStage
         : null,
+    crawlProvider:
+      analysis.scanMeta &&
+      typeof (analysis.scanMeta as { crawlProvider?: unknown }).crawlProvider ===
+        "string"
+        ? (analysis.scanMeta as { crawlProvider: string }).crawlProvider
+        : null,
+    crawlStage:
+      analysis.scanMeta &&
+      typeof (analysis.scanMeta as { crawlStage?: unknown }).crawlStage ===
+        "string"
+        ? (analysis.scanMeta as { crawlStage: string }).crawlStage
+        : null,
+    crawlElapsedMs:
+      analysis.scanMeta &&
+      typeof (analysis.scanMeta as { elapsedMs?: unknown }).elapsedMs === "number"
+        ? (analysis.scanMeta as { elapsedMs: number }).elapsedMs
+        : null,
+    pagesRecovered:
+      analysis.scanMeta &&
+      typeof (analysis.scanMeta as { pagesRecovered?: unknown }).pagesRecovered ===
+        "number"
+        ? (analysis.scanMeta as { pagesRecovered: number }).pagesRecovered
+        : null,
+    partial:
+      analysis.scanMeta &&
+      typeof (analysis.scanMeta as { partial?: unknown }).partial === "boolean"
+        ? (analysis.scanMeta as { partial: boolean }).partial
+        : null,
     stages: ANALYSIS_STAGES.map((s, index) => {
       const done =
         analysis.status === "completed" ||

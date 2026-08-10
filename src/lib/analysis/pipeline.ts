@@ -176,16 +176,15 @@ export async function failStalePreReportAnalysis(analysisId: string) {
     analysis.scanPhase === "processing" ||
     analysis.scanPhase === "waiting" ||
     analysis.scanPhase === "analyzing";
+  const HARD_CEILING_MS = 3 * 60 * 60 * 1000;
+  const softFloorMs = Math.max(
+    PRE_REPORT_STALE_MS,
+    (analysis.estimatedRemainingMs ?? 0) + 15 * 60 * 1000,
+    30 * 60 * 1000 + (analysis.pagesCompleted ?? 0) * 2_000,
+  );
+  // True ceiling — ETA cannot push unlock past HARD_CEILING_MS.
   const budgetMs = incremental
-    ? Math.max(
-        PRE_REPORT_STALE_MS,
-        (analysis.estimatedRemainingMs ?? 0) + 15 * 60 * 1000,
-        // Hard ceiling so truly hung jobs still unlock the UI.
-        Math.min(
-          3 * 60 * 60 * 1000,
-          30 * 60 * 1000 + (analysis.pagesCompleted ?? 0) * 2_000,
-        ),
-      )
+    ? Math.min(HARD_CEILING_MS, softFloorMs)
     : PRE_REPORT_STALE_MS;
 
   if (ageMs < budgetMs) {
@@ -706,7 +705,7 @@ export async function runAnalysisPipeline(analysisId: string) {
       ? analysis.scanProfile
       : "standard";
 
-    // All profiles use durable incremental discover + ticks (never one-shot crawl).
+    // Acquisition: Apify (async) → Firecrawl → MoneyGap native discover/ticks.
     await db
       .update(websiteAnalyses)
       .set({
@@ -715,8 +714,8 @@ export async function runAnalysisPipeline(analysisId: string) {
         status: "running",
       })
       .where(eq(websiteAnalyses.id, analysisId));
-    const { runIncrementalDiscover } = await import("@/lib/scan/batch");
-    await runIncrementalDiscover(analysisId);
+    const { startCrawlAcquisition } = await import("@/lib/scan/crawlers");
+    await startCrawlAcquisition(analysisId);
     return;
   } catch (err) {
     log("error", "analysis_failed", {

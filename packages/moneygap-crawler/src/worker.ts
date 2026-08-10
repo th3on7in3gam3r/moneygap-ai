@@ -586,11 +586,85 @@ async function processLegacyDeepJob(job: JobRow): Promise<void> {
   }
 }
 
+async function getAnalysisExecution(
+  analysisId: string,
+): Promise<string | null> {
+  let execution: string | null = null;
+  await withPg(async (client) => {
+    const res = await client.query(
+      `SELECT scan_meta->>'execution' AS execution,
+              scan_meta->>'crawlProvider' AS provider
+       FROM website_analyses WHERE id = $1::uuid`,
+      [analysisId],
+    );
+    const row = res.rows[0];
+    execution =
+      (row?.execution ? String(row.execution) : null) ||
+      (row?.provider === "apify" ? "apify" : null);
+  });
+  return execution;
+}
+
+/** Kick MoneyGap /api/scan/tick so Apify polls advance on the web app. */
+async function notifyApifyPoll(analysisId: string): Promise<void> {
+  const secret = process.env.CRON_SECRET?.trim();
+  const origin = (
+    process.env.APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.RENDER_EXTERNAL_URL ||
+    ""
+  )
+    .trim()
+    .replace(/\/$/, "");
+  if (!secret || !origin) {
+    console.error(
+      "crawl-worker: cannot poll Apify — set APP_URL and CRON_SECRET",
+      { analysisId },
+    );
+    return;
+  }
+  const url = `${origin}/api/scan/tick`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "x-cron-secret": secret,
+        Authorization: `Bearer ${secret}`,
+      },
+      body: JSON.stringify({ analysisId }),
+      signal: AbortSignal.timeout(45_000),
+    });
+    if (!res.ok) {
+      console.error("crawl-worker: apify tick HTTP", res.status, await res.text());
+    } else {
+      console.log("crawl-worker: apify tick ok", analysisId);
+    }
+  } catch (err) {
+    console.error("crawl-worker: apify tick failed", err);
+  }
+}
+
 async function tick() {
   const job = await claimJob();
   if (!job) return;
 
   if (job.analysis_id) {
+    const execution = await getAnalysisExecution(job.analysis_id);
+    if (execution === "apify") {
+      console.log("crawl-worker: apify job — delegating poll to web tick", job.id);
+      await notifyApifyPoll(job.analysis_id);
+      // Keep job claimable if still queued; Apify path usually sets processing.
+      await withPg(async (client) => {
+        await client.query(
+          `UPDATE crawl_jobs SET status = 'queued', updated_at = NOW() WHERE id = $1::uuid AND status = 'processing'`,
+          [job.id],
+        );
+      });
+      return;
+    }
+
     const pending = await countQueuedPages(job.id);
     if (pending > 0) {
       await processProductJob(job);

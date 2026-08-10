@@ -8,6 +8,10 @@ import { scanLog, scanWarn } from "./scan-log";
 const TICK_FETCH_TIMEOUT_MS = 5_000;
 /** Re-kick crawl ticks if no progress heartbeat for this long. */
 const STALL_KICK_MS = 90_000;
+/** Discover can sit without enqueue — allow kick after this. */
+const DISCOVER_STALL_MS = 3 * 60_000;
+/** Worker waiting with no heartbeat — kick complete/tick path. */
+const WORKER_STALL_MS = 3 * 60_000;
 /** Don't spam scheduleScanTick from status polls. */
 const KICK_COOLDOWN_MS = 45_000;
 
@@ -194,27 +198,6 @@ export async function kickStalledScanIfNeeded(analysisId: string): Promise<{
   }
 
   const meta = (analysis.scanMeta as Record<string, unknown>) ?? {};
-  if (meta.execution === "worker") {
-    // Product crawls are drained by the Render worker — do not self-schedule ticks.
-    return { kicked: false, reason: "worker_execution" };
-  }
-
-  const scanStage =
-    typeof meta.scanStage === "string" ? meta.scanStage : "";
-  // Do not kick while discover is still building the queue — empty-queue ticks
-  // used to falsely fail analyses mid-sitemap.
-  if (
-    phase === "discovering" ||
-    phase === "queued" ||
-    scanStage === "connecting" ||
-    scanStage === "robots" ||
-    scanStage === "sitemap" ||
-    scanStage === "discovery" ||
-    scanStage === "queue"
-  ) {
-    return { kicked: false, reason: "still_discovering" };
-  }
-
   const lastProgressAt =
     typeof meta.lastProgressAt === "number"
       ? meta.lastProgressAt
@@ -232,6 +215,64 @@ export async function kickStalledScanIfNeeded(analysisId: string): Promise<{
     analysis.createdAt.getTime();
   const ageMs = Date.now() - clock;
   const sinceKick = Date.now() - lastTickKickAt;
+
+  // Apify polls via the same tick scheduler — always eligible to re-kick.
+  const isApify = meta.execution === "apify" || meta.crawlProvider === "apify";
+  const isWorker = meta.execution === "worker" && !isApify;
+
+  // Worker with stale heartbeat: kick /api/scan/complete attempt via tick path
+  // (tick no-ops if queue empty; complete route is separate — schedule tick + warn).
+  if (isWorker) {
+    if (ageMs < WORKER_STALL_MS) {
+      return { kicked: false, reason: "worker_fresh" };
+    }
+    if (sinceKick < KICK_COOLDOWN_MS) {
+      return { kicked: false, reason: "cooldown" };
+    }
+    scanWarn("SCAN", "Worker crawl stale — re-kicking tick/complete path", {
+      analysisId,
+      ageMs,
+    });
+    await persistTickKickMeta(analysisId);
+    scheduleScanTickAsync(analysisId);
+    // Also try complete if pages already mirrored
+    try {
+      const { processScanTick } = await import("./batch");
+      await processScanTick(analysisId);
+    } catch {
+      /* ignore */
+    }
+    return { kicked: true, reason: "worker_stale" };
+  }
+
+  const scanStage =
+    typeof meta.scanStage === "string" ? meta.scanStage : "";
+  const stillDiscovering =
+    phase === "discovering" ||
+    phase === "queued" ||
+    scanStage === "connecting" ||
+    scanStage === "robots" ||
+    scanStage === "sitemap" ||
+    scanStage === "discovery" ||
+    scanStage === "queue";
+
+  // Allow kick after discover stall threshold so mid-discover kill cannot freeze forever.
+  if (stillDiscovering && !isApify) {
+    if (ageMs < DISCOVER_STALL_MS) {
+      return { kicked: false, reason: "still_discovering" };
+    }
+    if (sinceKick < KICK_COOLDOWN_MS) {
+      return { kicked: false, reason: "cooldown" };
+    }
+    scanWarn("SCAN", "Discover stall exceeded — re-kicking", {
+      analysisId,
+      ageMs,
+      scanStage,
+    });
+    await persistTickKickMeta(analysisId);
+    scheduleScanTickAsync(analysisId);
+    return { kicked: true, reason: "discover_stalled" };
+  }
 
   const shouldKick =
     Boolean(tickScheduleError) || ageMs >= STALL_KICK_MS;
