@@ -2,7 +2,7 @@
 
 import { AlertTriangle, Loader2, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ConnectivityDiagnosticsPanel } from "@/components/analysis/connectivity-diagnostics-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
@@ -22,7 +22,14 @@ type ProfileOption = {
   maxPages: number;
 };
 
-export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
+export function AnalyzeUrlForm({
+  initialUrl = "",
+  autoStart = false,
+}: {
+  initialUrl?: string;
+  /** When true with a URL, estimate then start the recommended scan automatically. */
+  autoStart?: boolean;
+}) {
   const router = useRouter();
   const [url, setUrl] = useState(initialUrl);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +48,8 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
     url: string;
     score: number;
   } | null>(null);
+  const [autoStarting, setAutoStarting] = useState(false);
+  const autoStartRan = useRef(false);
 
   useEffect(() => {
     if (initialUrl) return;
@@ -50,6 +59,39 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
     setSandboxBanner({ url: handoff.url, score: handoff.score });
   }, [initialUrl]);
 
+  async function fetchEstimate(targetUrl: string): Promise<{
+    ok: boolean;
+    estimate?: EstimateResult;
+    profiles?: ProfileOption[];
+    diagnostics?: ConnectivityDiagnostics;
+    error?: string;
+  }> {
+    const res = await fetch("/api/scan/estimate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: targetUrl }),
+    });
+    const data = (await res.json()) as {
+      estimate?: EstimateResult;
+      profiles?: ProfileOption[];
+      diagnostics?: ConnectivityDiagnostics;
+      error?: string;
+    };
+    if (!res.ok || !data.estimate) {
+      return {
+        ok: false,
+        diagnostics: data.diagnostics,
+        error: data.error ?? "Could not estimate this website.",
+      };
+    }
+    return {
+      ok: true,
+      estimate: data.estimate,
+      profiles: data.profiles,
+      diagnostics: data.diagnostics,
+    };
+  }
+
   async function runEstimate(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -57,26 +99,16 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
     setEstimating(true);
     setEstimate(null);
     try {
-      const res = await fetch("/api/scan/estimate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-      const data = (await res.json()) as {
-        estimate?: EstimateResult;
-        profiles?: ProfileOption[];
-        diagnostics?: ConnectivityDiagnostics;
-        error?: string;
-      };
-      if (data.diagnostics) setDiagnostics(data.diagnostics);
-      if (!res.ok || !data.estimate) {
-        setError(data.error ?? "Could not estimate this website.");
+      const result = await fetchEstimate(url);
+      if (result.diagnostics) setDiagnostics(result.diagnostics);
+      if (!result.ok || !result.estimate) {
+        setError(result.error ?? "Could not estimate this website.");
         setEstimating(false);
         return;
       }
-      setEstimate(data.estimate);
-      setProfiles(data.profiles ?? []);
-      setScanProfile(data.estimate.recommendedProfile);
+      setEstimate(result.estimate);
+      setProfiles(result.profiles ?? []);
+      setScanProfile(result.estimate.recommendedProfile);
       setEstimating(false);
     } catch {
       setError("Could not estimate this website.");
@@ -84,7 +116,10 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
     }
   }
 
-  async function startScan() {
+  async function startScan(opts?: {
+    targetUrl?: string;
+    profile?: ScanProfile;
+  }) {
     setError(null);
     setSubmitting(true);
     try {
@@ -92,8 +127,8 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          url: estimate?.url ?? url,
-          scanProfile,
+          url: opts?.targetUrl ?? estimate?.url ?? url,
+          scanProfile: opts?.profile ?? scanProfile,
           ...(businessName.trim() ? { businessName: businessName.trim() } : {}),
           ...(industry.trim() ? { industry: industry.trim() } : {}),
           ...(businessGoal.trim() ? { businessGoal: businessGoal.trim() } : {}),
@@ -108,6 +143,7 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
       if (!res.ok || !data.analysisId) {
         setError(data.error ?? "We couldn't start this analysis. Please try again.");
         setSubmitting(false);
+        setAutoStarting(false);
         return;
       }
       clearSandboxHandoff();
@@ -115,8 +151,48 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
     } catch {
       setError("We couldn't start this analysis. Please try again.");
       setSubmitting(false);
+      setAutoStarting(false);
     }
   }
+
+  useEffect(() => {
+    if (!autoStart || autoStartRan.current) return;
+    const target = initialUrl.trim();
+    if (!target) return;
+    autoStartRan.current = true;
+    setAutoStarting(true);
+    setError(null);
+    setDiagnostics(null);
+    setEstimating(true);
+    setEstimate(null);
+
+    void (async () => {
+      try {
+        const result = await fetchEstimate(target);
+        if (result.diagnostics) setDiagnostics(result.diagnostics);
+        if (!result.ok || !result.estimate) {
+          setError(result.error ?? "Could not estimate this website.");
+          setEstimating(false);
+          setAutoStarting(false);
+          return;
+        }
+        setEstimate(result.estimate);
+        setProfiles(result.profiles ?? []);
+        setScanProfile(result.estimate.recommendedProfile);
+        setEstimating(false);
+        await startScan({
+          targetUrl: result.estimate.url,
+          profile: result.estimate.recommendedProfile,
+        });
+      } catch {
+        setError("Could not estimate this website.");
+        setEstimating(false);
+        setAutoStarting(false);
+      }
+    })();
+    // Intentionally once on handoff mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart, initialUrl]);
 
   return (
     <Card>
@@ -132,7 +208,24 @@ export function AnalyzeUrlForm({ initialUrl = "" }: { initialUrl?: string }) {
           }
           className="space-y-4"
         >
-          {sandboxBanner ? (
+          {autoStarting ? (
+            <div className="flex gap-3 rounded-xl border border-accent/30 bg-accent-soft/50 px-3.5 py-3">
+              <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-accent" />
+              <div className="min-w-0 space-y-1">
+                <p className="text-sm font-medium text-fg">
+                  Starting your MoneyGap Engine™ scan
+                </p>
+                <p className="text-xs leading-relaxed text-fg-muted">
+                  Checking connectivity, picking the recommended profile, and
+                  launching the crawl for{" "}
+                  <span className="font-medium text-fg">{url || initialUrl}</span>.
+                  No need to re-enter the site.
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          {sandboxBanner && !autoStarting ? (
             <div className="flex gap-3 rounded-xl border border-accent/30 bg-accent-soft/50 px-3.5 py-3">
               <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
               <div className="min-w-0 space-y-1">

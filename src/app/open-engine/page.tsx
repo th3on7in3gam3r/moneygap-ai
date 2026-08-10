@@ -58,7 +58,7 @@ function safeAnalyzePath(url?: string): string {
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       return "/dashboard/analyze";
     }
-    return `/dashboard/analyze?url=${encodeURIComponent(parsed.toString())}`;
+    return `/dashboard/analyze?url=${encodeURIComponent(parsed.toString())}&auto=1`;
   } catch {
     return "/dashboard/analyze";
   }
