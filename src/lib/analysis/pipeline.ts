@@ -12,10 +12,21 @@ import {
   websites,
 } from "@/db/schema";
 import { buildCrawlCorpus, type ScrapedPage } from "@/lib/analysis/firecrawl";
+import {
+  AnalysisPipelineError,
+  classifyAiError,
+  classifyDbError,
+} from "@/lib/analysis/ai-errors";
+import {
+  buildCompactIntelligenceCorpus,
+  buildSiteIntelligenceModel,
+  dedupePagesByUrl,
+} from "@/lib/analysis/corpus";
 import type { IntelligenceResult } from "@/lib/analysis/openai";
 import { generateWebsiteIntelligence } from "@/lib/analysis/openai";
 import { persistMoneyGapEngineResult } from "@/lib/analysis/persist-money-gaps";
 import { persistCompetitiveIntelligence } from "@/lib/analysis/competitive/persist";
+import { claimPostCrawlAnalysis } from "@/lib/analysis/post-crawl-guard";
 import {
   ANALYSIS_STAGES,
   MISSING_KEYS_ERROR,
@@ -78,10 +89,15 @@ export async function updateAnalysisStageLabel(
     .where(eq(websiteAnalyses.id, analysisId));
 }
 
-async function failAnalysis(analysisId: string, websiteId: string, message: string) {
+async function failAnalysis(
+  analysisId: string,
+  websiteId: string,
+  message: string,
+  diagnostics?: Record<string, unknown>,
+) {
   const row = await db.query.websiteAnalyses.findFirst({
     where: eq(websiteAnalyses.id, analysisId),
-    columns: { startedAt: true },
+    columns: { startedAt: true, scanMeta: true },
   });
   const durationMs = row?.startedAt
     ? Date.now() - row.startedAt.getTime()
@@ -95,6 +111,14 @@ async function failAnalysis(analysisId: string, websiteId: string, message: stri
       error: message,
       completedAt: new Date(),
       ...(durationMs != null ? { durationMs } : {}),
+      ...(diagnostics
+        ? {
+            scanMeta: {
+              ...((row?.scanMeta as Record<string, unknown>) ?? {}),
+              ...diagnostics,
+            },
+          }
+        : {}),
     })
     .where(eq(websiteAnalyses.id, analysisId));
 
@@ -218,6 +242,25 @@ function toUserSafeError(err: unknown): string {
     }
   }
   return "Analysis failed unexpectedly. Please try again in a moment.";
+}
+
+function developerDiagnostics(
+  err: unknown,
+  patch: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const errorClass =
+    err instanceof AnalysisPipelineError
+      ? err.errorClass
+      : classifyAiError(err);
+  return {
+    failedStage: patch.failedStage ?? "preparing",
+    errorClass,
+    errorMessage: err instanceof Error ? err.message : String(err),
+    causeMessage:
+      err instanceof AnalysisPipelineError ? err.causeMessage ?? null : null,
+    severity: "FATAL",
+    ...patch,
+  };
 }
 
 function reconstructIntelligence(input: {
@@ -730,41 +773,131 @@ export async function runAnalysisPipeline(analysisId: string) {
 /** Resume analysis after durable crawl pages are stored in website_pages. */
 export async function runPostCrawlAnalysis(analysisId: string) {
   const startedAtMs = Date.now();
+  const claim = await claimPostCrawlAnalysis(analysisId);
+  if (!claim.claimed) {
+    log("info", "post_crawl_skipped", {
+      analysisId,
+      reason: claim.reason,
+      reportId: claim.reportId,
+    });
+    // If a report already exists but engines pending, resume instead of no-op fail.
+    if (claim.reason === "report_exists" && claim.reportId) {
+      try {
+        await resumeStuckAnalysis(analysisId);
+      } catch (err) {
+        log("warn", "post_crawl_resume_soft_fail", {
+          analysisId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    return;
+  }
+
   const analysis = await db.query.websiteAnalyses.findFirst({
     where: eq(websiteAnalyses.id, analysisId),
     with: { website: true },
   });
   if (!analysis) return;
   if (!process.env.OPENAI_API_KEY) {
-    await failAnalysis(analysisId, analysis.websiteId, MISSING_KEYS_ERROR);
+    await failAnalysis(analysisId, analysis.websiteId, MISSING_KEYS_ERROR, {
+      failedStage: "preparing",
+      errorClass: "AI_PROVIDER_ERROR",
+      severity: "FATAL",
+    });
     return;
   }
 
   const rows = await db.query.websitePages.findMany({
     where: eq(websitePages.analysisId, analysisId),
   });
-  const pages: ScrapedPage[] = rows.map((p) => ({
+  const rawPages: ScrapedPage[] = rows.map((p) => ({
     url: p.url,
     pageType: (p.pageType as ScrapedPage["pageType"]) || "other",
     title: p.title,
     markdown: p.markdown ?? "",
     metadata: (p.metadata as Record<string, unknown>) ?? {},
   }));
+  const pages = dedupePagesByUrl(rawPages);
 
   if (pages.length === 0) {
-    await failAnalysis(analysisId, analysis.websiteId, PUBLIC_CRAWL_ERROR);
+    await failAnalysis(analysisId, analysis.websiteId, PUBLIC_CRAWL_ERROR, {
+      failedStage: "extract_content",
+      errorClass: "UNKNOWN",
+      severity: "FATAL",
+    });
     return;
   }
 
+  log("info", "REPORT_GENERATION_START", {
+    analysisId,
+    rawPageRows: rawPages.length,
+    distinctPages: pages.length,
+    durationMs: Date.now() - startedAtMs,
+  });
+
   try {
-    await finishPipelineWithPages(analysisId, analysis, pages, startedAtMs);
+    await finishPipelineWithPages(analysisId, analysis, pages, startedAtMs, {
+      rawPageRows: rawPages.length,
+    });
   } catch (err) {
+    const errorClass =
+      err instanceof AnalysisPipelineError
+        ? err.errorClass
+        : classifyDbError(err);
     log("error", "analysis_failed", {
       analysisId,
       durationMs: Date.now() - startedAtMs,
+      errorClass,
       error: err instanceof Error ? err.message : String(err),
     });
-    await failAnalysis(analysisId, analysis.websiteId, toUserSafeError(err));
+    // If intelligence report already persisted, do not wipe it — mark partial + resume path.
+    const latest = await db.query.websiteAnalyses.findFirst({
+      where: eq(websiteAnalyses.id, analysisId),
+      columns: { reportId: true },
+    });
+    if (latest?.reportId) {
+      log("warn", "post_crawl_partial_after_error", {
+        analysisId,
+        reportId: latest.reportId,
+        errorClass,
+      });
+      await db
+        .update(websiteAnalyses)
+        .set({
+          status: "running",
+          error: null,
+          scanMeta: {
+            ...(((
+              await db.query.websiteAnalyses.findFirst({
+                where: eq(websiteAnalyses.id, analysisId),
+                columns: { scanMeta: true },
+              })
+            )?.scanMeta as Record<string, unknown>) ?? {}),
+            partial: true,
+            severity: "WARNING",
+            failedStage: "money_gap_or_competitive",
+            errorClass,
+            errorMessage: err instanceof Error ? err.message : String(err),
+          },
+        })
+        .where(eq(websiteAnalyses.id, analysisId));
+      try {
+        await resumeStuckAnalysis(analysisId);
+        return;
+      } catch {
+        /* fall through to fail */
+      }
+    }
+    await failAnalysis(
+      analysisId,
+      analysis.websiteId,
+      toUserSafeError(err),
+      developerDiagnostics(err, {
+        failedStage: "preparing",
+        durationMs: Date.now() - startedAtMs,
+      }),
+    );
   }
 }
 
@@ -777,6 +910,7 @@ async function finishPipelineWithPages(
   analysis: PipelineAnalysis,
   pages: ScrapedPage[],
   startedAtMs: number,
+  opts: { rawPageRows?: number } = {},
 ) {
   try {
     const priorMeta =
@@ -790,25 +924,49 @@ async function finishPipelineWithPages(
         scanMeta: {
           ...priorMeta,
           scanStage: "extract_content",
+          tickScheduleError: null,
+          tickScheduleSeverity: priorMeta.tickScheduleError
+            ? "RECOVERED"
+            : priorMeta.tickScheduleSeverity ?? null,
           stageDiagnostics: [
             ...priorDiag,
             {
               stage: "extract_content",
               status: "ok",
-              detail: `Corpus from ${pages.length} pages`,
+              detail: `Corpus from ${pages.length} distinct pages${
+                opts.rawPageRows && opts.rawPageRows !== pages.length
+                  ? ` (deduped from ${opts.rawPageRows} rows)`
+                  : ""
+              }`,
             },
           ],
         },
       })
       .where(eq(websiteAnalyses.id, analysisId));
 
-    const corpus = buildCrawlCorpus(pages);
+    const packed = buildCompactIntelligenceCorpus(pages);
+    const siteModel = buildSiteIntelligenceModel(pages);
+    const corpus = packed.corpus;
+
+    log("info", "llm_input_budget", {
+      analysisId,
+      stage: "website_intelligence",
+      pageCount: packed.pageCount,
+      inputChars: packed.inputChars,
+      estimatedTokens: packed.estimatedTokens,
+      truncated: packed.truncated,
+      droppedPages: packed.droppedPages,
+      model: process.env.OPENAI_MODEL || "gpt-4o",
+    });
 
     await setStage(analysisId, "understanding");
     const intelligence = await generateWebsiteIntelligence({
       url: analysis.url,
       domain: analysis.website.domain,
       corpus,
+      siteModel,
+      pageCount: packed.pageCount,
+      stage: "website_intelligence",
     });
 
     await setStage(analysisId, "extracting");
@@ -816,70 +974,100 @@ async function finishPipelineWithPages(
     await setStage(analysisId, "content");
     await setStage(analysisId, "preparing");
 
+    log("info", "REPORT_PERSIST_START", { analysisId });
+
     const siteName =
       pages.find((p) => p.pageType === "homepage")?.title?.split(/[|\-–—]/)[0]?.trim() ||
       analysis.website.name;
 
-    const [report] = await db
-      .insert(reports)
-      .values({
-        websiteId: analysis.websiteId,
-        workspaceId: analysis.workspaceId,
-        title: `${siteName} — Growth Intelligence`,
-        type: "intelligence",
-        status: "ready",
-        overview: intelligence.overview,
-        summary: intelligence.overview,
-        intelligenceScore: intelligence.score.overall,
-        scoreBreakdown: {
-          businessClarity: intelligence.score.businessClarity,
-          audienceClarity: intelligence.score.audienceClarity,
-          monetizationVisibility: intelligence.score.monetizationVisibility,
-          contentAuthority: intelligence.score.contentAuthority,
-          trustSignals: intelligence.score.trustSignals,
-        },
-        moneyGapScore: 0,
-        revenueAtRisk: 0,
-        capturePotential: 0,
-        moneyGapEngineStatus: "pending",
-        competitiveEngineStatus: "pending",
-      })
-      .returning();
+    let report: typeof reports.$inferSelect;
+    try {
+      const inserted = await db
+        .insert(reports)
+        .values({
+          websiteId: analysis.websiteId,
+          workspaceId: analysis.workspaceId,
+          title: `${siteName} — Growth Intelligence`,
+          type: "intelligence",
+          status: "ready",
+          overview: intelligence.overview,
+          summary: intelligence.overview,
+          intelligenceScore: intelligence.score.overall,
+          scoreBreakdown: {
+            businessClarity: intelligence.score.businessClarity,
+            audienceClarity: intelligence.score.audienceClarity,
+            monetizationVisibility: intelligence.score.monetizationVisibility,
+            contentAuthority: intelligence.score.contentAuthority,
+            trustSignals: intelligence.score.trustSignals,
+          },
+          moneyGapScore: 0,
+          revenueAtRisk: 0,
+          capturePotential: 0,
+          moneyGapEngineStatus: "pending",
+          competitiveEngineStatus: "pending",
+        })
+        .returning();
+      report = inserted[0]!;
+    } catch (err) {
+      throw new AnalysisPipelineError(toUserSafeError(err), {
+        errorClass: classifyDbError(err),
+        cause: err,
+      });
+    }
 
-    await db.insert(businessProfiles).values({
+    log("info", "REPORT_PERSIST_COMPLETE", {
       analysisId,
       reportId: report.id,
-      industry: intelligence.business.industry,
-      businessType: intelligence.business.businessType,
-      companyType: intelligence.business.companyType,
-      businessModel: intelligence.business.businessModel,
-      revenueModel: intelligence.business.revenueModel,
-      targetCustomer: intelligence.business.targetCustomer,
-      targetMarket: intelligence.business.targetMarket,
-      productsServices: intelligence.business.productsServices,
     });
 
-    await db.insert(audienceProfiles).values({
-      analysisId,
-      reportId: report.id,
-      primaryAudience: intelligence.audience.primaryAudience,
-      secondaryAudience: intelligence.audience.secondaryAudience,
-      customerProblems: intelligence.audience.customerProblems,
-      customerGoals: intelligence.audience.customerGoals,
-      buyingIntent: intelligence.audience.buyingIntent,
-    });
+    try {
+      await db.insert(businessProfiles).values({
+        analysisId,
+        reportId: report.id,
+        industry: intelligence.business.industry,
+        businessType: intelligence.business.businessType,
+        companyType: intelligence.business.companyType,
+        businessModel: intelligence.business.businessModel,
+        revenueModel: intelligence.business.revenueModel,
+        targetCustomer: intelligence.business.targetCustomer,
+        targetMarket: intelligence.business.targetMarket,
+        productsServices: intelligence.business.productsServices,
+      });
 
-    await db.insert(contentAnalyses).values({
-      analysisId,
-      reportId: report.id,
-      blogPresence: intelligence.content.blogPresence,
-      contentCategories: intelligence.content.contentCategories,
-      contentFrequency: intelligence.content.contentFrequency,
-      educationalResources: intelligence.content.educationalResources,
-      seoOpportunities: intelligence.content.seoOpportunities,
-      contentStrengths: intelligence.content.contentStrengths,
-      contentStrategy: intelligence.content.contentStrategy,
-    });
+      await db.insert(audienceProfiles).values({
+        analysisId,
+        reportId: report.id,
+        primaryAudience: intelligence.audience.primaryAudience,
+        secondaryAudience: intelligence.audience.secondaryAudience,
+        customerProblems: intelligence.audience.customerProblems,
+        customerGoals: intelligence.audience.customerGoals,
+        buyingIntent: intelligence.audience.buyingIntent,
+      });
+
+      await db.insert(contentAnalyses).values({
+        analysisId,
+        reportId: report.id,
+        blogPresence: intelligence.content.blogPresence,
+        contentCategories: intelligence.content.contentCategories,
+        contentFrequency: intelligence.content.contentFrequency,
+        educationalResources: intelligence.content.educationalResources,
+        seoOpportunities: intelligence.content.seoOpportunities,
+        contentStrengths: intelligence.content.contentStrengths,
+        contentStrategy: intelligence.content.contentStrategy,
+      });
+    } catch (err) {
+      // Unique analysis_id — another concurrent attempt already wrote profiles.
+      const cls = classifyDbError(err);
+      if (cls === "DATABASE_WRITE_ERROR") {
+        log("warn", "profile_persist_race_recovered", {
+          analysisId,
+          reportId: report.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      } else {
+        throw err;
+      }
+    }
 
     const insightRows: {
       analysisId: string;
@@ -992,7 +1180,8 @@ async function finishPipelineWithPages(
     await setStage(analysisId, "quantifying");
     await setStage(analysisId, "action_plans");
 
-    await persistMoneyGapEngineResult({
+    let partial = false;
+    const moneyGap = await persistMoneyGapEngineResult({
       analysisId,
       reportId: report.id,
       url: analysis.url,
@@ -1000,9 +1189,19 @@ async function finishPipelineWithPages(
       intelligence,
       corpus,
     });
+    if (!moneyGap.ok) {
+      partial = true;
+      log("warn", "money_gap_engine_soft_fail", {
+        analysisId,
+        reportId: report.id,
+        error: moneyGap.error,
+        errorClass: "AI_PROVIDER_ERROR",
+        severity: "WARNING",
+      });
+    }
 
     await setStage(analysisId, "discovering_competitors");
-    await persistCompetitiveIntelligence({
+    const competitive = await persistCompetitiveIntelligence({
       analysisId,
       reportId: report.id,
       websiteId: analysis.websiteId,
@@ -1019,6 +1218,15 @@ async function finishPipelineWithPages(
         onAnalyzeStart: () => setStage(analysisId, "competitive_analysis"),
       },
     });
+    if (!competitive.ok) {
+      partial = true;
+      log("warn", "competitive_engine_soft_fail", {
+        analysisId,
+        reportId: report.id,
+        error: competitive.error,
+        severity: "WARNING",
+      });
+    }
 
     try {
       const { runMonitorPostProcess } = await import("@/lib/monitor/post-process");
@@ -1096,8 +1304,32 @@ async function finishPipelineWithPages(
         engineVersion: MONEYGAP_ENGINE_VERSION,
         trustVersion: TRUST_ENGINE_VERSION,
         error: null,
+        scanMeta: {
+          ...(((
+            await db.query.websiteAnalyses.findFirst({
+              where: eq(websiteAnalyses.id, analysisId),
+              columns: { scanMeta: true },
+            })
+          )?.scanMeta as Record<string, unknown>) ?? {}),
+          partial,
+          severity: partial ? "WARNING" : "INFO",
+          reportGenerationComplete: true,
+        },
       })
       .where(eq(websiteAnalyses.id, analysisId));
+
+    log("info", "SCAN_COMPLETE", {
+      analysisId,
+      reportId: report.id,
+      durationMs,
+      partial,
+    });
+    log("info", "REPORT_GENERATION_COMPLETE", {
+      analysisId,
+      reportId: report.id,
+      durationMs,
+      partial,
+    });
 
     try {
       const { recordUsage } = await import("@/lib/billing");

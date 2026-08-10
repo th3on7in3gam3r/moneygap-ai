@@ -99,6 +99,16 @@ ${ctx.corpus.slice(0, 45000)}`,
   );
 
   const text = extractOutputText(response);
-  const parsed = JSON.parse(text) as { findings: MoneyGapFinding[] };
+  let parsed: { findings: MoneyGapFinding[] };
+  try {
+    parsed = JSON.parse(text) as { findings: MoneyGapFinding[] };
+  } catch {
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start < 0 || end <= start) throw new Error(MONEY_GAP_ENGINE_ERROR);
+    parsed = JSON.parse(text.slice(start, end + 1)) as {
+      findings: MoneyGapFinding[];
+    };
+  }
   return (parsed.findings ?? []).map((f) => normalizeFinding(f, def.id));
 }

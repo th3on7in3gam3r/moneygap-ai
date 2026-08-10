@@ -493,13 +493,18 @@ export async function processApifyPoll(analysisId: string): Promise<{
   if (
     analysis.scanPhase === "paused" ||
     analysis.scanPhase === "cancelled" ||
+    analysis.scanPhase === "analyzing" ||
     analysis.status === "failed" ||
-    analysis.status === "completed"
+    analysis.status === "completed" ||
+    analysis.reportId
   ) {
     return { done: true, processed: 0 };
   }
 
   const meta = (analysis.scanMeta as Record<string, unknown>) ?? {};
+  if (typeof meta.postCrawlClaimedAt === "number") {
+    return { done: true, processed: 0 };
+  }
   const runId = typeof meta.providerRunId === "string" ? meta.providerRunId : null;
   if (!runId) {
     scanWarn("CRAWLER", "Missing providerRunId — falling back", { analysisId });

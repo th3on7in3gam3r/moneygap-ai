@@ -5,6 +5,7 @@ import {
   type OnProgress,
   type ScrapedPage as CrawlerScrapedPage,
 } from "moneygap-crawler";
+import { buildCompactIntelligenceCorpus } from "@/lib/analysis/corpus";
 import type { PageType } from "@/lib/analysis/stages";
 import { MISSING_KEYS_ERROR, PUBLIC_CRAWL_ERROR } from "@/lib/analysis/stages";
 import { log, withRetry } from "@/lib/observability/logger";
@@ -278,11 +279,5 @@ export async function crawlWebsite(
 }
 
 export function buildCrawlCorpus(pages: ScrapedPage[]): string {
-  return pages
-    .map(
-      (page) =>
-        `## [${page.pageType.toUpperCase()}] ${page.title ?? page.url}\nURL: ${page.url}\n\n${page.markdown}`,
-    )
-    .join("\n\n---\n\n")
-    .slice(0, 90000);
+  return buildCompactIntelligenceCorpus(pages).corpus;
 }

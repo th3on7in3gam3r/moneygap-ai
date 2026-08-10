@@ -138,6 +138,45 @@ export async function GET(
       typeof (analysis.scanMeta as { partial?: unknown }).partial === "boolean"
         ? (analysis.scanMeta as { partial: boolean }).partial
         : null,
+    diagnostics: {
+      scanId: analysis.id,
+      failedStage:
+        analysis.scanMeta &&
+        typeof (analysis.scanMeta as { failedStage?: unknown }).failedStage ===
+          "string"
+          ? (analysis.scanMeta as { failedStage: string }).failedStage
+          : null,
+      errorClass:
+        analysis.scanMeta &&
+        typeof (analysis.scanMeta as { errorClass?: unknown }).errorClass ===
+          "string"
+          ? (analysis.scanMeta as { errorClass: string }).errorClass
+          : null,
+      errorMessage:
+        analysis.scanMeta &&
+        typeof (analysis.scanMeta as { errorMessage?: unknown }).errorMessage ===
+          "string"
+          ? (analysis.scanMeta as { errorMessage: string }).errorMessage
+          : null,
+      severity:
+        analysis.scanMeta &&
+        typeof (analysis.scanMeta as { severity?: unknown }).severity === "string"
+          ? (analysis.scanMeta as { severity: string }).severity
+          : analysis.scanMeta &&
+              typeof (analysis.scanMeta as { tickScheduleSeverity?: unknown })
+                .tickScheduleSeverity === "string"
+            ? (analysis.scanMeta as { tickScheduleSeverity: string })
+                .tickScheduleSeverity
+            : null,
+      durationMs: analysis.durationMs,
+      reportId: analysis.reportId,
+      tickScheduleError:
+        analysis.scanMeta &&
+        typeof (analysis.scanMeta as { tickScheduleError?: unknown })
+          .tickScheduleError === "string"
+          ? (analysis.scanMeta as { tickScheduleError: string }).tickScheduleError
+          : null,
+    },
     stages: ANALYSIS_STAGES.map((s, index) => {
       const done =
         analysis.status === "completed" ||
