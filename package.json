@@ -12,7 +12,7 @@
     "db:push": "drizzle-kit push",
     "db:seed": "tsx --env-file=.env.local src/db/seed.ts",
     "db:studio": "drizzle-kit studio",
-    "test:scan": "tsx --test src/lib/scan/profiles.test.ts src/lib/scan/reclaim.test.ts src/lib/scan/normalize.test.ts src/lib/scan/connectivity/classify-error.test.ts src/lib/scan/connectivity/pipeline.test.ts",
+    "test:scan": "tsx --test src/lib/billing/scan-profiles.test.ts src/lib/scan/profiles.test.ts src/lib/scan/reclaim.test.ts src/lib/scan/normalize.test.ts src/lib/scan/connectivity/classify-error.test.ts src/lib/scan/connectivity/pipeline.test.ts",
     "stripe:setup": "node --import tsx --env-file=.env.local scripts/setup-stripe-catalog.ts",
     "stripe:setup:vercel": "node --import tsx --env-file=.env.local scripts/setup-stripe-catalog.ts --vercel"
   },

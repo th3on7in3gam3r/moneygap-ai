@@ -9,6 +9,7 @@ import {
   failStalePreReportAnalysis,
 } from "@/lib/analysis/pipeline";
 import { ANALYSIS_STAGES } from "@/lib/analysis/stages";
+import { kickStalledScanIfNeeded } from "@/lib/scan/continue";
 
 export const maxDuration = 300;
 
@@ -49,6 +50,13 @@ export async function GET(
     !analysis.reportId &&
     (analysis.status === "running" || analysis.status === "queued")
   ) {
+    // Self-heal stalled crawl ticks before the long stale-fail budget.
+    after(() => {
+      void kickStalledScanIfNeeded(id).catch((err) => {
+        console.error("Stalled scan kick failed:", err);
+      });
+    });
+
     // Hung during crawl / Reading pages — fail after stale budget so UI unlocks.
     // Incremental profiles use a longer budget (see failStalePreReportAnalysis).
     const failedStale = await failStalePreReportAnalysis(id);

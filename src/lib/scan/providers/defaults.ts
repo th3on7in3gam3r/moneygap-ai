@@ -310,12 +310,10 @@ export const defaultProgressProvider: ProgressProvider = {
         ? { currentUrl: patch.currentUrl }
         : undefined;
 
-    const existing = meta
-      ? await db.query.websiteAnalyses.findFirst({
-          where: eq(websiteAnalyses.id, analysisId),
-          columns: { scanMeta: true },
-        })
-      : null;
+    const existing = await db.query.websiteAnalyses.findFirst({
+      where: eq(websiteAnalyses.id, analysisId),
+      columns: { scanMeta: true },
+    });
 
     await db
       .update(websiteAnalyses)
@@ -333,14 +331,11 @@ export const defaultProgressProvider: ProgressProvider = {
         ...(patch.estimatedRemainingMs !== undefined
           ? { estimatedRemainingMs: patch.estimatedRemainingMs }
           : {}),
-        ...(meta
-          ? {
-              scanMeta: {
-                ...((existing?.scanMeta as Record<string, unknown>) ?? {}),
-                ...meta,
-              },
-            }
-          : {}),
+        scanMeta: {
+          ...((existing?.scanMeta as Record<string, unknown>) ?? {}),
+          ...(meta ?? {}),
+          lastProgressAt: Date.now(),
+        },
       })
       .where(eq(websiteAnalyses.id, analysisId));
   },

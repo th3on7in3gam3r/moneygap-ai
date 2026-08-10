@@ -1,4 +1,5 @@
 import type { FeatureKey } from "@/lib/billing/catalog";
+import type { ScanProfile } from "@/lib/scan/types";
 
 export function upgradeMessage(feature: FeatureKey): string {
   switch (feature) {
@@ -25,6 +26,19 @@ export function upgradeMessage(feature: FeatureKey): string {
     default:
       return "You're discovering real growth opportunities. Upgrade to analyze more and go deeper.";
   }
+}
+
+export function scanProfileUpgradeMessage(profile: ScanProfile): string {
+  if (profile === "enterprise") {
+    return "Enterprise scans unlock on the Enterprise plan. Upgrade to crawl very large sites.";
+  }
+  if (profile === "deep") {
+    return "Deep Intelligence scans unlock on Starter and above. Upgrade to crawl up to 500 pages.";
+  }
+  if (profile === "standard") {
+    return "Standard Growth scans unlock on Starter and above. Free includes Basics (Quick) scans.";
+  }
+  return "Upgrade to unlock deeper MoneyGap Engine™ scan profiles.";
 }
 
 export function usageLimitMessage(kind: string): string {

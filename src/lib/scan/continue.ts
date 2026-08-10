@@ -6,6 +6,10 @@ import { getSiteOrigin } from "@/lib/seo";
 import { scanLog, scanWarn } from "./scan-log";
 
 const TICK_FETCH_TIMEOUT_MS = 5_000;
+/** Re-kick crawl ticks if no progress heartbeat for this long. */
+const STALL_KICK_MS = 90_000;
+/** Don't spam scheduleScanTick from status polls. */
+const KICK_COOLDOWN_MS = 45_000;
 
 async function persistTickScheduleError(
   analysisId: string,
@@ -22,6 +26,26 @@ async function persistTickScheduleError(
         scanMeta: {
           ...((existing?.scanMeta as Record<string, unknown>) ?? {}),
           tickScheduleError: message,
+        },
+      })
+      .where(eq(websiteAnalyses.id, analysisId));
+  } catch {
+    /* ignore */
+  }
+}
+
+async function persistTickKickMeta(analysisId: string): Promise<void> {
+  try {
+    const existing = await db.query.websiteAnalyses.findFirst({
+      where: eq(websiteAnalyses.id, analysisId),
+      columns: { scanMeta: true },
+    });
+    await db
+      .update(websiteAnalyses)
+      .set({
+        scanMeta: {
+          ...((existing?.scanMeta as Record<string, unknown>) ?? {}),
+          lastTickKickAt: Date.now(),
         },
       })
       .where(eq(websiteAnalyses.id, analysisId));
@@ -56,10 +80,8 @@ function fallbackInProcessTick(analysisId: string): void {
 /** Schedule the next serverless crawl tick (fire-and-forget, timed). */
 export async function scheduleScanTick(analysisId: string): Promise<void> {
   const secret = process.env.CRON_SECRET?.trim();
-  const origin =
-    process.env.APP_URL?.replace(/\/$/, "") ||
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-    getSiteOrigin();
+  // Prefer canonical site origin (handles www vs apex / missing APP_URL).
+  const origin = getSiteOrigin();
 
   if (!secret || !origin) {
     const msg =
@@ -129,4 +151,81 @@ export async function scheduleScanTick(analysisId: string): Promise<void> {
 /** Fire-and-forget helper — never blocks the caller on the child tick. */
 export function scheduleScanTickAsync(analysisId: string): void {
   void scheduleScanTick(analysisId);
+}
+
+/**
+ * If a crawl looks stalled (no page progress heartbeat), re-schedule a tick.
+ * Called from status polling so hung "Reading pages" jobs self-heal.
+ */
+export async function kickStalledScanIfNeeded(analysisId: string): Promise<{
+  kicked: boolean;
+  reason?: string;
+}> {
+  const analysis = await db.query.websiteAnalyses.findFirst({
+    where: eq(websiteAnalyses.id, analysisId),
+    columns: {
+      id: true,
+      status: true,
+      reportId: true,
+      scanPhase: true,
+      startedAt: true,
+      createdAt: true,
+      scanMeta: true,
+    },
+  });
+
+  if (!analysis) return { kicked: false, reason: "missing" };
+  if (analysis.reportId) return { kicked: false, reason: "has_report" };
+  if (analysis.status !== "running" && analysis.status !== "queued") {
+    return { kicked: false, reason: "not_running" };
+  }
+
+  const phase = analysis.scanPhase;
+  if (
+    phase !== "discovering" &&
+    phase !== "processing" &&
+    phase !== "waiting" &&
+    phase !== "queued"
+  ) {
+    return { kicked: false, reason: "not_crawl_phase" };
+  }
+
+  const meta = (analysis.scanMeta as Record<string, unknown>) ?? {};
+  const lastProgressAt =
+    typeof meta.lastProgressAt === "number"
+      ? meta.lastProgressAt
+      : typeof meta.lastProgressAt === "string"
+        ? Date.parse(meta.lastProgressAt)
+        : NaN;
+  const lastTickKickAt =
+    typeof meta.lastTickKickAt === "number" ? meta.lastTickKickAt : 0;
+  const tickScheduleError =
+    typeof meta.tickScheduleError === "string" ? meta.tickScheduleError : null;
+
+  const clock =
+    (Number.isFinite(lastProgressAt) ? lastProgressAt : null) ??
+    analysis.startedAt?.getTime() ??
+    analysis.createdAt.getTime();
+  const ageMs = Date.now() - clock;
+  const sinceKick = Date.now() - lastTickKickAt;
+
+  const shouldKick =
+    Boolean(tickScheduleError) ||
+    ageMs >= STALL_KICK_MS ||
+    (phase === "queued" && ageMs >= 30_000);
+
+  if (!shouldKick) return { kicked: false, reason: "fresh" };
+  if (sinceKick < KICK_COOLDOWN_MS) {
+    return { kicked: false, reason: "cooldown" };
+  }
+
+  scanWarn("SCAN", "Re-kicking stalled crawl tick from status poll", {
+    analysisId,
+    phase,
+    ageMs,
+    tickScheduleError,
+  });
+  await persistTickKickMeta(analysisId);
+  scheduleScanTickAsync(analysisId);
+  return { kicked: true, reason: tickScheduleError ? "tick_error" : "stalled" };
 }

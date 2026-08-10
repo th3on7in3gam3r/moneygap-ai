@@ -320,23 +320,37 @@ export function AnalysisProgress({
               <div className="min-w-0 space-y-1 text-xs leading-relaxed text-fg-muted">
                 <p>
                   <span className="font-semibold text-fg">
-                    {data?.scanProfile
-                      ? `${data.scanProfile} scan`
-                      : "Scan"}
+                    {data?.scanProfile === "quick"
+                      ? "Basics (Quick) scan"
+                      : data?.scanProfile
+                        ? `${data.scanProfile} scan`
+                        : "Scan"}
                     :
                   </span>{" "}
-                  {data?.scanPhase === "discovering" || data?.scanPhase === "processing"
-                    ? "Crawling in small batches so large sites stay reliable."
+                  {data?.scanPhase === "discovering" ||
+                  data?.scanPhase === "processing"
+                    ? "Reading pages in small batches so the crawl stays reliable on serverless."
                     : "Leave this tab open while we crawl pages, score gaps, and build your report."}
                 </p>
                 {typeof data?.pagesDiscovered === "number" &&
                 data.pagesDiscovered > 0 ? (
                   <p className="tabular-nums text-fg">
-                    Pages {data.pagesCompleted ?? 0}/{data.pagesDiscovered}
+                    Reading pages {data.pagesCompleted ?? 0} of{" "}
+                    {data.pagesDiscovered}
                     {data.pagesFailed ? ` · ${data.pagesFailed} failed` : ""}
-                    {data.estimatedRemainingMs
-                      ? ` · ~${Math.max(1, Math.round(data.estimatedRemainingMs / 60000))}m remaining`
+                    {data.estimatedRemainingMs != null &&
+                    data.estimatedRemainingMs > 0
+                      ? data.estimatedRemainingMs < 60_000
+                        ? ` · ~${Math.max(5, Math.round(data.estimatedRemainingMs / 1000))}s remaining`
+                        : ` · ~${Math.max(1, Math.round(data.estimatedRemainingMs / 60000))}m remaining`
                       : ""}
+                  </p>
+                ) : data?.scanPhase === "discovering" ||
+                  data?.stage?.toLowerCase().includes("reading") ||
+                  data?.stage?.toLowerCase().includes("sitemap") ? (
+                  <p className="text-fg">
+                    Discovering pages to read… this usually takes under a minute
+                    for Basics scans.
                   </p>
                 ) : null}
                 {data?.currentUrl ? (
@@ -344,8 +358,9 @@ export function AnalysisProgress({
                 ) : null}
                 {data?.tickScheduleError ? (
                   <p className="text-gap" role="alert">
-                    Crawl continuation issue: {data.tickScheduleError} Ask your
-                    admin to set APP_URL and CRON_SECRET, then retry the scan.
+                    Crawl continuation issue: {data.tickScheduleError} We are
+                    retrying automatically. If this persists, ask your admin to
+                    set APP_URL and CRON_SECRET, then retry the scan.
                   </p>
                 ) : null}
               </div>

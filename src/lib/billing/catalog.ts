@@ -1,5 +1,7 @@
 /** Client-safe plan catalog (no DB imports). */
 
+import type { ScanProfile } from "@/lib/scan/types";
+
 export type PlanId =
   | "free"
   | "starter"
@@ -235,4 +237,28 @@ export function getPlanDefinition(planId: string): PlanDefinition {
 /** Blueprint persona string for UI (never used for entitlement checks). */
 export function blueprintPersonaForPlan(planId: string): string {
   return getPlanDefinition(planId).blueprintPersona;
+}
+
+/** Free = Basics (quick) only. Paid plans unlock deeper crawls. */
+export function allowedScanProfiles(planId: string): ScanProfile[] {
+  const id = resolvePlanId(planId);
+  if (id === "free") return ["quick"];
+  if (id === "enterprise") {
+    return ["quick", "standard", "deep", "enterprise"];
+  }
+  // Starter through agency: quick + standard + deep (enterprise profile = Enterprise plan)
+  return ["quick", "standard", "deep"];
+}
+
+export function planAllowsScanProfile(
+  planId: string,
+  profile: ScanProfile,
+): boolean {
+  return allowedScanProfiles(planId).includes(profile);
+}
+
+export function suggestedPlanForScanProfile(profile: ScanProfile): PlanId {
+  if (profile === "enterprise") return "enterprise";
+  if (profile === "quick") return "free";
+  return "starter";
 }

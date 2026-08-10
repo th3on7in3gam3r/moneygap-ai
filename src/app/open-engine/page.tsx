@@ -1,10 +1,16 @@
 import Link from "next/link";
+import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { db } from "@/db";
 import { extensionReports } from "@/db/schema";
+import {
+  allowedScanProfiles,
+  getWorkspacePlanId,
+} from "@/lib/billing";
+import { ensureUserAndWorkspace } from "@/lib/analysis/workspace";
 import type {
   ExtensionFixPathItem,
   ExtensionMoneyGapReport,
@@ -32,9 +38,9 @@ export async function generateMetadata({
   return buildPageMetadata({
     title: hostHint
       ? `Open Engine — ${hostHint}`
-      : "Open MoneyGap Engine™",
+      : "Open MoneyGap Engine™ Basics",
     description:
-      "Continue from the MoneyGap browser extension into the full MoneyGap Engine™. Sign in to run a deeper analysis with Fix Paths™.",
+      "Continue from the MoneyGap browser extension into MoneyGap Engine™. Run a free Basics scan, or upgrade for Standard and Deep crawls with Fix Paths™.",
     path: "/open-engine",
   });
 }
@@ -51,16 +57,17 @@ function teaserFixes(report: ExtensionMoneyGapReport): ExtensionFixPathItem[] {
   }));
 }
 
+/** Extension handoff always launches a Basics (quick) Engine scan after auth. */
 function safeAnalyzePath(url?: string): string {
-  if (!url) return "/dashboard/analyze";
+  if (!url) return "/dashboard/analyze?profile=quick&auto=1";
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      return "/dashboard/analyze";
+      return "/dashboard/analyze?profile=quick&auto=1";
     }
-    return `/dashboard/analyze?url=${encodeURIComponent(parsed.toString())}&auto=1`;
+    return `/dashboard/analyze?url=${encodeURIComponent(parsed.toString())}&profile=quick&auto=1`;
   } catch {
-    return "/dashboard/analyze";
+    return "/dashboard/analyze?profile=quick&auto=1";
   }
 }
 
@@ -102,6 +109,18 @@ export default async function OpenEnginePage({
   const fixes = report ? teaserFixes(report) : [];
   const analyzePath = safeAnalyzePath(siteUrl || undefined);
 
+  let canRunDeep = false;
+  const { isAuthenticated } = await auth();
+  if (isAuthenticated) {
+    try {
+      const { workspace } = await ensureUserAndWorkspace();
+      const planId = await getWorkspacePlanId(workspace.id);
+      canRunDeep = allowedScanProfiles(planId).includes("standard");
+    } catch {
+      canRunDeep = false;
+    }
+  }
+
   return (
     <div className="min-h-screen bg-bg">
       <header className="border-b border-border/70 bg-bg/80 backdrop-blur-xl">
@@ -121,15 +140,16 @@ export default async function OpenEnginePage({
           <div className="pointer-events-none absolute inset-0 bg-grid opacity-70" />
           <div className="relative mx-auto max-w-3xl px-5 py-14 sm:px-8 sm:py-20">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">
-              Browser extension → MoneyGap Engine™
+              Browser extension → MoneyGap Engine™ Basics
             </p>
             <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight text-fg sm:text-5xl">
-              Continue in MoneyGap Engine™
+              Run a Basics Engine scan
             </h1>
             <p className="mt-4 max-w-2xl text-lg leading-relaxed text-fg-muted">
-              Your extension scan is a local preview. Sign in to run the full
-              Engine crawl, unlock deeper Fix Paths™, and keep a workspace
-              backlog you can re-scan after you ship.
+              Your extension scan is a local preview. Sign in to run a free
+              Basics (Quick) crawl of homepage and key pages. Upgrade for
+              Standard or Deep crawls with fuller Fix Paths™ and workspace
+              backlog.
             </p>
 
             {hostname ? (
@@ -152,10 +172,14 @@ export default async function OpenEnginePage({
             )}
 
             <div className="mt-8">
-              <OpenEngineAuthCtas analyzePath={analyzePath} />
+              <OpenEngineAuthCtas
+                analyzePath={analyzePath}
+                canRunDeep={canRunDeep}
+              />
             </div>
             <p className="mt-3 text-xs text-fg-subtle">
-              Free to start. Auth required to open the Engine workspace.
+              Free includes Basics scans (monthly quota). Standard and Deep
+              require Starter or higher.
             </p>
           </div>
         </section>
@@ -166,8 +190,9 @@ export default async function OpenEnginePage({
               Preview from your extension scan
             </h2>
             <p className="text-sm text-fg-muted">
-              Top Money Gaps™ captured locally — the full Engine adds crawl
-              depth, Opportunity Index™, and execution tools.
+              Top Money Gaps™ captured locally — Basics adds a real Engine
+              crawl; Standard / Deep add more pages, Opportunity Index™, and
+              execution tools.
             </p>
             <ol className="space-y-3">
               {fixes.map((item, i) => (
@@ -202,12 +227,21 @@ export default async function OpenEnginePage({
           <section className="mx-auto max-w-3xl px-5 py-12 sm:px-8">
             <div className="rounded-xl border border-border/80 bg-bg-elevated/40 p-5">
               <h2 className="font-display text-base font-semibold text-fg">
-                What you unlock in the Engine
+                What you unlock
               </h2>
               <ul className="mt-3 space-y-2 text-sm text-fg-muted">
-                <li>Deeper crawlability, schema, and conversion scoring</li>
-                <li>Ranked Money Gaps™ with Fix Paths™ you can execute</li>
-                <li>Workspace history, monitoring, and re-scans after you ship</li>
+                <li>
+                  <span className="font-medium text-fg">Basics (Free):</span>{" "}
+                  Quick crawl of homepage and key marketing pages
+                </li>
+                <li>
+                  <span className="font-medium text-fg">Standard / Deep:</span>{" "}
+                  Deeper crawlability, schema, and conversion scoring
+                </li>
+                <li>
+                  Ranked Money Gaps™ with Fix Paths™, workspace history, and
+                  re-scans
+                </li>
               </ul>
             </div>
           </section>

@@ -3,6 +3,9 @@ export {
   resolvePlanId,
   getPlanDefinition,
   blueprintPersonaForPlan,
+  allowedScanProfiles,
+  planAllowsScanProfile,
+  suggestedPlanForScanProfile,
   ensureBillingPlansSeeded,
   listBillingPlans,
   getPlan,
@@ -16,7 +19,11 @@ export {
   suggestedPlanForFeature,
   ALL_FEATURES,
 } from "@/lib/billing/entitlements";
-export { upgradeMessage, usageLimitMessage } from "@/lib/billing/messages";
+export {
+  upgradeMessage,
+  usageLimitMessage,
+  scanProfileUpgradeMessage,
+} from "@/lib/billing/messages";
 export {
   recordUsage,
   getCurrentPeriodUsage,
@@ -37,6 +44,7 @@ export {
 export {
   requireFeature,
   requireFeatureAndUsage,
+  requireScanProfile,
   getWorkspacePlanId,
   upgradeResponse,
   type GateDenied,

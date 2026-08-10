@@ -3,15 +3,23 @@ import { db } from "@/db";
 import { workspaces } from "@/db/schema";
 import type { FeatureKey } from "@/lib/billing/catalog";
 import {
+  planAllowsScanProfile,
+  suggestedPlanForScanProfile,
+} from "@/lib/billing/catalog";
+import {
   planHasFeature,
   suggestedPlanForFeature,
 } from "@/lib/billing/entitlements";
-import { upgradeMessage } from "@/lib/billing/messages";
+import {
+  scanProfileUpgradeMessage,
+  upgradeMessage,
+} from "@/lib/billing/messages";
 import { getWorkspaceSubscription } from "@/lib/billing/subscription";
 import {
   assertWithinLimit,
   type UsageType,
 } from "@/lib/billing/usage";
+import type { ScanProfile } from "@/lib/scan/types";
 
 export type GateDenied = {
   ok: false;
@@ -71,6 +79,23 @@ export async function requireFeatureAndUsage(input: {
   }
 
   return featureGate;
+}
+
+export async function requireScanProfile(
+  workspaceId: string,
+  profile: ScanProfile,
+): Promise<GateOk | GateDenied> {
+  const planId = await getWorkspacePlanId(workspaceId);
+  if (!planAllowsScanProfile(planId, profile)) {
+    return {
+      ok: false,
+      code: "upgrade_required",
+      feature: "moneygap_engine",
+      message: scanProfileUpgradeMessage(profile),
+      suggestedPlan: suggestedPlanForScanProfile(profile),
+    };
+  }
+  return { ok: true, planId };
 }
 
 export async function getWorkspacePlanId(workspaceId: string): Promise<string> {

@@ -61,6 +61,11 @@ export async function POST(req: Request) {
     });
     if (!gate.ok) return upgradeResponse(gate);
 
+    const scanProfile = parsed.data.scanProfile ?? "quick";
+    const { requireScanProfile } = await import("@/lib/billing");
+    const profileGate = await requireScanProfile(workspace.id, scanProfile);
+    if (!profileGate.ok) return upgradeResponse(profileGate);
+
     const domainMatch = await db.query.websites.findFirst({
       where: and(
         eq(websites.workspaceId, workspace.id),
@@ -119,7 +124,7 @@ export async function POST(req: Request) {
         status: "queued",
         stage: "Queued",
         progress: 0,
-        scanProfile: parsed.data.scanProfile ?? "standard",
+        scanProfile,
         scanPhase: "queued",
         scanMeta:
           Object.keys(entryContext).length > 0

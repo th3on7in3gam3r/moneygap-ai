@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertTriangle, Loader2, Sparkles } from "lucide-react";
+import { AlertTriangle, Loader2, Lock, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ConnectivityDiagnosticsPanel } from "@/components/analysis/connectivity-diagnostics-panel";
@@ -20,15 +21,19 @@ type ProfileOption = {
   label: string;
   description: string;
   maxPages: number;
+  locked?: boolean;
 };
 
 export function AnalyzeUrlForm({
   initialUrl = "",
   autoStart = false,
+  forcedProfile,
 }: {
   initialUrl?: string;
-  /** When true with a URL, estimate then start the recommended scan automatically. */
+  /** When true with a URL, estimate then start the scan automatically. */
   autoStart?: boolean;
+  /** When set (e.g. extension handoff), auto-start uses this profile — not the estimate recommendation. */
+  forcedProfile?: ScanProfile;
 }) {
   const router = useRouter();
   const [url, setUrl] = useState(initialUrl);
@@ -40,7 +45,13 @@ export function AnalyzeUrlForm({
   const [estimating, setEstimating] = useState(false);
   const [estimate, setEstimate] = useState<EstimateResult | null>(null);
   const [profiles, setProfiles] = useState<ProfileOption[]>([]);
-  const [scanProfile, setScanProfile] = useState<ScanProfile>("standard");
+  const [scanProfile, setScanProfile] = useState<ScanProfile>(
+    forcedProfile ?? "quick",
+  );
+  const [allowedProfiles, setAllowedProfiles] = useState<ScanProfile[] | null>(
+    null,
+  );
+  const [suggestedPlan, setSuggestedPlan] = useState<string | null>(null);
   const [businessName, setBusinessName] = useState("");
   const [industry, setIndustry] = useState("");
   const [businessGoal, setBusinessGoal] = useState("");
@@ -59,10 +70,23 @@ export function AnalyzeUrlForm({
     setSandboxBanner({ url: handoff.url, score: handoff.score });
   }, [initialUrl]);
 
+  function resolveStartProfile(
+    recommended: ScanProfile,
+    allowed: ScanProfile[] | null | undefined,
+  ): ScanProfile {
+    const preferred = forcedProfile ?? recommended;
+    if (allowed?.length && !allowed.includes(preferred)) {
+      return allowed.includes("quick") ? "quick" : allowed[0]!;
+    }
+    return preferred;
+  }
+
   async function fetchEstimate(targetUrl: string): Promise<{
     ok: boolean;
     estimate?: EstimateResult;
     profiles?: ProfileOption[];
+    allowedProfiles?: ScanProfile[];
+    suggestedPlan?: string | null;
     diagnostics?: ConnectivityDiagnostics;
     error?: string;
   }> {
@@ -74,6 +98,8 @@ export function AnalyzeUrlForm({
     const data = (await res.json()) as {
       estimate?: EstimateResult;
       profiles?: ProfileOption[];
+      allowedProfiles?: ScanProfile[];
+      suggestedPlan?: string | null;
       diagnostics?: ConnectivityDiagnostics;
       error?: string;
     };
@@ -88,6 +114,8 @@ export function AnalyzeUrlForm({
       ok: true,
       estimate: data.estimate,
       profiles: data.profiles,
+      allowedProfiles: data.allowedProfiles,
+      suggestedPlan: data.suggestedPlan,
       diagnostics: data.diagnostics,
     };
   }
@@ -108,7 +136,14 @@ export function AnalyzeUrlForm({
       }
       setEstimate(result.estimate);
       setProfiles(result.profiles ?? []);
-      setScanProfile(result.estimate.recommendedProfile);
+      setAllowedProfiles(result.allowedProfiles ?? null);
+      setSuggestedPlan(result.suggestedPlan ?? null);
+      setScanProfile(
+        resolveStartProfile(
+          result.estimate.recommendedProfile,
+          result.allowedProfiles,
+        ),
+      );
       setEstimating(false);
     } catch {
       setError("Could not estimate this website.");
@@ -137,10 +172,13 @@ export function AnalyzeUrlForm({
       const data = (await res.json()) as {
         analysisId?: string;
         error?: string;
+        code?: string;
+        suggestedPlan?: string;
         diagnostics?: ConnectivityDiagnostics;
       };
       if (data.diagnostics) setDiagnostics(data.diagnostics);
       if (!res.ok || !data.analysisId) {
+        if (data.suggestedPlan) setSuggestedPlan(data.suggestedPlan);
         setError(data.error ?? "We couldn't start this analysis. Please try again.");
         setSubmitting(false);
         setAutoStarting(false);
@@ -178,11 +216,17 @@ export function AnalyzeUrlForm({
         }
         setEstimate(result.estimate);
         setProfiles(result.profiles ?? []);
-        setScanProfile(result.estimate.recommendedProfile);
+        setAllowedProfiles(result.allowedProfiles ?? null);
+        setSuggestedPlan(result.suggestedPlan ?? null);
+        const profile = resolveStartProfile(
+          result.estimate.recommendedProfile,
+          result.allowedProfiles,
+        );
+        setScanProfile(profile);
         setEstimating(false);
         await startScan({
           targetUrl: result.estimate.url,
-          profile: result.estimate.recommendedProfile,
+          profile,
         });
       } catch {
         setError("Could not estimate this website.");
@@ -192,7 +236,23 @@ export function AnalyzeUrlForm({
     })();
     // Intentionally once on handoff mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoStart, initialUrl]);
+  }, [autoStart, initialUrl, forcedProfile]);
+
+  const profileList: ProfileOption[] = (
+    profiles.length
+      ? profiles
+      : (["quick", "standard", "deep", "enterprise"] as ScanProfile[]).map(
+          (id) => ({
+            id,
+            label: id,
+            description: "",
+            maxPages: 0,
+          }),
+        )
+  ).map((p) => ({
+    ...p,
+    locked: Boolean(allowedProfiles && !allowedProfiles.includes(p.id)),
+  }));
 
   return (
     <Card>
@@ -213,11 +273,15 @@ export function AnalyzeUrlForm({
               <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-accent" />
               <div className="min-w-0 space-y-1">
                 <p className="text-sm font-medium text-fg">
-                  Starting your MoneyGap Engine™ scan
+                  Starting your MoneyGap Engine™{" "}
+                  {forcedProfile === "quick" ? "Basics" : ""} scan
                 </p>
                 <p className="text-xs leading-relaxed text-fg-muted">
-                  Checking connectivity, picking the recommended profile, and
-                  launching the crawl for{" "}
+                  Checking connectivity
+                  {forcedProfile === "quick"
+                    ? " and launching a Quick Basics crawl"
+                    : ", picking the scan profile, and launching the crawl"}{" "}
+                  for{" "}
                   <span className="font-medium text-fg">{url || initialUrl}</span>.
                   No need to re-enter the site.
                 </p>
@@ -369,48 +433,72 @@ export function AnalyzeUrlForm({
               ) : null}
 
               <div className="grid gap-2 sm:grid-cols-2">
-                {(profiles.length
-                  ? profiles
-                  : (["quick", "standard", "deep", "enterprise"] as ScanProfile[]).map(
-                      (id) => ({
-                        id,
-                        label: id,
-                        description: "",
-                        maxPages: 0,
-                      }),
-                    )
-                ).map((p) => {
+                {profileList.map((p) => {
                   const eta = estimate.etaByProfile[p.id];
                   const selected = scanProfile === p.id;
                   const recommended = estimate.recommendedProfile === p.id;
+                  const locked = Boolean(p.locked);
                   return (
                     <button
                       key={p.id}
                       type="button"
-                      onClick={() => setScanProfile(p.id)}
+                      disabled={locked}
+                      onClick={() => {
+                        if (!locked) setScanProfile(p.id);
+                      }}
                       className={cn(
                         "rounded-xl border px-3 py-3 text-left transition",
-                        selected
-                          ? "border-accent bg-accent-soft/40"
-                          : "border-border hover:border-border-strong",
+                        locked
+                          ? "cursor-not-allowed border-border/60 opacity-70"
+                          : selected
+                            ? "border-accent bg-accent-soft/40"
+                            : "border-border hover:border-border-strong",
                       )}
                     >
-                      <p className="text-sm font-semibold text-fg">
+                      <p className="flex items-center gap-1.5 text-sm font-semibold text-fg">
                         {p.label}
-                        {recommended ? (
-                          <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-accent">
+                        {locked ? (
+                          <Lock className="h-3.5 w-3.5 text-fg-subtle" />
+                        ) : null}
+                        {recommended && !locked ? (
+                          <span className="ml-1 text-[10px] font-bold uppercase tracking-wide text-accent">
                             Recommended
+                          </span>
+                        ) : null}
+                        {locked ? (
+                          <span className="ml-1 text-[10px] font-bold uppercase tracking-wide text-fg-subtle">
+                            Upgrade
                           </span>
                         ) : null}
                       </p>
                       <p className="mt-1 text-xs text-fg-muted">
-                        {eta?.etaLabel ?? "—"}
-                        {p.maxPages ? ` · up to ${p.maxPages.toLocaleString()} pages` : ""}
+                        {locked
+                          ? "Available on Starter and above"
+                          : `${eta?.etaLabel ?? "—"}${
+                              p.maxPages
+                                ? ` · up to ${p.maxPages.toLocaleString()} pages`
+                                : ""
+                            }`}
                       </p>
                     </button>
                   );
                 })}
               </div>
+
+              {allowedProfiles &&
+              allowedProfiles.length === 1 &&
+              allowedProfiles[0] === "quick" ? (
+                <p className="text-xs text-fg-muted">
+                  Free includes Basics (Quick) scans.{" "}
+                  <Link
+                    href="/pricing"
+                    className="font-medium text-accent underline-offset-2 hover:underline"
+                  >
+                    Upgrade to {suggestedPlan ?? "Starter"}
+                  </Link>{" "}
+                  for Standard and Deep crawls.
+                </p>
+              ) : null}
             </div>
           ) : (
             <div className="flex gap-3 rounded-xl border border-border bg-bg-muted/60 px-3.5 py-3">
@@ -425,6 +513,16 @@ export function AnalyzeUrlForm({
           {error && (
             <div className="space-y-3 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3">
               <p className="text-sm text-danger">{error}</p>
+              {suggestedPlan ? (
+                <p className="text-xs text-fg-muted">
+                  <Link
+                    href="/pricing"
+                    className="font-medium text-accent underline-offset-2 hover:underline"
+                  >
+                    View {suggestedPlan} plans
+                  </Link>
+                </p>
+              ) : null}
               {diagnostics ? (
                 <ConnectivityDiagnosticsPanel diagnostics={diagnostics} defaultOpen />
               ) : null}

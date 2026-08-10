@@ -60,6 +60,13 @@ export async function POST(req: Request) {
   });
   if (!gate.ok) return upgradeResponse(gate);
 
+  const scanProfile = body.success
+    ? (body.data.scanProfile ?? "quick")
+    : "quick";
+  const { requireScanProfile } = await import("@/lib/billing");
+  const profileGate = await requireScanProfile(workspace.id, scanProfile);
+  if (!profileGate.ok) return upgradeResponse(profileGate);
+
   const domainMatch = await db.query.websites.findFirst({
     where: and(
       eq(websites.workspaceId, workspace.id),
@@ -91,10 +98,6 @@ export async function POST(req: Request) {
       .returning();
     websiteId = site.id;
   }
-
-  const scanProfile = body.success
-    ? (body.data.scanProfile ?? "quick")
-    : "quick";
 
   const [analysis] = await db
     .insert(websiteAnalyses)
