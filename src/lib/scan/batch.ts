@@ -283,6 +283,31 @@ export async function processScanTick(analysisId: string): Promise<{
 
     const completed = counts.completed ?? 0;
     if (completed === 0) {
+      const meta = (analysis.scanMeta as Record<string, unknown>) ?? {};
+      const scanStage =
+        typeof meta.scanStage === "string" ? meta.scanStage : "";
+      const stillDiscovering =
+        analysis.scanPhase === "discovering" ||
+        analysis.scanPhase === "queued" ||
+        scanStage === "connecting" ||
+        scanStage === "robots" ||
+        scanStage === "sitemap" ||
+        scanStage === "discovery" ||
+        scanStage === "queue";
+
+      // Race: status-poll ticks can run before discover finishes enqueueing.
+      // Never treat an empty pre-crawl queue as a permanent crawl failure.
+      if (stillDiscovering) {
+        scanWarn("CRAWLER", "Empty queue during discover — waiting for enqueue", {
+          analysisId,
+          scanPhase: analysis.scanPhase,
+          scanStage,
+          pagesDiscovered: analysis.pagesDiscovered,
+        });
+        scheduleScanTickAsync(analysisId);
+        return { done: false, processed: 0 };
+      }
+
       await db
         .update(websiteAnalyses)
         .set({
@@ -292,7 +317,7 @@ export async function processScanTick(analysisId: string): Promise<{
           error: PUBLIC_CRAWL_ERROR,
           completedAt: new Date(),
           scanMeta: {
-            ...((analysis.scanMeta as Record<string, unknown>) ?? {}),
+            ...meta,
             stageDiagnostics: [
               {
                 stage: "read_pages",

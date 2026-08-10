@@ -1,5 +1,6 @@
 import { after } from "next/server";
 import { z } from "zod";
+import { authorizeCron } from "@/lib/cron/auth";
 import { processScanTick } from "@/lib/scan/batch";
 
 export const maxDuration = 60;
@@ -8,15 +9,8 @@ const bodySchema = z.object({
   analysisId: z.string().uuid(),
 });
 
-function authorized(req: Request): boolean {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return false;
-  const header = req.headers.get("authorization") ?? "";
-  return header === `Bearer ${secret}`;
-}
-
 export async function POST(req: Request) {
-  if (!authorized(req)) {
+  if (!authorizeCron(req)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 

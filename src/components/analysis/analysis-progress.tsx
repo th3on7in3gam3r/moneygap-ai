@@ -486,6 +486,11 @@ export function AnalysisProgress({
                 {data?.error ??
                   "We couldn't analyze this website. Please confirm the URL is publicly accessible."}
               </p>
+              {data?.tickScheduleError ? (
+                <p className="text-xs text-fg-muted" role="status">
+                  Crawl worker note: {data.tickScheduleError}
+                </p>
+              ) : null}
               <div className="flex flex-wrap gap-2">
                 {onTryAnotherUrl ? (
                   <Button
@@ -513,10 +518,10 @@ export function AnalysisProgress({
                   </button>
                 ) : (
                   <Link
-                    href={`/dashboard/analyze?url=${encodeURIComponent(data?.url ?? "")}`}
-                    className="inline-flex h-9 items-center rounded-xl px-3.5 text-sm text-fg-muted hover:text-fg"
+                    href={`/dashboard/analyze?url=${encodeURIComponent(data?.url ?? "")}&profile=quick&auto=1`}
+                    className="inline-flex h-9 items-center rounded-xl bg-accent px-3.5 text-sm font-medium text-accent-fg hover:brightness-110"
                   >
-                    Retry this site
+                    Retry Basics scan
                   </Link>
                 )}
               </div>

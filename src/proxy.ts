@@ -14,6 +14,12 @@ const isPublicOAuthCallback = createRouteMatcher([
   "/api/integrations/oauth/(.*)/callback",
 ]);
 
+/** Internal crawl/cron endpoints authenticate via CRON_SECRET, not Clerk. */
+const isInternalCronRoute = createRouteMatcher([
+  "/api/scan/tick",
+  "/api/cron(.*)",
+]);
+
 export default clerkMiddleware(async (auth, req) => {
   if (isMaintenanceMode()) {
     const path = req.nextUrl.pathname;
@@ -41,6 +47,11 @@ export default clerkMiddleware(async (auth, req) => {
   // OAuth provider redirects back without a Clerk session cookie reliably;
   // state token carries workspace identity.
   if (isPublicOAuthCallback(req)) {
+    return;
+  }
+
+  // Skip Clerk session handling for machine-to-machine crawl ticks / cron.
+  if (isInternalCronRoute(req)) {
     return;
   }
 

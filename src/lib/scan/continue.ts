@@ -103,8 +103,11 @@ export async function scheduleScanTick(analysisId: string): Promise<void> {
       const res = await fetch(url, {
         method: "POST",
         headers: {
+          // Prefer x-cron-secret — Authorization Bearer can be intercepted by Clerk.
+          "x-cron-secret": secret,
           Authorization: `Bearer ${secret}`,
           "Content-Type": "application/json",
+          Accept: "application/json",
         },
         body: JSON.stringify({ analysisId }),
         signal: AbortSignal.timeout(TICK_FETCH_TIMEOUT_MS),
@@ -191,6 +194,22 @@ export async function kickStalledScanIfNeeded(analysisId: string): Promise<{
   }
 
   const meta = (analysis.scanMeta as Record<string, unknown>) ?? {};
+  const scanStage =
+    typeof meta.scanStage === "string" ? meta.scanStage : "";
+  // Do not kick while discover is still building the queue — empty-queue ticks
+  // used to falsely fail analyses mid-sitemap.
+  if (
+    phase === "discovering" ||
+    phase === "queued" ||
+    scanStage === "connecting" ||
+    scanStage === "robots" ||
+    scanStage === "sitemap" ||
+    scanStage === "discovery" ||
+    scanStage === "queue"
+  ) {
+    return { kicked: false, reason: "still_discovering" };
+  }
+
   const lastProgressAt =
     typeof meta.lastProgressAt === "number"
       ? meta.lastProgressAt
@@ -210,9 +229,7 @@ export async function kickStalledScanIfNeeded(analysisId: string): Promise<{
   const sinceKick = Date.now() - lastTickKickAt;
 
   const shouldKick =
-    Boolean(tickScheduleError) ||
-    ageMs >= STALL_KICK_MS ||
-    (phase === "queued" && ageMs >= 30_000);
+    Boolean(tickScheduleError) || ageMs >= STALL_KICK_MS;
 
   if (!shouldKick) return { kicked: false, reason: "fresh" };
   if (sinceKick < KICK_COOLDOWN_MS) {
