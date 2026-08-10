@@ -12,8 +12,9 @@
     "db:push": "drizzle-kit push",
     "db:seed": "tsx --env-file=.env.local src/db/seed.ts",
     "db:studio": "drizzle-kit studio",
-    "test:scan": "tsx --test src/lib/billing/scan-profiles.test.ts src/lib/scan/execution.test.ts src/lib/scan/profiles.test.ts src/lib/scan/reclaim.test.ts src/lib/scan/normalize.test.ts src/lib/scan/connectivity/classify-error.test.ts src/lib/scan/connectivity/pipeline.test.ts src/lib/scan/crawlers/crawlers.test.ts src/lib/scan/crawlers/orchestrator.test.ts",
+    "test:scan": "tsx --test src/lib/billing/scan-profiles.test.ts src/lib/scan/execution.test.ts src/lib/scan/profiles.test.ts src/lib/scan/reclaim.test.ts src/lib/scan/normalize.test.ts src/lib/scan/connectivity/classify-error.test.ts src/lib/scan/connectivity/pipeline.test.ts src/lib/scan/crawlers/crawlers.test.ts src/lib/scan/crawlers/orchestrator.test.ts scripts/smoke-crawl-orchestrator.ts",
     "smoke:worker-crawl": "tsx scripts/smoke-worker-crawl.ts",
+    "smoke:crawl-orchestrator": "tsx --test scripts/smoke-crawl-orchestrator.ts",
     "stripe:setup": "node --import tsx --env-file=.env.local scripts/setup-stripe-catalog.ts",
     "stripe:setup:vercel": "node --import tsx --env-file=.env.local scripts/setup-stripe-catalog.ts --vercel"
   },

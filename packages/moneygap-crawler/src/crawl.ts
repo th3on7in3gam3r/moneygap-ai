@@ -320,6 +320,7 @@ export async function loadPageHtml(
     userAgent?: string;
     timeoutMs?: number;
     maxBytes?: number;
+    signal?: AbortSignal;
   },
 ): Promise<{
   html: string;
@@ -329,6 +330,8 @@ export async function loadPageHtml(
   renderedWith: "cheerio" | "playwright";
   framework: import("./types/index.js").FrameworkId;
 } | null> {
+  if (opts?.signal?.aborted) return null;
+
   const homepage = normalizeCrawlUrl(url);
   const res = await fetchText(homepage, {
     timeoutMs: opts?.timeoutMs ?? 15_000,
@@ -337,6 +340,7 @@ export async function loadPageHtml(
     maxRedirects: 8,
   });
   if (!res.ok) return null;
+  if (opts?.signal?.aborted) return null;
 
   let html = res.text;
   let finalUrl = res.finalUrl;
@@ -348,6 +352,7 @@ export async function loadPageHtml(
     const pw = await renderWithPlaywright(homepage, {
       timeoutMs: opts?.timeoutMs ?? 20_000,
       userAgent: opts?.userAgent ?? "MoneyGapCrawler/0.1 (+https://moneygap-ai.com)",
+      signal: opts?.signal,
     });
     if (pw) {
       html = pw.html;
@@ -358,6 +363,8 @@ export async function loadPageHtml(
     }
     await closeBrowser();
   }
+
+  if (opts?.signal?.aborted) return null;
 
   const { detectFramework } = await import("./framework-detectors/index.js");
   return {
@@ -377,6 +384,7 @@ export async function extractSinglePage(
     userAgent?: string;
     timeoutMs?: number;
     maxBytes?: number;
+    signal?: AbortSignal;
   },
 ): Promise<PageRecord | null> {
   const loaded = await loadPageHtml(url, opts);

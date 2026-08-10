@@ -15,6 +15,7 @@ import {
   resetApifyCircuitForTests,
 } from "./circuit";
 import {
+  isApifyConfigured,
   isApifyInProgress,
   isApifySuccess,
   isApifyTerminalFailure,
@@ -273,6 +274,7 @@ describe("provider order + router", () => {
   afterEach(() => {
     if (prevToken === undefined) delete process.env.APIFY_API_TOKEN;
     else process.env.APIFY_API_TOKEN = prevToken;
+    delete process.env.APIFY_TOKEN;
     if (prevFc === undefined) delete process.env.FIRECRAWL_API_KEY;
     else process.env.FIRECRAWL_API_KEY = prevFc;
     if (prevPref === undefined) delete process.env.CRAWL_PROVIDER;
@@ -295,6 +297,15 @@ describe("provider order + router", () => {
       "firecrawl",
       "native",
     ]);
+  });
+
+  it("accepts APIFY_TOKEN alias when APIFY_API_TOKEN unset", () => {
+    delete process.env.APIFY_API_TOKEN;
+    process.env.APIFY_TOKEN = "alias-token";
+    delete process.env.CRAWL_PROVIDER;
+    assert.equal(isApifyConfigured(), true);
+    assert.deepEqual(resolveProviderOrder("auto")[0], "apify");
+    delete process.env.APIFY_TOKEN;
   });
 
   it("honors CRAWL_PROVIDER=native", () => {

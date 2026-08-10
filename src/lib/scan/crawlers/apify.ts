@@ -29,7 +29,11 @@ export type ApifyRun = {
 export type ApifyDatasetItem = Record<string, unknown>;
 
 function getToken(): string | null {
-  const token = process.env.APIFY_API_TOKEN?.trim();
+  // Prefer APIFY_API_TOKEN; accept APIFY_TOKEN alias (common local/Vercel name).
+  const token =
+    process.env.APIFY_API_TOKEN?.trim() ||
+    process.env.APIFY_TOKEN?.trim() ||
+    null;
   return token || null;
 }
 

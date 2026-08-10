@@ -28,6 +28,29 @@ function raceTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   });
 }
 
+function abortable<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return promise;
+  if (signal.aborted) {
+    return Promise.reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+  }
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (v) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(v);
+      },
+      (e) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(e);
+      },
+    );
+  });
+}
+
 async function getBrowser(
   launchTimeoutMs: number,
 ): Promise<import("playwright").Browser | null> {
@@ -67,33 +90,71 @@ export async function closeBrowser(): Promise<void> {
 
 export async function renderWithPlaywright(
   url: string,
-  opts: { timeoutMs: number; userAgent: string },
+  opts: {
+    timeoutMs: number;
+    userAgent: string;
+    signal?: AbortSignal;
+  },
 ): Promise<RenderResult | null> {
+  if (opts.signal?.aborted) return null;
+
   const timeoutMs = opts.timeoutMs > 0 ? opts.timeoutMs : 15_000;
   const browser = await getBrowser(Math.min(timeoutMs, 15_000));
   if (!browser) return null;
 
   const started = Date.now();
   let context: import("playwright").BrowserContext | null = null;
+  let page: import("playwright").Page | null = null;
+
+  const onAbort = () => {
+    void page?.close().catch(() => undefined);
+    void context?.close().catch(() => undefined);
+  };
+  opts.signal?.addEventListener("abort", onAbort, { once: true });
+
   try {
-    context = await raceTimeout(
-      browser.newContext({
-        userAgent: opts.userAgent,
-        javaScriptEnabled: true,
-      }),
-      10_000,
-      "playwright.newContext",
+    if (opts.signal?.aborted) return null;
+
+    context = await abortable(
+      raceTimeout(
+        browser.newContext({
+          userAgent: opts.userAgent,
+          javaScriptEnabled: true,
+        }),
+        10_000,
+        "playwright.newContext",
+      ),
+      opts.signal,
     );
-    const page = await raceTimeout(context.newPage(), 10_000, "playwright.newPage");
-    const res = await page.goto(url, {
-      waitUntil: "domcontentloaded",
-      timeout: timeoutMs,
-    });
-    await page.waitForTimeout(Math.min(400, timeoutMs));
-    const html = await raceTimeout(
-      page.content(),
-      Math.max(5_000, timeoutMs),
-      "playwright.content",
+    page = await abortable(
+      raceTimeout(context.newPage(), 10_000, "playwright.newPage"),
+      opts.signal,
+    );
+
+    if (opts.signal?.aborted) return null;
+
+    const res = await abortable(
+      page.goto(url, {
+        waitUntil: "domcontentloaded",
+        timeout: timeoutMs,
+      }),
+      opts.signal,
+    );
+    if (opts.signal?.aborted) return null;
+
+    await abortable(
+      page.waitForTimeout(Math.min(400, timeoutMs)),
+      opts.signal,
+    );
+    if (opts.signal?.aborted) return null;
+
+    const html = await abortable(
+      raceTimeout(
+        page.content(),
+        Math.max(5_000, timeoutMs),
+        "playwright.content",
+      ),
+      opts.signal,
     );
     return {
       html,
@@ -105,10 +166,16 @@ export async function renderWithPlaywright(
   } catch {
     return null;
   } finally {
+    opts.signal?.removeEventListener("abort", onAbort);
+    if (page) {
+      await page.close().catch(() => undefined);
+      page = null;
+    }
     if (context) {
       await raceTimeout(context.close(), 5_000, "playwright.contextClose").catch(
         () => undefined,
       );
+      context = null;
     }
   }
 }

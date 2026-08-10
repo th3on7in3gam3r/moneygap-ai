@@ -137,6 +137,7 @@ declare function loadPageHtml(url: string, opts?: {
     userAgent?: string;
     timeoutMs?: number;
     maxBytes?: number;
+    signal?: AbortSignal;
 }): Promise<{
     html: string;
     finalUrl: string;
@@ -150,6 +151,7 @@ declare function extractSinglePage(url: string, opts?: {
     userAgent?: string;
     timeoutMs?: number;
     maxBytes?: number;
+    signal?: AbortSignal;
 }): Promise<PageRecord | null>;
 
 /**

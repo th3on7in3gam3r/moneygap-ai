@@ -622,6 +622,28 @@ function raceTimeout(promise, ms, label) {
     );
   });
 }
+function abortable(promise, signal) {
+  if (!signal) return promise;
+  if (signal.aborted) {
+    return Promise.reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+  }
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (v) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(v);
+      },
+      (e) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(e);
+      }
+    );
+  });
+}
 async function getBrowser(launchTimeoutMs) {
   try {
     const pw = await import("playwright");
@@ -655,30 +677,56 @@ async function closeBrowser() {
   }
 }
 async function renderWithPlaywright(url, opts) {
+  if (opts.signal?.aborted) return null;
   const timeoutMs = opts.timeoutMs > 0 ? opts.timeoutMs : 15e3;
   const browser = await getBrowser(Math.min(timeoutMs, 15e3));
   if (!browser) return null;
   const started = Date.now();
   let context = null;
+  let page = null;
+  const onAbort = () => {
+    void page?.close().catch(() => void 0);
+    void context?.close().catch(() => void 0);
+  };
+  opts.signal?.addEventListener("abort", onAbort, { once: true });
   try {
-    context = await raceTimeout(
-      browser.newContext({
-        userAgent: opts.userAgent,
-        javaScriptEnabled: true
-      }),
-      1e4,
-      "playwright.newContext"
+    if (opts.signal?.aborted) return null;
+    context = await abortable(
+      raceTimeout(
+        browser.newContext({
+          userAgent: opts.userAgent,
+          javaScriptEnabled: true
+        }),
+        1e4,
+        "playwright.newContext"
+      ),
+      opts.signal
     );
-    const page = await raceTimeout(context.newPage(), 1e4, "playwright.newPage");
-    const res = await page.goto(url, {
-      waitUntil: "domcontentloaded",
-      timeout: timeoutMs
-    });
-    await page.waitForTimeout(Math.min(400, timeoutMs));
-    const html = await raceTimeout(
-      page.content(),
-      Math.max(5e3, timeoutMs),
-      "playwright.content"
+    page = await abortable(
+      raceTimeout(context.newPage(), 1e4, "playwright.newPage"),
+      opts.signal
+    );
+    if (opts.signal?.aborted) return null;
+    const res = await abortable(
+      page.goto(url, {
+        waitUntil: "domcontentloaded",
+        timeout: timeoutMs
+      }),
+      opts.signal
+    );
+    if (opts.signal?.aborted) return null;
+    await abortable(
+      page.waitForTimeout(Math.min(400, timeoutMs)),
+      opts.signal
+    );
+    if (opts.signal?.aborted) return null;
+    const html = await abortable(
+      raceTimeout(
+        page.content(),
+        Math.max(5e3, timeoutMs),
+        "playwright.content"
+      ),
+      opts.signal
     );
     return {
       html,
@@ -690,10 +738,16 @@ async function renderWithPlaywright(url, opts) {
   } catch {
     return null;
   } finally {
+    opts.signal?.removeEventListener("abort", onAbort);
+    if (page) {
+      await page.close().catch(() => void 0);
+      page = null;
+    }
     if (context) {
       await raceTimeout(context.close(), 5e3, "playwright.contextClose").catch(
         () => void 0
       );
+      context = null;
     }
   }
 }
@@ -1194,6 +1248,7 @@ async function crawlSite(input, opts) {
   };
 }
 async function loadPageHtml(url, opts) {
+  if (opts?.signal?.aborted) return null;
   const homepage = normalizeCrawlUrl(url);
   const res = await fetchText(homepage, {
     timeoutMs: opts?.timeoutMs ?? 15e3,
@@ -1202,6 +1257,7 @@ async function loadPageHtml(url, opts) {
     maxRedirects: 8
   });
   if (!res.ok) return null;
+  if (opts?.signal?.aborted) return null;
   let html = res.text;
   let finalUrl = res.finalUrl;
   let statusCode = res.statusCode;
@@ -1210,7 +1266,8 @@ async function loadPageHtml(url, opts) {
   if (shouldUsePlaywright(html, opts?.playwrightEnabled === true)) {
     const pw = await renderWithPlaywright(homepage, {
       timeoutMs: opts?.timeoutMs ?? 2e4,
-      userAgent: opts?.userAgent ?? "MoneyGapCrawler/0.1 (+https://moneygap-ai.com)"
+      userAgent: opts?.userAgent ?? "MoneyGapCrawler/0.1 (+https://moneygap-ai.com)",
+      signal: opts?.signal
     });
     if (pw) {
       html = pw.html;
@@ -1221,6 +1278,7 @@ async function loadPageHtml(url, opts) {
     }
     await closeBrowser();
   }
+  if (opts?.signal?.aborted) return null;
   const { detectFramework: detectFramework2 } = await Promise.resolve().then(() => (init_framework_detectors(), framework_detectors_exports));
   return {
     html,
@@ -1504,13 +1562,20 @@ async function isAnalysisPaused(analysisId) {
   });
   return paused;
 }
+async function resolveWorkerWebOrigin() {
+  const secret = Boolean(process.env.CRON_SECRET?.trim());
+  const appUrl = process.env.APP_URL?.trim().replace(/\/$/, "") || null;
+  const publicUrl = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") || null;
+  const origin = appUrl || publicUrl || null;
+  return { origin, hasSecret: secret };
+}
 async function notifyScanComplete(analysisId) {
   const secret = process.env.CRON_SECRET?.trim();
-  const origin = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL || "").trim().replace(/\/$/, "");
+  const { origin, hasSecret } = await resolveWorkerWebOrigin();
   if (!secret || !origin) {
     console.error(
-      "crawl-worker: cannot notify scan complete \u2014 set APP_URL and CRON_SECRET",
-      { analysisId, hasSecret: Boolean(secret), hasOrigin: Boolean(origin) }
+      "crawl-worker: cannot notify scan complete \u2014 set APP_URL (or NEXT_PUBLIC_APP_URL) and CRON_SECRET",
+      { analysisId, hasSecret, hasOrigin: Boolean(origin) }
     );
     return;
   }
@@ -1738,11 +1803,11 @@ async function getAnalysisExecution(analysisId) {
 }
 async function notifyApifyPoll(analysisId) {
   const secret = process.env.CRON_SECRET?.trim();
-  const origin = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL || "").trim().replace(/\/$/, "");
+  const { origin, hasSecret } = await resolveWorkerWebOrigin();
   if (!secret || !origin) {
     console.error(
-      "crawl-worker: cannot poll Apify \u2014 set APP_URL and CRON_SECRET",
-      { analysisId }
+      "crawl-worker: cannot poll Apify \u2014 set APP_URL (or NEXT_PUBLIC_APP_URL) and CRON_SECRET",
+      { analysisId, hasSecret, hasOrigin: Boolean(origin) }
     );
     return;
   }

@@ -3,6 +3,11 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { crawlJobs, websiteAnalyses, websitePages } from "@/db/schema";
 import { PUBLIC_CRAWL_ERROR } from "@/lib/analysis/stages";
+import { getOrchestratorBudget } from "./crawlers/profiles";
+import {
+  isActiveCrawlDeadlinePassed,
+  resolveActiveCrawlDeadlineAt,
+} from "./deadline";
 import { isWorkerScanExecution } from "./execution";
 import { scheduleScanTickAsync } from "./continue";
 import { isQueueDrained, remainingQueueCount } from "./claim";
@@ -30,14 +35,26 @@ export async function runIncrementalDiscover(analysisId: string): Promise<void> 
 
   const profile = (analysis.scanProfile as ScanProfile) || "standard";
   const cfg = getScanProfile(profile);
+  const existingMeta = (analysis.scanMeta as Record<string, unknown>) ?? {};
+  const crawlDeadlineAt =
+    typeof existingMeta.crawlDeadlineAt === "number"
+      ? existingMeta.crawlDeadlineAt
+      : Date.now() + getOrchestratorBudget(profile).globalDeadlineMs;
 
-  scanLog("SCAN", "Starting scan discover", { analysisId, profile });
+  scanLog("SCAN", "Starting scan discover", { analysisId, profile, crawlDeadlineAt });
 
   await defaultProgressProvider.update(analysisId, {
     scanPhase: "discovering",
     stage: "Connecting…",
     progress: 8,
-    scanMeta: { scanStage: "connecting" },
+    scanMeta: {
+      scanStage: "connecting",
+      crawlDeadlineAt,
+      crawlStartedAt:
+        typeof existingMeta.crawlStartedAt === "string"
+          ? existingMeta.crawlStartedAt
+          : new Date().toISOString(),
+    },
   });
 
   let jobId = analysis.crawlJobId;
@@ -142,6 +159,7 @@ export async function runIncrementalDiscover(analysisId: string): Promise<void> 
     pagesFailed: 0,
     scanMeta: {
       scanStage: "crawling",
+      crawlDeadlineAt,
       framework: discovery.framework,
       jsRequired: discovery.jsRequired,
       sitemapFound: discovery.sitemapFound,
@@ -166,6 +184,7 @@ export async function runIncrementalDiscover(analysisId: string): Promise<void> 
       scanMeta: {
         scanStage: "crawling",
         execution: "worker",
+        crawlDeadlineAt,
         framework: discovery.framework,
         jsRequired: discovery.jsRequired,
         sitemapFound: discovery.sitemapFound,
@@ -176,6 +195,7 @@ export async function runIncrementalDiscover(analysisId: string): Promise<void> 
       analysisId,
       jobId,
       pages: discovery.urls.length,
+      crawlDeadlineAt,
     });
     return;
   }
@@ -296,6 +316,82 @@ export async function processScanTick(analysisId: string): Promise<{
   const jobId = analysis.crawlJobId;
   const siteUrl = analysis.url;
   const concurrency = Math.min(READ_CONCURRENCY, cfg.concurrency || READ_CONCURRENCY);
+  const metaEarly = (analysis.scanMeta as Record<string, unknown>) ?? {};
+  const deadlineAtMs = resolveActiveCrawlDeadlineAt({
+    scanMeta: metaEarly,
+    profile,
+    startedAt: analysis.startedAt,
+    createdAt: analysis.createdAt,
+  });
+
+  if (isActiveCrawlDeadlinePassed(deadlineAtMs)) {
+    const counts = await defaultQueueProvider.countByState(jobId);
+    const completed = counts.completed ?? analysis.pagesCompleted ?? 0;
+    scanWarn("CRAWLER", "Active crawl deadline exceeded (native/worker)", {
+      analysisId,
+      deadlineAtMs,
+      completed,
+      execution: metaEarly.execution,
+    });
+    if (completed > 0) {
+      await defaultProgressProvider.update(analysisId, {
+        scanPhase: "analyzing",
+        stage: "Understanding business (partial crawl)",
+        progress: 32,
+        pagesCompleted: completed,
+        estimatedRemainingMs: null,
+        scanMeta: {
+          scanStage: "extract_content",
+          crawlDeadlineAt: deadlineAtMs,
+          partial: true,
+          stageDiagnostics: [
+            {
+              stage: "read_pages",
+              status: "partial",
+              detail: "Active crawlDeadlineAt exceeded",
+              completed,
+              failed: counts.failed ?? 0,
+            },
+          ],
+        },
+      });
+      await db
+        .update(crawlJobs)
+        .set({
+          status: "completed",
+          pageCount: completed,
+          completedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(crawlJobs.id, jobId));
+      const { runPostCrawlAnalysis } = await import("@/lib/analysis/pipeline");
+      await runPostCrawlAnalysis(analysisId);
+      return { done: true, processed: 0 };
+    }
+
+    await db
+      .update(websiteAnalyses)
+      .set({
+        status: "failed",
+        scanPhase: "failed",
+        stage: "Failed",
+        error: PUBLIC_CRAWL_ERROR,
+        completedAt: new Date(),
+        scanMeta: {
+          ...metaEarly,
+          crawlDeadlineAt: deadlineAtMs,
+          stageDiagnostics: [
+            {
+              stage: "read_pages",
+              status: "failed",
+              detail: "Active crawlDeadlineAt exceeded with insufficient pages",
+            },
+          ],
+        },
+      })
+      .where(eq(websiteAnalyses.id, analysisId));
+    return { done: true, processed: 0 };
+  }
 
   await defaultQueueProvider.reclaimStaleProcessing(jobId, STALE_PROCESSING_MS);
 
@@ -488,9 +584,12 @@ export async function processScanTick(analysisId: string): Promise<{
     const extractStarted = Date.now();
     try {
       const page = await withTimeout(
-        defaultCrawlerProvider.extractPage(item.url),
+        defaultCrawlerProvider.extractPage(item.url, {
+          signal: controller.signal,
+        }),
         EXTRACT_TIMEOUT_MS,
         `extract ${item.url}`,
+        controller,
       );
       if (controller.signal.aborted) {
         await defaultQueueProvider.markFailed(item.id, "Aborted by watchdog", true);

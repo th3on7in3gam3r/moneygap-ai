@@ -52,15 +52,21 @@ export function startWatchdog(input: {
   };
 }
 
-/** Race a promise against a timeout; reject with AbortError-like Error. */
+/** Race a promise against a timeout; abort optional controller so work can stop. */
 export function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
   label = "operation",
+  signalController?: AbortController,
 ): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
+      try {
+        signalController?.abort();
+      } catch {
+        /* ignore */
+      }
       const err = new Error(`${label} timed out after ${timeoutMs}ms`);
       err.name = "TimeoutError";
       reject(err);

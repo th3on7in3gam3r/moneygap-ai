@@ -80,4 +80,21 @@ describe("withTimeout", () => {
     const v = await withTimeout(Promise.resolve(42), 200, "ok");
     assert.equal(v, 42);
   });
+
+  it("aborts optional AbortController on timeout", async () => {
+    const controller = new AbortController();
+    await assert.rejects(
+      () =>
+        withTimeout(
+          new Promise(() => {
+            /* never */
+          }),
+          40,
+          "abort-hang",
+          controller,
+        ),
+      /timed out/i,
+    );
+    assert.equal(controller.signal.aborted, true);
+  });
 });

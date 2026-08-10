@@ -11,7 +11,7 @@ See also:
 ## Quick reference
 
 - Actor: `apify/website-content-crawler` (`apify~website-content-crawler`)
-- Auth: `Authorization: Bearer ${APIFY_API_TOKEN}` (never in URL)
+- Auth: `Authorization: Bearer ${APIFY_API_TOKEN}` (never in URL). Alias: `APIFY_TOKEN` is also accepted.
 - Start async → persist `providerRunId` → poll via `/api/scan/tick`
 - On success/failure with dataset: merge into SuccessfulPageMap → Firecrawl/Scrape.do recovery
 - Never hold the initial Vercel request open for the crawl

@@ -2,8 +2,13 @@ import { after } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { websiteAnalyses } from "@/db/schema";
-import { getSiteOrigin } from "@/lib/seo";
+import {
+  isActiveCrawlDeadlinePassed,
+  resolveActiveCrawlDeadlineAt,
+} from "./deadline";
 import { scanLog, scanWarn } from "./scan-log";
+import { diagnoseTickEnv } from "./tick-env";
+import type { ScanProfile } from "./types";
 
 const TICK_FETCH_TIMEOUT_MS = 5_000;
 /** Re-kick crawl ticks if no progress heartbeat for this long. */
@@ -83,17 +88,17 @@ function fallbackInProcessTick(analysisId: string): void {
 
 /** Schedule the next serverless crawl tick (fire-and-forget, timed). */
 export async function scheduleScanTick(analysisId: string): Promise<void> {
+  const diag = diagnoseTickEnv();
   const secret = process.env.CRON_SECRET?.trim();
-  // Prefer canonical site origin (handles www vs apex / missing APP_URL).
-  const origin = getSiteOrigin();
 
-  if (!secret || !origin) {
+  if (!diag.ok || !diag.origin || !secret) {
     const msg =
-      "Missing CRON_SECRET or APP_URL — crawl ticks cannot self-schedule over HTTP.";
-    scanWarn("SCAN", "scheduleScanTick: missing CRON_SECRET or APP_URL", {
+      diag.message ??
+      "Crawl ticks cannot self-schedule — check APP_URL and CRON_SECRET.";
+    scanWarn("SCAN", "scheduleScanTick: env incomplete", {
       analysisId,
-      hasSecret: Boolean(secret),
-      hasOrigin: Boolean(origin),
+      hasSecret: diag.hasSecret,
+      hasOrigin: diag.hasOrigin,
     });
     await persistTickScheduleError(analysisId, msg);
     // Still advance the queue in-process so local/misconfigured deploys don't freeze.
@@ -101,7 +106,7 @@ export async function scheduleScanTick(analysisId: string): Promise<void> {
     return;
   }
 
-  const url = `${origin}/api/scan/tick`;
+  const url = `${diag.origin}/api/scan/tick`;
   const run = async () => {
     try {
       const res = await fetch(url, {
@@ -175,6 +180,7 @@ export async function kickStalledScanIfNeeded(analysisId: string): Promise<{
       status: true,
       reportId: true,
       scanPhase: true,
+      scanProfile: true,
       startedAt: true,
       createdAt: true,
       scanMeta: true,
@@ -219,6 +225,32 @@ export async function kickStalledScanIfNeeded(analysisId: string): Promise<{
   // Apify polls via the same tick scheduler — always eligible to re-kick.
   const isApify = meta.execution === "apify" || meta.crawlProvider === "apify";
   const isWorker = meta.execution === "worker" && !isApify;
+
+  // Active profile deadline (not the 3h orphan stale ceiling) — force tick so
+  // processScanTick can fail or complete-partial instead of waiting for stale unlock.
+  const profile = (analysis.scanProfile as ScanProfile) || "standard";
+  const deadlineAtMs = resolveActiveCrawlDeadlineAt({
+    scanMeta: meta,
+    profile,
+    startedAt: analysis.startedAt,
+    createdAt: analysis.createdAt,
+  });
+  if (isActiveCrawlDeadlinePassed(deadlineAtMs) && sinceKick >= KICK_COOLDOWN_MS) {
+    scanWarn("SCAN", "Active crawlDeadlineAt passed — forcing tick", {
+      analysisId,
+      deadlineAtMs,
+      execution: meta.execution,
+    });
+    await persistTickKickMeta(analysisId);
+    scheduleScanTickAsync(analysisId);
+    try {
+      const { processScanTick } = await import("./batch");
+      await processScanTick(analysisId);
+    } catch {
+      /* ignore */
+    }
+    return { kicked: true, reason: "active_deadline" };
+  }
 
   // Worker with stale heartbeat: kick /api/scan/complete attempt via tick path
   // (tick no-ops if queue empty; complete route is separate — schedule tick + warn).

@@ -340,21 +340,27 @@ async function isAnalysisPaused(analysisId: string): Promise<boolean> {
   return paused;
 }
 
+async function resolveWorkerWebOrigin(): Promise<{
+  origin: string | null;
+  hasSecret: boolean;
+}> {
+  const secret = Boolean(process.env.CRON_SECRET?.trim());
+  const appUrl = process.env.APP_URL?.trim().replace(/\/$/, "") || null;
+  const publicUrl =
+    process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") || null;
+  // Prefer APP_URL then NEXT_PUBLIC — do not use RENDER_EXTERNAL_URL (worker host).
+  const origin = appUrl || publicUrl || null;
+  return { origin, hasSecret: secret };
+}
+
 async function notifyScanComplete(analysisId: string): Promise<void> {
   const secret = process.env.CRON_SECRET?.trim();
-  const origin = (
-    process.env.APP_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.RENDER_EXTERNAL_URL ||
-    ""
-  )
-    .trim()
-    .replace(/\/$/, "");
+  const { origin, hasSecret } = await resolveWorkerWebOrigin();
 
   if (!secret || !origin) {
     console.error(
-      "crawl-worker: cannot notify scan complete — set APP_URL and CRON_SECRET",
-      { analysisId, hasSecret: Boolean(secret), hasOrigin: Boolean(origin) },
+      "crawl-worker: cannot notify scan complete — set APP_URL (or NEXT_PUBLIC_APP_URL) and CRON_SECRET",
+      { analysisId, hasSecret, hasOrigin: Boolean(origin) },
     );
     return;
   }
@@ -608,18 +614,11 @@ async function getAnalysisExecution(
 /** Kick MoneyGap /api/scan/tick so Apify polls advance on the web app. */
 async function notifyApifyPoll(analysisId: string): Promise<void> {
   const secret = process.env.CRON_SECRET?.trim();
-  const origin = (
-    process.env.APP_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.RENDER_EXTERNAL_URL ||
-    ""
-  )
-    .trim()
-    .replace(/\/$/, "");
+  const { origin, hasSecret } = await resolveWorkerWebOrigin();
   if (!secret || !origin) {
     console.error(
-      "crawl-worker: cannot poll Apify — set APP_URL and CRON_SECRET",
-      { analysisId },
+      "crawl-worker: cannot poll Apify — set APP_URL (or NEXT_PUBLIC_APP_URL) and CRON_SECRET",
+      { analysisId, hasSecret, hasOrigin: Boolean(origin) },
     );
     return;
   }

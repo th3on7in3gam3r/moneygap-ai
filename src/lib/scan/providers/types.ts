@@ -13,7 +13,10 @@ export interface CrawlerProvider {
     /** Same ProgressEvent shape as moneygap-crawler (currentUrl is string | null). */
     onProgress?: OnProgress;
   }): Promise<DiscoveryResult>;
-  extractPage(url: string): Promise<ScrapedPage | null>;
+  extractPage(
+    url: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<ScrapedPage | null>;
 }
 
 export interface QueueProvider {

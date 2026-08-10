@@ -37,33 +37,13 @@ function parseClaimRows(
 
 export const defaultCrawlerProvider: CrawlerProvider = {
   async discover({ url, profile, onProgress }) {
-    // #region agent log
-    fetch("http://127.0.0.1:7547/ingest/c54f9334-ca1e-4faa-8308-e06f232f589c", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "226101",
-      },
-      body: JSON.stringify({
-        sessionId: "226101",
-        runId: "post-fix",
-        hypothesisId: "A",
-        location: "defaults.ts:discover",
-        message: "discover invoked with OnProgress-compatible callback",
-        data: {
-          profile,
-          hasOnProgress: Boolean(onProgress),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     return runScanDiscovery({ url, profile, onProgress });
   },
-  async extractPage(url) {
+  async extractPage(url, opts) {
     const record = await extractSinglePage(url, {
       playwrightEnabled: process.env.PLAYWRIGHT_ENABLED === "1",
       timeoutMs: 15_000,
+      signal: opts?.signal,
     });
     if (!record || record.markdown.trim().length < 40) return null;
     return toScrapedPage(record);
