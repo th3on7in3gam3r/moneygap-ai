@@ -7,7 +7,7 @@ import {
   extractSinglePage,
   classifyPageType,
   toScrapedPage,
-} from "../packages/moneygap-crawler/src/index.ts";
+} from "moneygap-crawler";
 
 async function main() {
   const url = process.env.SMOKE_URL || "https://www.signaldeskblog.com";
