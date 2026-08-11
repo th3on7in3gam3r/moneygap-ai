@@ -184,6 +184,7 @@ export function AnalysisProgress({
           const body = (await res.json().catch(() => ({}))) as { error?: string };
           if (!cancelled) {
             setPollError(body.error ?? "Unable to load analysis status.");
+            timer = setTimeout(poll, 2500);
           }
           return;
         }

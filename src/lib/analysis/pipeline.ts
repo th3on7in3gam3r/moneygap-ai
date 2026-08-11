@@ -697,6 +697,21 @@ export async function runCompetitiveIntelligenceOnly(analysisId: string) {
     })
     .where(eq(reports.id, analysis.reportId));
 
+  const profileForCompetitive: ScanProfile = isScanProfile(analysis.scanProfile)
+    ? analysis.scanProfile
+    : "standard";
+  if (profileForCompetitive === "quick") {
+    await db
+      .update(reports)
+      .set({
+        competitiveEngineStatus: "skipped",
+        competitiveEngineError: null,
+      })
+      .where(eq(reports.id, analysis.reportId));
+    await setStage(analysisId, "complete");
+    return { ok: true as const };
+  }
+
   await setStage(analysisId, "discovering_competitors");
 
   const result = await persistCompetitiveIntelligence({
@@ -1266,41 +1281,95 @@ async function finishPipelineWithPages(
       partial = true;
     }
 
-    await setStage(analysisId, "discovering_competitors");
     const profileForCompetitive: ScanProfile = isScanProfile(analysis.scanProfile)
       ? analysis.scanProfile
       : "standard";
     // Basics (quick): skip competitive — Scan Engine V3 profile matrix.
     if (profileForCompetitive === "quick") {
       log("info", "competitive_skipped_quick_profile", { analysisId });
+      await db
+        .update(reports)
+        .set({
+          competitiveEngineStatus: "skipped",
+          competitiveEngineError: null,
+        })
+        .where(eq(reports.id, report.id));
     } else {
-    const competitive = await persistCompetitiveIntelligence({
-      analysisId,
-      reportId: report.id,
-      websiteId: analysis.websiteId,
-      ctx: {
-        url: analysis.url,
-        domain: analysis.website.domain,
-        siteName: siteName.slice(0, 120),
-        intelligence,
-        userCorpus: corpus,
-      },
-      hooks: {
-        onDiscoverDone: () => setStage(analysisId, "profiling_competitors"),
-        onProfileStart: () => setStage(analysisId, "profiling_competitors"),
-        onAnalyzeStart: () => setStage(analysisId, "competitive_analysis"),
-      },
-    });
-    if (!competitive.ok) {
-      partial = true;
-      log("warn", "competitive_engine_soft_fail", {
+      await setStage(analysisId, "discovering_competitors");
+      const competitive = await persistCompetitiveIntelligence({
         analysisId,
         reportId: report.id,
-        error: competitive.error,
-        severity: "WARNING",
+        websiteId: analysis.websiteId,
+        ctx: {
+          url: analysis.url,
+          domain: analysis.website.domain,
+          siteName: siteName.slice(0, 120),
+          intelligence,
+          userCorpus: corpus,
+        },
+        hooks: {
+          onDiscoverDone: () => setStage(analysisId, "profiling_competitors"),
+          onProfileStart: () => setStage(analysisId, "profiling_competitors"),
+          onAnalyzeStart: () => setStage(analysisId, "competitive_analysis"),
+        },
       });
+      if (!competitive.ok) {
+        partial = true;
+        log("warn", "competitive_engine_soft_fail", {
+          analysisId,
+          reportId: report.id,
+          error: competitive.error,
+          severity: "WARNING",
+        });
+      }
     }
-    }
+
+    // Complete the customer-facing analysis BEFORE optional monitor/webhooks so
+    // serverless death cannot leave the UI stuck on Discovering competitors.
+    const durationMs = Date.now() - startedAtMs;
+    const priorCompleteMeta =
+      ((
+        await db.query.websiteAnalyses.findFirst({
+          where: eq(websiteAnalyses.id, analysisId),
+          columns: { scanMeta: true },
+        })
+      )?.scanMeta as Record<string, unknown>) ?? {};
+
+    await db
+      .update(websiteAnalyses)
+      .set({
+        reportId: report.id,
+        status: "completed",
+        scanPhase: "completed",
+        stage: "Complete",
+        progress: 100,
+        completedAt: new Date(),
+        durationMs,
+        engineVersion: MONEYGAP_ENGINE_VERSION,
+        trustVersion: TRUST_ENGINE_VERSION,
+        error: null,
+        scanMeta: {
+          ...priorCompleteMeta,
+          partial,
+          severity: partial ? "WARNING" : "INFO",
+          reportGenerationComplete: true,
+          competitiveSkipped: profileForCompetitive === "quick",
+        },
+      })
+      .where(eq(websiteAnalyses.id, analysisId));
+
+    log("info", "SCAN_COMPLETE", {
+      analysisId,
+      reportId: report.id,
+      durationMs,
+      partial,
+    });
+    log("info", "REPORT_GENERATION_COMPLETE", {
+      analysisId,
+      reportId: report.id,
+      durationMs,
+      partial,
+    });
 
     try {
       const { runMonitorPostProcess } = await import("@/lib/monitor/post-process");
@@ -1362,48 +1431,6 @@ async function finishPipelineWithPages(
         error: err instanceof Error ? err.message : String(err),
       });
     }
-
-    const durationMs = Date.now() - startedAtMs;
-
-    await db
-      .update(websiteAnalyses)
-      .set({
-        reportId: report.id,
-        status: "completed",
-        scanPhase: "completed",
-        stage: "Complete",
-        progress: 100,
-        completedAt: new Date(),
-        durationMs,
-        engineVersion: MONEYGAP_ENGINE_VERSION,
-        trustVersion: TRUST_ENGINE_VERSION,
-        error: null,
-        scanMeta: {
-          ...(((
-            await db.query.websiteAnalyses.findFirst({
-              where: eq(websiteAnalyses.id, analysisId),
-              columns: { scanMeta: true },
-            })
-          )?.scanMeta as Record<string, unknown>) ?? {}),
-          partial,
-          severity: partial ? "WARNING" : "INFO",
-          reportGenerationComplete: true,
-        },
-      })
-      .where(eq(websiteAnalyses.id, analysisId));
-
-    log("info", "SCAN_COMPLETE", {
-      analysisId,
-      reportId: report.id,
-      durationMs,
-      partial,
-    });
-    log("info", "REPORT_GENERATION_COMPLETE", {
-      analysisId,
-      reportId: report.id,
-      durationMs,
-      partial,
-    });
 
     try {
       const { recordUsage } = await import("@/lib/billing");
