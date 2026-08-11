@@ -1847,6 +1847,7 @@ export function IntelligenceReport({
         <ExecutionModePanel
           reportId={report.id}
           opportunity={focusOpportunity}
+          website={report.website}
           onExit={() => {
             setExecutionFocusId(null);
             if (typeof window !== "undefined") {

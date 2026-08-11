@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { AssetSection } from "@/db/schema";
 import { IdePromptPanel } from "@/components/developer/ide-prompt-panel";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,20 @@ import {
   type UpgradePayload,
 } from "@/components/billing/upgrade-prompt";
 import { cn } from "@/lib/utils";
+
+/** Portal to body so drawers aren't trapped by Execution Mode's backdrop-filter scroll container. */
+function DrawerPortal({ children }: { children: ReactNode }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+  return createPortal(children, document.body);
+}
+
+const DRAWER_OVERLAY =
+  "fixed inset-0 z-[100] flex justify-end bg-black/40 backdrop-blur-sm";
+const DRAWER_PANEL =
+  "flex h-full w-full max-w-xl flex-col border-l border-border bg-bg-elevated shadow-2xl";
+
 
 export function AssetDrawer({
   open,
@@ -38,8 +53,9 @@ export function AssetDrawer({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm">
-      <div className="flex h-full w-full max-w-xl flex-col border-l border-border bg-bg-elevated shadow-2xl">
+    <DrawerPortal>
+    <div className={DRAWER_OVERLAY}>
+      <div className={cn(DRAWER_PANEL, "max-w-xl")}>
         <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-accent">
@@ -108,6 +124,7 @@ export function AssetDrawer({
         </div>
       </div>
     </div>
+    </DrawerPortal>
   );
 }
 
@@ -129,8 +146,9 @@ export function ChecklistDrawer({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm">
-      <div className="flex h-full w-full max-w-md flex-col border-l border-border bg-bg-elevated shadow-2xl">
+    <DrawerPortal>
+    <div className={DRAWER_OVERLAY}>
+      <div className={cn(DRAWER_PANEL, "max-w-md")}>
         <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-accent">
@@ -166,6 +184,7 @@ export function ChecklistDrawer({
         </div>
       </div>
     </div>
+    </DrawerPortal>
   );
 }
 
@@ -185,12 +204,13 @@ export function IdePromptDrawer({
   const fullHref = `/dashboard/ide-prompt?opportunityId=${encodeURIComponent(opportunityId)}&reportId=${encodeURIComponent(reportId)}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm">
+    <DrawerPortal>
+    <div className={DRAWER_OVERLAY}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="ide-prompt-drawer-title"
-        className="flex h-full w-full max-w-2xl flex-col border-l border-border bg-bg-elevated shadow-2xl"
+        className={cn(DRAWER_PANEL, "max-w-2xl")}
       >
         <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
           <div>
@@ -233,6 +253,7 @@ export function IdePromptDrawer({
         </div>
       </div>
     </div>
+    </DrawerPortal>
   );
 }
 
@@ -279,12 +300,13 @@ export function AutomationFixDrawer({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm">
+    <DrawerPortal>
+    <div className={DRAWER_OVERLAY}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="automation-fix-drawer-title"
-        className="flex h-full w-full max-w-md flex-col border-l border-border bg-bg-elevated shadow-2xl"
+        className={cn(DRAWER_PANEL, "max-w-md")}
       >
         <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
           <div>
@@ -339,6 +361,7 @@ export function AutomationFixDrawer({
         </div>
       </div>
     </div>
+    </DrawerPortal>
   );
 }
 
@@ -354,12 +377,13 @@ export function IntegrationsFixDrawer({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm">
+    <DrawerPortal>
+    <div className={DRAWER_OVERLAY}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="integrations-fix-drawer-title"
-        className="flex h-full w-full max-w-md flex-col border-l border-border bg-bg-elevated shadow-2xl"
+        className={cn(DRAWER_PANEL, "max-w-md")}
       >
         <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
           <div>
@@ -401,6 +425,7 @@ export function IntegrationsFixDrawer({
         </div>
       </div>
     </div>
+    </DrawerPortal>
   );
 }
 

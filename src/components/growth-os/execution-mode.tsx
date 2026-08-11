@@ -13,11 +13,13 @@ import { formatCurrency } from "@/lib/utils";
 export function ExecutionModePanel({
   reportId,
   opportunity,
+  website,
   onExit,
   onAskAdvisor,
 }: {
   reportId: string;
   opportunity: OpportunityCardData;
+  website: { name: string; domain: string; url: string };
   onExit: () => void;
   onAskAdvisor?: (opportunityId: string) => void;
 }) {
@@ -43,14 +45,29 @@ export function ExecutionModePanel({
     <div className="fixed inset-0 z-50 overflow-y-auto bg-bg/95 backdrop-blur-sm">
       <div className="mx-auto max-w-3xl space-y-6 px-4 py-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
               Execution Mode
             </p>
-            <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-fg">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Badge tone="accent">{website.domain}</Badge>
+              <a
+                href={website.url}
+                target="_blank"
+                rel="noreferrer"
+                className="truncate text-xs text-accent hover:underline"
+              >
+                {website.url}
+              </a>
+            </div>
+            <h1 className="mt-2 font-display text-2xl font-semibold tracking-tight text-fg">
               {opportunity.title}
             </h1>
-            <p className="mt-1 text-sm text-fg-muted">{opportunity.summary ?? opportunity.whatsMissing}</p>
+            <p className="mt-1 text-sm text-fg-muted">
+              Fix for <span className="font-medium text-fg">{website.name}</span>
+              {" · "}
+              {opportunity.summary ?? opportunity.whatsMissing}
+            </p>
           </div>
           <Button type="button" size="sm" variant="secondary" onClick={onExit}>
             Exit focus
@@ -93,9 +110,10 @@ export function ExecutionModePanel({
           </CardHeader>
           <CardBody className="space-y-2 text-sm text-fg-muted">
             <p>
-              Work this opportunity end-to-end: use the Action Center below to generate assets,
-              create a project, and mark progress. Stay in Execution Mode until the checklist is
-              done.
+              Work this opportunity end-to-end for{" "}
+              <span className="font-medium text-fg">{website.domain}</span>: use
+              the Action Center below to generate assets, create a project, and
+              mark progress. Stay in Execution Mode until the checklist is done.
             </p>
             {opportunity.detectionSource && (
               <p className="text-xs text-fg-subtle">Source: {opportunity.detectionSource}</p>
