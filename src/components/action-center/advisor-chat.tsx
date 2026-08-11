@@ -24,7 +24,7 @@ export function AdvisorChatPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,7 +47,9 @@ export function AdvisorChatPanel({
 
   useEffect(() => {
     if (!loaded) return;
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
   }, [messages, loading, loaded]);
 
   async function send() {
@@ -96,7 +98,10 @@ export function AdvisorChatPanel({
         )}
       </CardHeader>
       <CardBody className="space-y-4">
-        <div className="max-h-[420px] space-y-3 overflow-y-auto rounded-xl border border-border bg-bg px-4 py-4">
+        <div
+          ref={listRef}
+          className="mx-auto max-h-[420px] w-full max-w-2xl space-y-3 overflow-y-auto overscroll-contain rounded-xl border border-border bg-bg px-4 py-4"
+        >
           {!loaded && <p className="text-sm text-fg-muted">Loading conversation…</p>}
           {loaded && messages.length === 0 && (
             <p className="text-sm text-fg-muted">
@@ -108,18 +113,17 @@ export function AdvisorChatPanel({
               key={m.id}
               className={
                 m.role === "user"
-                  ? "ml-8 rounded-xl bg-accent-soft/50 px-3 py-2 text-sm text-fg"
-                  : "mr-8 rounded-xl border border-border bg-bg-elevated px-3 py-2 text-sm text-fg-muted whitespace-pre-wrap"
+                  ? "ml-4 rounded-xl bg-accent-soft/50 px-3 py-2 text-sm text-fg sm:ml-8"
+                  : "mr-4 rounded-xl border border-border bg-bg-elevated px-3 py-2 text-sm text-fg-muted whitespace-pre-wrap sm:mr-8"
               }
             >
               {m.content}
             </div>
           ))}
           {loading && <p className="text-xs text-fg-subtle">Advisor is thinking…</p>}
-          <div ref={bottomRef} />
         </div>
         {error && <p className="text-xs text-danger">{error}</p>}
-        <div className="flex gap-2">
+        <div className="mx-auto flex w-full max-w-2xl gap-2">
           <input
             className="flex-1 rounded-xl border border-border bg-bg px-3 py-2 text-sm text-fg"
             placeholder="Ask your Growth Advisor…"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { AssetSection } from "@/db/schema";
 import { IdePromptPanel } from "@/components/developer/ide-prompt-panel";
@@ -14,9 +14,32 @@ import { cn } from "@/lib/utils";
 /** Portal to body so drawers aren't trapped by Execution Mode's backdrop-filter scroll container. */
 function DrawerPortal({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const frame = requestAnimationFrame(() => {
+      const closeBtn =
+        rootRef.current?.querySelector<HTMLElement>("[data-drawer-close]");
+      closeBtn?.focus({ preventScroll: true });
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [mounted]);
+
   if (!mounted) return null;
-  return createPortal(children, document.body);
+  return createPortal(
+    <div ref={rootRef} className="contents">
+      {children}
+    </div>,
+    document.body,
+  );
 }
 
 const DRAWER_OVERLAY =
@@ -68,6 +91,7 @@ export function AssetDrawer({
           </div>
           <button
             type="button"
+            data-drawer-close
             onClick={onClose}
             className="rounded-lg px-2 py-1 text-sm text-fg-muted hover:bg-bg-muted"
           >
@@ -158,6 +182,7 @@ export function ChecklistDrawer({
           </div>
           <button
             type="button"
+            data-drawer-close
             onClick={onClose}
             className="rounded-lg px-2 py-1 text-sm text-fg-muted hover:bg-bg-muted"
           >
@@ -229,6 +254,7 @@ export function IdePromptDrawer({
           </div>
           <button
             type="button"
+            data-drawer-close
             onClick={onClose}
             className="rounded-lg px-2 py-1 text-sm text-fg-muted hover:bg-bg-muted"
           >
@@ -325,6 +351,7 @@ export function AutomationFixDrawer({
           </div>
           <button
             type="button"
+            data-drawer-close
             onClick={onClose}
             className="rounded-lg px-2 py-1 text-sm text-fg-muted hover:bg-bg-muted"
           >
@@ -402,6 +429,7 @@ export function IntegrationsFixDrawer({
           </div>
           <button
             type="button"
+            data-drawer-close
             onClick={onClose}
             className="rounded-lg px-2 py-1 text-sm text-fg-muted hover:bg-bg-muted"
           >

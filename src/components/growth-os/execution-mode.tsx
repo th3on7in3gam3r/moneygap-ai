@@ -42,7 +42,7 @@ export function ExecutionModePanel({
     : 0;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-bg/95 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-bg/95 backdrop-blur-sm">
       <div className="mx-auto max-w-3xl space-y-6 px-4 py-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">

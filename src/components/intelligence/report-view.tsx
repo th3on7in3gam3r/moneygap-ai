@@ -918,7 +918,7 @@ export function IntelligenceReport({
   const engineFailed = report.moneyGapEngineStatus === "failed";
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-4">
+    <div className="mx-auto w-full max-w-4xl space-y-4">
       {report.status === "archived" && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-bg-muted/40 px-3 py-2 text-sm text-fg-muted">
           <span>
@@ -939,13 +939,13 @@ export function IntelligenceReport({
           )}
         </div>
       )}
-      <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 space-y-1">
+      <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="gap">Growth intelligence</Badge>
             <span className="text-xs text-fg-subtle">{report.website.domain}</span>
           </div>
-          <h1 className="font-display text-xl font-semibold tracking-tight sm:text-2xl">
+          <h1 className="font-display text-xl font-semibold tracking-tight">
             {report.title}
           </h1>
           <a
@@ -957,18 +957,18 @@ export function IntelligenceReport({
             {report.website.url}
           </a>
           {report.opportunitySummary && (
-            <p className="line-clamp-2 max-w-2xl text-sm leading-snug text-fg-muted">
+            <p className="line-clamp-2 text-sm leading-snug text-fg-muted">
               {report.opportunitySummary}
             </p>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-4 rounded-xl border border-border bg-bg-elevated px-3 py-2">
+        <div className="flex shrink-0 items-center gap-3 self-start rounded-xl border border-border bg-bg-elevated px-3 py-2 sm:self-center">
           <MoneyGapScore score={report.moneyGapScore} size="sm" />
-          <div className="min-w-[7rem]">
+          <div className="min-w-0">
             <p className="text-[10px] uppercase tracking-[0.08em] text-fg-subtle">
               Est. annual opp.
             </p>
-            <p className="font-display text-lg font-semibold tabular-nums text-gap">
+            <p className="font-display text-base font-semibold tabular-nums text-gap">
               {formatCurrency(report.revenueAtRisk)}
             </p>
             <p className="text-[11px] text-fg-muted">
