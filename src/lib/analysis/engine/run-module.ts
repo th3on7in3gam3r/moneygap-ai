@@ -10,25 +10,10 @@ import type {
   MoneyGapFinding,
 } from "@/lib/analysis/engine/types";
 import { estimateTokenCount } from "@/lib/analysis/corpus";
+import { createStructuredJsonText } from "@/lib/analysis/llm-request";
 import { MODULE_CORPUS_MAX_CHARS } from "@/lib/analysis/roadmap-errors";
 import { MONEY_GAP_ENGINE_ERROR } from "@/lib/analysis/stages";
-import { log, withRetry } from "@/lib/observability/logger";
-
-function extractOutputText(response: OpenAI.Responses.Response): string {
-  if (typeof response.output_text === "string" && response.output_text.trim()) {
-    return response.output_text;
-  }
-  for (const item of response.output ?? []) {
-    if (item.type === "message") {
-      for (const part of item.content ?? []) {
-        if (part.type === "output_text" && part.text) {
-          return part.text;
-        }
-      }
-    }
-  }
-  throw new Error(MONEY_GAP_ENGINE_ERROR);
-}
+import { log } from "@/lib/observability/logger";
 
 function clamp(n: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, Math.round(Number.isFinite(n) ? n : min)));
@@ -118,48 +103,24 @@ ${corpusExcerpt}`;
     corpusChars: corpusExcerpt.length,
   });
 
-  const response = await withRetry(
-    () => {
-      if (ctx.signal?.aborted) {
-        throw Object.assign(new Error("Money Gap engine deadline exceeded"), {
-          name: "AbortError",
-        });
-      }
-      return client.responses.create(
-        {
-          model,
-          instructions: buildModuleInstructions(def, ctx.kgContext),
-          input,
-          text: {
-            format: {
-              type: "json_schema",
-              name: `moneygap_${def.id}_module`,
-              strict: true,
-              schema: moduleOutputSchema,
-            },
-          },
-        },
-        {
-          timeout: MODULE_TIMEOUT_MS,
-          signal: mergeAbortSignals(
-            AbortSignal.timeout(MODULE_TIMEOUT_MS),
-            ctx.signal,
-          ),
-        },
-      );
-    },
-    {
-      attempts: 2,
-      label: `openai_module_${def.id}`,
-      shouldRetry: (err) => {
-        if (err instanceof Error && err.name === "AbortError") return false;
-        if (/deadline exceeded/i.test(String(err))) return false;
-        return true;
-      },
-    },
-  );
+  const text = await createStructuredJsonText({
+    client,
+    model,
+    instructions: buildModuleInstructions(def, ctx.kgContext),
+    input,
+    schemaName: `moneygap_${def.id}_module`,
+    schema: JSON.parse(JSON.stringify(moduleOutputSchema)) as Record<
+      string,
+      unknown
+    >,
+    timeoutMs: MODULE_TIMEOUT_MS,
+    signal: mergeAbortSignals(
+      AbortSignal.timeout(MODULE_TIMEOUT_MS),
+      ctx.signal,
+    ),
+    label: `openai_module_${def.id}`,
+  });
 
-  const text = extractOutputText(response);
   let parsed: { findings: MoneyGapFinding[] };
   try {
     parsed = JSON.parse(text) as { findings: MoneyGapFinding[] };

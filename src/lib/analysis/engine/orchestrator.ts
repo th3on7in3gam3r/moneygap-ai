@@ -91,11 +91,11 @@ export async function runMoneyGapOrchestrator(
     onProgress?: (p: OrchestratorProgress) => void | Promise<void>;
   },
 ): Promise<MoneyGapEngineResult & { partial: boolean; modulesFailed: number }> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) throw new Error(MISSING_KEYS_ERROR);
 
   const client = new OpenAI({ apiKey });
-  const model = process.env.OPENAI_MODEL || "gpt-4o";
+  const model = (process.env.OPENAI_MODEL || "gpt-4o").trim();
   const modulesTotal = MODULE_RUNNERS.length;
   let modulesCompleted = 0;
   let hitDeadline = false;
@@ -176,10 +176,18 @@ export async function runMoneyGapOrchestrator(
     }
 
     if (findings.length === 0) {
+      const firstReason =
+        settled.find((r) => r.status === "rejected")?.reason ?? null;
+      const detail =
+        firstReason instanceof Error
+          ? firstReason.message
+          : firstReason != null
+            ? String(firstReason)
+            : "no findings returned";
       console.error(
-        `MoneyGap Orchestrator: all modules failed (${failures}/${MODULE_RUNNERS.length})`,
+        `MoneyGap Orchestrator: all modules failed (${failures}/${MODULE_RUNNERS.length}): ${detail}`,
       );
-      throw new Error(MONEY_GAP_ENGINE_ERROR);
+      throw new Error(`${MONEY_GAP_ENGINE_ERROR} (${detail.slice(0, 240)})`);
     }
 
     if (failures > 0 || hitDeadline) {

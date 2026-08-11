@@ -640,7 +640,8 @@ export async function persistMoneyGapEngineResult(input: {
     await releaseMoneyGapClaim(input.analysisId, {
       errorClass,
       severity: "FATAL",
-      errorMessage: err instanceof Error ? err.message : String(err),
+      errorMessage: message,
+      causeMessage: err instanceof Error ? err.message : String(err),
     });
 
     return { ok: false, error: message };
