@@ -197,7 +197,7 @@ function claimNextStageSql() {
       claimed_at = NOW(),
       started_at = COALESCE(s.started_at, NOW()),
       heartbeat_at = NOW(),
-      lease_expires_at = NOW() + ($2::text || ' milliseconds')::interval,
+      lease_expires_at = NOW() + ($1::text || ' milliseconds')::interval,
       error_class = NULL,
       error_message = NULL
     FROM candidate c, scan_jobs j
@@ -272,10 +272,7 @@ function logEvent(event, fields) {
 }
 async function processOneScanStage(client, runners, opts = { workerId: "worker" }) {
   const leaseMs = opts.leaseMs ?? DEFAULT_LEASE_MS;
-  const claim = await client.query(claimNextStageSql(), [
-    opts.workerId,
-    String(leaseMs)
-  ]);
+  const claim = await client.query(claimNextStageSql(), [String(leaseMs)]);
   if (!claim.rows.length) return { processed: false };
   const row = claim.rows[0];
   const stage = row.stage;

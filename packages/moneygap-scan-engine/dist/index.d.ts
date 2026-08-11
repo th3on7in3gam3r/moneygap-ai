@@ -44,7 +44,7 @@ declare function stageOrderSql(alias?: string): string;
  * Atomic claim SQL for the next eligible stage across all running/queued jobs.
  * Only `queued` or reclaimable `running` (expired lease) stages are claimable —
  * later stages stay `pending` until the previous stage advances them.
- * Bind: $1 workerId, $2 leaseMs (milliseconds as text).
+ * Bind: $1 leaseMs (milliseconds as text). Worker id is applied via touchJobHeartbeatSql.
  */
 declare function claimNextStageSql(): string;
 declare function heartbeatStageSql(): string;

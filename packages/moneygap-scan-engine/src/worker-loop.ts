@@ -55,10 +55,7 @@ export async function processOneScanStage(
   opts: { workerId: string; leaseMs?: number } = { workerId: "worker" },
 ): Promise<{ processed: boolean; stage?: string }> {
   const leaseMs = opts.leaseMs ?? DEFAULT_LEASE_MS;
-  const claim = await client.query(claimNextStageSql(), [
-    opts.workerId,
-    String(leaseMs),
-  ]);
+  const claim = await client.query(claimNextStageSql(), [String(leaseMs)]);
   if (!claim.rows.length) return { processed: false };
 
   const row = claim.rows[0]! as unknown as ClaimableStageRow;

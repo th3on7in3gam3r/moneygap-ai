@@ -34,7 +34,7 @@ export function stageOrderSql(alias = "s"): string {
  * Atomic claim SQL for the next eligible stage across all running/queued jobs.
  * Only `queued` or reclaimable `running` (expired lease) stages are claimable —
  * later stages stay `pending` until the previous stage advances them.
- * Bind: $1 workerId, $2 leaseMs (milliseconds as text).
+ * Bind: $1 leaseMs (milliseconds as text). Worker id is applied via touchJobHeartbeatSql.
  */
 export function claimNextStageSql(): string {
   return `
@@ -66,7 +66,7 @@ export function claimNextStageSql(): string {
       claimed_at = NOW(),
       started_at = COALESCE(s.started_at, NOW()),
       heartbeat_at = NOW(),
-      lease_expires_at = NOW() + ($2::text || ' milliseconds')::interval,
+      lease_expires_at = NOW() + ($1::text || ' milliseconds')::interval,
       error_class = NULL,
       error_message = NULL
     FROM candidate c, scan_jobs j
