@@ -8,7 +8,7 @@ import {
   updateOnboarding,
 } from "@/lib/onboarding";
 
-export const DEMO_COOKIE = "mg_demo_mode";
+const DEMO_COOKIE = "mg_demo_mode";
 
 const schema = z.object({
   action: z.enum(["enter", "exit"]),
