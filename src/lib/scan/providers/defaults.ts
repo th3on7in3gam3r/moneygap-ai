@@ -268,14 +268,25 @@ export const defaultQueueProvider: QueueProvider = {
 
 export const defaultStorageProvider: StorageProvider = {
   async mirrorWebsitePage(input) {
-    await db.insert(websitePages).values({
-      analysisId: input.analysisId,
-      url: input.url,
-      pageType: input.pageType,
-      title: input.title,
-      markdown: input.markdown,
-      metadata: input.metadata,
-    });
+    await db
+      .insert(websitePages)
+      .values({
+        analysisId: input.analysisId,
+        url: input.url,
+        pageType: input.pageType,
+        title: input.title,
+        markdown: input.markdown,
+        metadata: input.metadata,
+      })
+      .onConflictDoUpdate({
+        target: [websitePages.analysisId, websitePages.url],
+        set: {
+          pageType: input.pageType,
+          title: input.title,
+          markdown: input.markdown,
+          metadata: input.metadata,
+        },
+      });
   },
 };
 

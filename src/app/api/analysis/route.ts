@@ -7,6 +7,8 @@ import { websiteAnalyses, websites } from "@/db/schema";
 import { runAnalysisPipeline } from "@/lib/analysis/pipeline";
 import { verifyUrlReachable } from "@/lib/analysis/url";
 import { ensureUserAndWorkspace } from "@/lib/analysis/workspace";
+import { createScanJobForAnalysis } from "@/lib/scan-engine/create-job";
+import { isScanEngineV3 } from "@/lib/scan-engine/flag";
 
 export const maxDuration = 300;
 
@@ -139,6 +141,15 @@ export async function POST(req: Request) {
       type: "website_analysis",
       meta: { analysisId: analysis.id },
     });
+
+    if (isScanEngineV3()) {
+      await createScanJobForAnalysis(analysis.id);
+      return Response.json({
+        analysisId: analysis.id,
+        scanEngine: "v3",
+        redirectTo: `/dashboard/scans/${analysis.id}`,
+      });
+    }
 
     after(() => {
       void runAnalysisPipeline(analysis.id);

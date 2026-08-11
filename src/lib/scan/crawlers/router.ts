@@ -31,7 +31,17 @@ export function getPreferredCrawlProvider(): PreferredCrawlProvider {
 
 export function resolveProviderOrder(
   preferred: PreferredCrawlProvider = getPreferredCrawlProvider(),
+  profile?: string | null,
 ): CrawlProviderName[] {
+  // Basics (quick): prefer fast HTTP/Firecrawl; Apify only as last resort.
+  if (profile === "quick" && preferred === "auto") {
+    const order: CrawlProviderName[] = [];
+    if (isFirecrawlConfigured()) order.push("firecrawl");
+    order.push("native");
+    if (isApifyConfigured() && !isApifyCircuitOpen()) order.push("apify");
+    return order;
+  }
+
   if (preferred === "native") return ["native"];
   if (preferred === "firecrawl") return ["firecrawl", "native"];
   if (preferred === "scrapedo") return ["firecrawl", "native"];
@@ -105,7 +115,7 @@ export async function routeCrawlStart(
     return { kind: "failed", error };
   }
 
-  const order = resolveProviderOrder();
+  const order = resolveProviderOrder(getPreferredCrawlProvider(), input.profile);
   let fallbackUsed = false;
   let fallbackFrom: CrawlProviderName | undefined;
 

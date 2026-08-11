@@ -550,6 +550,64 @@ export const websitePages = pgTable(
   (t) => [
     index("website_pages_analysis_idx").on(t.analysisId),
     index("website_pages_type_idx").on(t.pageType),
+    uniqueIndex("website_pages_analysis_url_uidx").on(t.analysisId, t.url),
+  ],
+);
+
+/** Scan Engine V3 — durable scan job (1:1 with website_analyses). */
+export const scanJobs = pgTable(
+  "scan_jobs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    analysisId: uuid("analysis_id")
+      .notNull()
+      .references(() => websiteAnalyses.id, { onDelete: "cascade" }),
+    profile: text("profile").notNull().default("quick"),
+    /** queued | running | completed | partial | failed | cancelled */
+    status: text("status").notNull().default("queued"),
+    currentStage: text("current_stage"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    lastHeartbeatAt: timestamp("last_heartbeat_at", { withTimezone: true }),
+    workerId: text("worker_id"),
+    errorClass: text("error_class"),
+    errorMessage: text("error_message"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+  },
+  (t) => [
+    uniqueIndex("scan_jobs_analysis_uidx").on(t.analysisId),
+    index("scan_jobs_status_idx").on(t.status),
+  ],
+);
+
+/** Scan Engine V3 — per-stage durable execution with leases. */
+export const scanJobStages = pgTable(
+  "scan_job_stages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    scanJobId: uuid("scan_job_id")
+      .notNull()
+      .references(() => scanJobs.id, { onDelete: "cascade" }),
+    /** acquire | normalize | intelligence | moneygap | findings | roadmap | competitive | finalize */
+    stage: text("stage").notNull(),
+    /** pending | queued | running | completed | partial | failed | skipped */
+    status: text("status").notNull().default("pending"),
+    attempt: integer("attempt").notNull().default(0),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+    heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    durationMs: integer("duration_ms"),
+    errorClass: text("error_class"),
+    errorMessage: text("error_message"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+  },
+  (t) => [
+    uniqueIndex("scan_job_stages_job_stage_uidx").on(t.scanJobId, t.stage),
+    index("scan_job_stages_status_idx").on(t.status),
+    index("scan_job_stages_lease_idx").on(t.leaseExpiresAt),
   ],
 );
 
@@ -2512,6 +2570,21 @@ export const websitePagesRelations = relations(websitePages, ({ one }) => ({
   }),
 }));
 
+export const scanJobsRelations = relations(scanJobs, ({ one, many }) => ({
+  analysis: one(websiteAnalyses, {
+    fields: [scanJobs.analysisId],
+    references: [websiteAnalyses.id],
+  }),
+  stages: many(scanJobStages),
+}));
+
+export const scanJobStagesRelations = relations(scanJobStages, ({ one }) => ({
+  job: one(scanJobs, {
+    fields: [scanJobStages.scanJobId],
+    references: [scanJobs.id],
+  }),
+}));
+
 export const businessProfilesRelations = relations(businessProfiles, ({ one }) => ({
   analysis: one(websiteAnalyses, {
     fields: [businessProfiles.analysisId],
@@ -2564,6 +2637,8 @@ export type MoneyGap = typeof moneyGaps.$inferSelect;
 export type DailyMetric = typeof dailyMetrics.$inferSelect;
 export type WebsiteAnalysis = typeof websiteAnalyses.$inferSelect;
 export type WebsitePage = typeof websitePages.$inferSelect;
+export type ScanJob = typeof scanJobs.$inferSelect;
+export type ScanJobStage = typeof scanJobStages.$inferSelect;
 export type BusinessProfile = typeof businessProfiles.$inferSelect;
 export type AudienceProfile = typeof audienceProfiles.$inferSelect;
 export type ContentAnalysis = typeof contentAnalyses.$inferSelect;

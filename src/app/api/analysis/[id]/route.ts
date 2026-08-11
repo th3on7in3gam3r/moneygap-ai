@@ -10,6 +10,10 @@ import {
 } from "@/lib/analysis/pipeline";
 import { ANALYSIS_STAGES } from "@/lib/analysis/stages";
 import { kickStalledScanIfNeeded } from "@/lib/scan/continue";
+import {
+  buildScanEngineStatusPayload,
+  isV3AnalysisMeta,
+} from "@/lib/scan-engine/status";
 
 export const maxDuration = 300;
 
@@ -33,40 +37,45 @@ export async function GET(
     return Response.json({ error: "Analysis not found." }, { status: 404 });
   }
 
-  const stale = isStaleRunningAnalysis({
-    status: analysis.status,
-    startedAt: analysis.startedAt,
-    reportId: analysis.reportId,
-  });
+  const v3 = isV3AnalysisMeta(analysis.scanMeta);
+  const scanEngine = v3 ? await buildScanEngineStatusPayload(id) : null;
 
-  // Serverless often dies mid Money Gap Engine — resume when polling detects a stale run.
-  if (stale && analysis.reportId) {
-    after(() => {
-      void resumeStuckAnalysis(id).catch((err) => {
-        console.error("Stuck analysis resume failed:", err);
-      });
-    });
-  } else if (
-    !analysis.reportId &&
-    (analysis.status === "running" || analysis.status === "queued")
-  ) {
-    // Self-heal stalled crawl ticks before the long stale-fail budget.
-    after(() => {
-      void kickStalledScanIfNeeded(id).catch((err) => {
-        console.error("Stalled scan kick failed:", err);
-      });
+  // V3: worker owns long stages — do not kick legacy tick/after() heal paths.
+  if (!v3) {
+    const stale = isStaleRunningAnalysis({
+      status: analysis.status,
+      startedAt: analysis.startedAt,
+      reportId: analysis.reportId,
     });
 
-    // Hung during crawl / Reading pages — fail after stale budget so UI unlocks.
-    // Incremental profiles use a longer budget (see failStalePreReportAnalysis).
-    const failedStale = await failStalePreReportAnalysis(id);
-    if (failedStale.ok) {
-      analysis = await db.query.websiteAnalyses.findFirst({
-        where: and(eq(websiteAnalyses.id, id), eq(websiteAnalyses.userId, userId)),
-        with: { website: true },
+    if (stale && analysis.reportId) {
+      after(() => {
+        void resumeStuckAnalysis(id).catch((err) => {
+          console.error("Stuck analysis resume failed:", err);
+        });
       });
-      if (!analysis) {
-        return Response.json({ error: "Analysis not found." }, { status: 404 });
+    } else if (
+      !analysis.reportId &&
+      (analysis.status === "running" || analysis.status === "queued")
+    ) {
+      after(() => {
+        void kickStalledScanIfNeeded(id).catch((err) => {
+          console.error("Stalled scan kick failed:", err);
+        });
+      });
+
+      const failedStale = await failStalePreReportAnalysis(id);
+      if (failedStale.ok) {
+        analysis = await db.query.websiteAnalyses.findFirst({
+          where: and(
+            eq(websiteAnalyses.id, id),
+            eq(websiteAnalyses.userId, userId),
+          ),
+          with: { website: true },
+        });
+        if (!analysis) {
+          return Response.json({ error: "Analysis not found." }, { status: 404 });
+        }
       }
     }
   }
@@ -76,13 +85,18 @@ export async function GET(
     analysis.progress ?? 0,
   );
 
+  const progress =
+    scanEngine?.progress != null
+      ? Math.max(analysis.progress ?? 0, scanEngine.progress)
+      : analysis.progress;
+
   return Response.json({
     id: analysis.id,
     url: analysis.url,
     domain: analysis.website.domain,
     status: analysis.status,
     stage: analysis.stage,
-    progress: analysis.progress,
+    progress,
     error: analysis.error,
     reportId: analysis.reportId,
     startedAt: analysis.startedAt,
@@ -94,9 +108,11 @@ export async function GET(
     pagesFailed: analysis.pagesFailed ?? 0,
     estimatedRemainingMs: analysis.estimatedRemainingMs,
     scanMeta: analysis.scanMeta,
+    scanEngine,
     currentUrl:
       analysis.scanMeta &&
-      typeof (analysis.scanMeta as { currentUrl?: unknown }).currentUrl === "string"
+      typeof (analysis.scanMeta as { currentUrl?: unknown }).currentUrl ===
+        "string"
         ? (analysis.scanMeta as { currentUrl: string }).currentUrl
         : null,
     tickScheduleError:
@@ -161,17 +177,19 @@ export async function GET(
           ? (analysis.scanMeta as { failedStage: string }).failedStage
           : null,
       errorClass:
-        analysis.scanMeta &&
+        scanEngine?.errorClass ??
+        (analysis.scanMeta &&
         typeof (analysis.scanMeta as { errorClass?: unknown }).errorClass ===
           "string"
           ? (analysis.scanMeta as { errorClass: string }).errorClass
-          : null,
+          : null),
       errorMessage:
-        analysis.scanMeta &&
+        scanEngine?.errorMessage ??
+        (analysis.scanMeta &&
         typeof (analysis.scanMeta as { errorMessage?: unknown }).errorMessage ===
           "string"
           ? (analysis.scanMeta as { errorMessage: string }).errorMessage
-          : null,
+          : null),
       severity:
         analysis.scanMeta &&
         typeof (analysis.scanMeta as { severity?: unknown }).severity === "string"
@@ -197,25 +215,40 @@ export async function GET(
           ? (analysis.scanMeta as { tickScheduleErrorClass: string })
               .tickScheduleErrorClass
           : null,
+      ...(scanEngine?.diagnostics ?? {}),
     },
-    stages: ANALYSIS_STAGES.map((s, index) => {
-      const done =
-        analysis.status === "completed" ||
-        (currentIndex >= 0 && index < currentIndex);
-      const active =
-        analysis.status === "failed"
-          ? index === currentIndex
-          : analysis.status === "queued"
-            ? index === 0
-            : analysis.status === "running" && index === currentIndex;
+    stages: scanEngine
+      ? scanEngine.stages.map((s) => ({
+          id: s.id,
+          label: s.label,
+          done:
+            s.status === "completed" ||
+            s.status === "skipped" ||
+            s.status === "partial",
+          active: s.status === "running",
+          status: s.status,
+          durationMs: s.durationMs,
+          attempt: s.attempt,
+          errorMessage: s.errorMessage,
+        }))
+      : ANALYSIS_STAGES.map((s, index) => {
+          const done =
+            analysis.status === "completed" ||
+            (currentIndex >= 0 && index < currentIndex);
+          const active =
+            analysis.status === "failed"
+              ? index === currentIndex
+              : analysis.status === "queued"
+                ? index === 0
+                : analysis.status === "running" && index === currentIndex;
 
-      return {
-        id: s.id,
-        label: s.label,
-        done,
-        active,
-      };
-    }),
+          return {
+            id: s.id,
+            label: s.label,
+            done,
+            active,
+          };
+        }),
   });
 }
 

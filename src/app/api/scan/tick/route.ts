@@ -38,6 +38,24 @@ export async function POST(req: Request) {
   const { analysisId } = parsed.data;
   const workerEnabled = isWorkerScanExecution();
 
+  const { db } = await import("@/db");
+  const { websiteAnalyses } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const { isV3AnalysisMeta } = await import("@/lib/scan-engine/status");
+  const analysis = await db.query.websiteAnalyses.findFirst({
+    where: eq(websiteAnalyses.id, analysisId),
+    columns: { scanMeta: true },
+  });
+  if (isV3AnalysisMeta(analysis?.scanMeta)) {
+    log("info", "TICK_SKIP_V3", { analysisId });
+    return Response.json({
+      accepted: false,
+      reason: "scan_engine_v3",
+      analysisId,
+      ackDurationMs: Date.now() - ackStarted,
+    });
+  }
+
   const claim = await claimScanTick(analysisId);
   if (!claim.claimed) {
     log("info", "TICK_SCHEDULE_ACK", {

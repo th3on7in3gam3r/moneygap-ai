@@ -5,6 +5,8 @@ import { db } from "@/db";
 import { websiteAnalyses } from "@/db/schema";
 import { scheduleScanTick } from "@/lib/scan/continue";
 import { resumeScan } from "@/lib/scan/jobs";
+import { resumeScanJob } from "@/lib/scan-engine/create-job";
+import { isV3AnalysisMeta } from "@/lib/scan-engine/status";
 
 export const maxDuration = 30;
 
@@ -19,9 +21,25 @@ export async function POST(
   const { id } = await ctx.params;
   const row = await db.query.websiteAnalyses.findFirst({
     where: and(eq(websiteAnalyses.id, id), eq(websiteAnalyses.userId, userId)),
-    columns: { id: true },
+    columns: { id: true, scanMeta: true, crawlJobId: true },
   });
   if (!row) return Response.json({ error: "Not found" }, { status: 404 });
+
+  if (isV3AnalysisMeta(row.scanMeta)) {
+    const result = await resumeScanJob(id);
+    if (!result.ok) {
+      return Response.json(
+        { error: "Cannot resume this scan.", reason: result.reason },
+        { status: 400 },
+      );
+    }
+    return Response.json({
+      ok: true,
+      scanEngine: "v3",
+      reason: result.reason,
+      scanPhase: "queued",
+    });
+  }
 
   const ok = await resumeScan(id);
   if (!ok) {

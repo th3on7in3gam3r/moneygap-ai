@@ -175,6 +175,8 @@ export function AnalyzeUrlForm({
         code?: string;
         suggestedPlan?: string;
         diagnostics?: ConnectivityDiagnostics;
+        redirectTo?: string;
+        scanEngine?: string;
       };
       if (data.diagnostics) setDiagnostics(data.diagnostics);
       if (!res.ok || !data.analysisId) {
@@ -185,7 +187,9 @@ export function AnalyzeUrlForm({
         return;
       }
       clearSandboxHandoff();
-      router.push(`/dashboard/analyze/${data.analysisId}`);
+      router.push(
+        data.redirectTo ?? `/dashboard/analyze/${data.analysisId}`,
+      );
     } catch {
       setError("We couldn't start this analysis. Please try again.");
       setSubmitting(false);

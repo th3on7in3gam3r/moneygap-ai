@@ -1267,6 +1267,13 @@ async function finishPipelineWithPages(
     }
 
     await setStage(analysisId, "discovering_competitors");
+    const profileForCompetitive: ScanProfile = isScanProfile(analysis.scanProfile)
+      ? analysis.scanProfile
+      : "standard";
+    // Basics (quick): skip competitive — Scan Engine V3 profile matrix.
+    if (profileForCompetitive === "quick") {
+      log("info", "competitive_skipped_quick_profile", { analysisId });
+    } else {
     const competitive = await persistCompetitiveIntelligence({
       analysisId,
       reportId: report.id,
@@ -1292,6 +1299,7 @@ async function finishPipelineWithPages(
         error: competitive.error,
         severity: "WARNING",
       });
+    }
     }
 
     try {

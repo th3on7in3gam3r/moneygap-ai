@@ -43,6 +43,8 @@ services:
         sync: false
       - key: NEXT_PUBLIC_APP_URL
         sync: false
+      - key: SCAN_ENGINE_V3
+        value: "1"
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM
@@ -88,6 +90,49 @@ services:
           name: moneygap-ai
           type: web
           envVarKey: NEXT_PUBLIC_APP_URL
+
+  - type: worker
+    name: moneygap-scan-worker
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build --prefix packages/moneygap-scan-engine
+    startCommand: npx tsx scripts/scan-engine-worker.ts
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        sync: false
+      - key: SCAN_ENGINE_V3
+        value: "1"
+      - key: SCAN_WORKER_POLL_MS
+        value: "3000"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o
+      - key: CRAWL_WORKER_ENABLED
+        value: "1"
+      - key: SCAN_EXECUTION
+        value: "worker"
+      - key: CRON_SECRET
+        fromService:
+          name: moneygap-ai
+          type: web
+          envVarKey: CRON_SECRET
+      - key: APP_URL
+        fromService:
+          name: moneygap-ai
+          type: web
+          envVarKey: APP_URL
+      - key: NEXT_PUBLIC_APP_URL
+        fromService:
+          name: moneygap-ai
+          type: web
+          envVarKey: NEXT_PUBLIC_APP_URL
+      - key: FIRECRAWL_API_KEY
+        sync: false
+      - key: APIFY_API_TOKEN
+        sync: false
 
   - type: cron
     name: moneygap-monitor

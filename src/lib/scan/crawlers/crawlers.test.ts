@@ -321,7 +321,7 @@ describe("provider order + router", () => {
       {
         url: "https://example.com",
         scanId: "scan-1",
-        profile: "quick",
+        profile: "standard",
         maxPages: 25,
         maxDepth: 2,
         timeoutMs: 60_000,
@@ -355,7 +355,7 @@ describe("provider order + router", () => {
       {
         url: "https://example.com",
         scanId: "scan-2",
-        profile: "quick",
+        profile: "standard",
         maxPages: 25,
         maxDepth: 2,
         timeoutMs: 60_000,
@@ -375,6 +375,32 @@ describe("provider order + router", () => {
     if (result.kind === "native_handoff") {
       assert.equal(result.fallbackUsed, true);
     }
+  });
+
+  it("Basics (quick) prefers native/Firecrawl before Apify", async () => {
+    process.env.APIFY_API_TOKEN = "test-token";
+    delete process.env.FIRECRAWL_API_KEY;
+    delete process.env.CRAWL_PROVIDER;
+    const order = resolveProviderOrder("auto", "quick");
+    assert.equal(order[0], "native");
+    assert.ok(order.indexOf("apify") > 0);
+    const result = await routeCrawlStart(
+      {
+        url: "https://example.com",
+        scanId: "scan-quick",
+        profile: "quick",
+        maxPages: 25,
+        maxDepth: 2,
+        timeoutMs: 60_000,
+        useSitemap: false,
+      },
+      {
+        startApify: async () => {
+          throw new Error("Apify should not be primary for Basics");
+        },
+      },
+    );
+    assert.equal(result.kind, "native_handoff");
   });
 
   it("does not fallback for invalid URL", async () => {

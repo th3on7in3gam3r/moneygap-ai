@@ -50,13 +50,17 @@ export function AnalyticsAnalyzeActions({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: websiteUrl }),
       });
-      const data = (await res.json()) as { analysisId?: string; error?: string };
+      const data = (await res.json()) as {
+        analysisId?: string;
+        error?: string;
+        redirectTo?: string;
+      };
       if (!res.ok || !data.analysisId) {
         setError(data.error ?? "Could not restart analysis.");
         setRerunning(false);
         return;
       }
-      router.push(`/dashboard/analyze/${data.analysisId}`);
+      router.push(data.redirectTo ?? `/dashboard/analyze/${data.analysisId}`);
     } catch {
       setError("Could not restart analysis.");
       setRerunning(false);
