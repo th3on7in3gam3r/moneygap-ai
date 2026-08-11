@@ -7,7 +7,7 @@ export default function ReportsLayout({ children }: { children: React.ReactNode 
   return (
     <div className="min-h-screen bg-bg">
       <header className="sticky top-0 z-30 border-b border-border bg-bg/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-full max-w-[1600px] items-center justify-between px-4 sm:px-6">
+        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-4">
             <Logo href="/dashboard" />
             <span className="hidden text-sm text-fg-subtle sm:inline">Intelligence Report</span>
@@ -24,8 +24,8 @@ export default function ReportsLayout({ children }: { children: React.ReactNode 
           </div>
         </div>
       </header>
-      <main className="px-4 py-8 sm:px-6">
-        <div className="mx-auto w-full max-w-[1600px]">{children}</div>
+      <main className="px-4 py-5 sm:px-6">
+        <div className="mx-auto w-full max-w-6xl">{children}</div>
       </main>
     </div>
   );

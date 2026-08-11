@@ -6,6 +6,7 @@ import {
   Briefcase,
   Check,
   ChevronDown,
+  FileText,
   Gauge,
   ListChecks,
   MessageSquare,
@@ -275,6 +276,7 @@ export type IntelligenceReportView = {
 
 const tabs = [
   { id: "opportunities", label: "Opportunities", icon: Gauge },
+  { id: "summary", label: "Summary", icon: FileText },
   { id: "advisor", label: "Advisor", icon: MessageSquare },
   { id: "action", label: "Action", icon: ListChecks },
   { id: "competitive", label: "Competitive", icon: Swords },
@@ -323,7 +325,7 @@ function ExpandableList({
   items?: string[] | null;
   empty?: string;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const list = items ?? [];
 
   return (
@@ -914,81 +916,48 @@ export function IntelligenceReport({
   const engineFailed = report.moneyGapEngineStatus === "failed";
 
   return (
-    <div className="mx-auto w-full max-w-[1600px] space-y-8">
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge tone="gap">Growth intelligence</Badge>
-          <span className="text-sm text-fg-subtle">{report.website.domain}</span>
+    <div className="mx-auto w-full max-w-6xl space-y-4">
+      <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone="gap">Growth intelligence</Badge>
+            <span className="text-xs text-fg-subtle">{report.website.domain}</span>
+          </div>
+          <h1 className="font-display text-xl font-semibold tracking-tight sm:text-2xl">
+            {report.title}
+          </h1>
+          <a
+            href={report.website.url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-accent hover:underline"
+          >
+            {report.website.url}
+          </a>
+          {report.opportunitySummary && (
+            <p className="line-clamp-2 max-w-2xl text-sm leading-snug text-fg-muted">
+              {report.opportunitySummary}
+            </p>
+          )}
         </div>
-        <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-          {report.title}
-        </h1>
-        <a
-          href={report.website.url}
-          target="_blank"
-          rel="noreferrer"
-          className="text-sm text-accent hover:underline"
-        >
-          {report.website.url}
-        </a>
-        {report.opportunitySummary && (
-          <p className="max-w-3xl text-base leading-relaxed text-fg-muted">
-            {report.opportunitySummary}
-          </p>
-        )}
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
-        <Card>
-          <CardBody className="flex flex-col items-center gap-3 text-center sm:flex-row sm:text-left">
-            <MoneyGapScore score={report.moneyGapScore} size="lg" />
-            <div>
-              <p className="text-xs uppercase tracking-[0.1em] text-fg-subtle">
-                MoneyGap Score™
-              </p>
-              <p className="mt-1 text-sm text-fg-muted">
-                How much growth opportunity is still missing on this site.
-              </p>
-            </div>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody className="space-y-4">
-            <div className="flex items-center gap-2">
-              <p className="text-xs uppercase tracking-[0.1em] text-fg-subtle">
-                Estimated Annual Revenue Opportunity
-              </p>
-              <EstimateBadge />
-            </div>
-            <p className="font-display text-3xl font-semibold tabular-nums text-gap">
+        <div className="flex shrink-0 items-center gap-4 rounded-xl border border-border bg-bg-elevated px-3 py-2">
+          <MoneyGapScore score={report.moneyGapScore} size="sm" />
+          <div className="min-w-[7rem]">
+            <p className="text-[10px] uppercase tracking-[0.08em] text-fg-subtle">
+              Est. annual opp.
+            </p>
+            <p className="font-display text-lg font-semibold tabular-nums text-gap">
               {formatCurrency(report.revenueAtRisk)}
             </p>
-            <p className="text-sm text-fg-muted">
-              Capture potential (AI estimate):{" "}
-              <span className="font-semibold text-accent">
-                {formatCurrency(report.capturePotential)}
-              </span>
+            <p className="text-[11px] text-fg-muted">
+              Capture {formatCurrency(report.capturePotential)}
             </p>
-            <EstimateDisclaimer />
-          </CardBody>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {report.opportunities.length > 0 && (
-        <Card>
-          <CardHeader>
-            <h2 className="font-display text-lg font-semibold">
-              MoneyGap Categories™
-            </h2>
-            <p className="mt-1 text-sm text-fg-muted">
-              Gaps found across the seven growth intelligence categories — then
-              prioritized into a Fix Roadmap and implementation prompts.
-            </p>
-          </CardHeader>
-          <CardBody>
-            <CategoryFoundStrip opportunities={report.opportunities} />
-          </CardBody>
-        </Card>
+        <CategoryFoundStrip opportunities={report.opportunities} />
       )}
 
       {showSoftUpgrade &&
@@ -1013,456 +982,29 @@ export function IntelligenceReport({
           </div>
         )}
 
-      {report.categoryScores && (
-        <div id="categories">
-          <Card>
-            <CardHeader>
-              <h2 className="font-display text-lg font-semibold">
-                MoneyGap Score™ by category
-              </h2>
-              <p className="mt-1 text-sm text-fg-muted">
-                Higher = more missing opportunity in that MoneyGap Category™.
-              </p>
-            </CardHeader>
-            <CardBody>
-              <ScoreBreakdown
-                scores={report.categoryScores}
-                opportunities={report.opportunities}
-              />
-            </CardBody>
-          </Card>
-        </div>
-      )}
-
-      {report.executiveBrief && (
-        <Card>
-          <CardHeader>
-            <h2 className="font-display text-lg font-semibold">
-              Executive Growth Brief
-            </h2>
-          </CardHeader>
-          <CardBody>
-            <div className="space-y-3 text-sm leading-relaxed text-fg-muted whitespace-pre-line">
-              {report.executiveBrief}
-            </div>
-          </CardBody>
-        </Card>
-      )}
-
-      {report.industryGapReport && (
-        <IndustryComparedSection
-          reportId={report.id}
-          initial={report.industryGapReport}
-        />
-      )}
-
-      {report.revenueArchitecture && report.revenueArchitecture.stages.length > 0 && (
-        <RevenueArchitectureSection architecture={report.revenueArchitecture} />
-      )}
-
-      {report.businessModelGapReport && (
-        <BusinessModelComparedSection
-          key={`${report.id}-${report.businessModelGapReport.businessModelSlug}`}
-          reportId={report.id}
-          initial={report.businessModelGapReport}
-        />
-      )}
-
-      {report.patternMatchReport &&
-        report.patternMatchReport.recommendations.length > 0 && (
-          <RecommendedPatternsSection
-            snapshot={report.patternMatchReport}
-            opportunities={report.opportunities}
-          />
-        )}
-
-      {report.industryPlaybook && report.industryPlaybook.steps.length > 0 && (
-        <Card>
-          <CardHeader>
-            <div>
-              <h2 className="font-display text-lg font-semibold">
-                {report.industryPlaybook.name}
-              </h2>
-              <p className="mt-1 text-sm text-fg-muted">
-                Industry Growth Playbook from Knowledge Graph™ — recommended sequence, not isolated tips.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              <Badge tone="accent">
-                {report.industryPlaybook.industrySlug.replace(/_/g, " ")}
-              </Badge>
-              {report.industryPlaybook.businessModelSlug && (
-                <Badge tone="neutral">
-                  {report.industryPlaybook.businessModelSlug.replace(/_/g, " ")}
-                </Badge>
-              )}
-            </div>
-          </CardHeader>
-          <CardBody>
-            {report.industryPlaybook.patternSlugs &&
-              report.industryPlaybook.patternSlugs.length > 0 && (
-                <p className="mb-3 text-xs text-fg-subtle">
-                  Patterns:{" "}
-                  {report.industryPlaybook.patternSlugs
-                    .map((s) => s.replace(/_/g, " "))
-                    .join(" · ")}
-                </p>
-              )}
-            <ol className="space-y-3">
-              {[...report.industryPlaybook.steps]
-                .sort((a, b) => a.order - b.order)
-                .map((step) => {
-                  const related = report.opportunities.find((o) => {
-                    const hay = `${o.title} ${o.category} ${o.moduleId ?? ""}`.toLowerCase();
-                    const moduleHit =
-                      step.moduleId &&
-                      (o.moduleId === step.moduleId ||
-                        o.category.toLowerCase().includes(step.moduleId));
-                    const titleHit = step.title
-                      .toLowerCase()
-                      .split(/\s+/)
-                      .some((w) => w.length > 4 && hay.includes(w));
-                    return Boolean(moduleHit || titleHit);
-                  });
-                  return (
-                    <li
-                      key={`${step.order}-${step.title}`}
-                      className="rounded-xl border border-border px-3 py-3"
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-[11px] uppercase tracking-[0.08em] text-fg-subtle">
-                          Step {step.order}
-                        </p>
-                        {(step.patternName || step.patternSlug) && (
-                          <Badge tone="neutral">
-                            {step.patternName ??
-                              step.patternSlug!.replace(/_/g, " ")}
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="mt-1 font-medium text-fg">{step.title}</p>
-                      <p className="mt-1 text-sm text-fg-muted">{step.action}</p>
-                      {related && (
-                        <p className="mt-2 text-xs text-accent">
-                          Related opportunity: {related.title}
-                        </p>
-                      )}
-                    </li>
-                  );
-                })}
-            </ol>
-          </CardBody>
-        </Card>
-      )}
-
-      {report.opportunities.length > 0 && (
-        <Card>
-          <CardHeader>
-            <h2 className="font-display text-lg font-semibold">
-              Decision summary
-            </h2>
-            <p className="mt-1 text-sm text-fg-muted">
-              Trust Engine™ priorities and confidence at a glance.{" "}
-              <a
-                href="/dashboard/confidence"
-                className="text-accent underline-offset-2 hover:underline"
-              >
-                Open Confidence Center™
-              </a>
-            </p>
-          </CardHeader>
-          <CardBody className="space-y-4 text-sm">
-            {(() => {
-              const sorted = [...report.opportunities].sort(
-                (a, b) =>
-                  (b.opportunityIndex ?? b.priorityScore) -
-                  (a.opportunityIndex ?? a.priorityScore),
-              );
-              const top3 = sorted.slice(0, 3);
-              const biggest = top3[0];
-              const quickWins = sorted.filter((o) =>
-                (o.fixes ?? []).some((f) => f.tier === "quick_win"),
-              ).slice(0, 3);
-              const longTerm = sorted.filter((o) =>
-                (o.fixes ?? []).some((f) => f.tier === "long_term"),
-              ).slice(0, 2);
-              const avgConf = Math.round(
-                sorted.reduce((s, o) => s + o.confidence, 0) / sorted.length,
-              );
-              const withIntel = sorted.filter((o) => o.confidenceIntel);
-              const avgOverall =
-                withIntel.length > 0
-                  ? Math.round(
-                      withIntel.reduce(
-                        (s, o) => s + (o.confidenceIntel?.overall ?? 0),
-                        0,
-                      ) / withIntel.length,
-                    )
-                  : null;
-              const impact = sorted.reduce(
-                (s, o) => s + (o.estimatedAnnualRevenue ?? 0),
-                0,
-              );
-              return (
-                <>
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-subtle">
-                      Top 3 priorities
-                    </p>
-                    <ol className="mt-2 list-decimal space-y-1 pl-4 text-fg-muted">
-                      {top3.map((o) => (
-                        <li key={o.id}>
-                          <span className="text-fg">{o.title}</span>
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
-                  {biggest && (
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-subtle">
-                        Biggest opportunity
-                      </p>
-                      <p className="mt-1 text-fg">{biggest.title}</p>
-                      <p className="mt-1 text-xs text-fg-muted">
-                        Next best action:{" "}
-                        {biggest.fixes?.find((f) => f.tier === "quick_win")?.action ??
-                          biggest.fixes?.[0]?.action ??
-                          "Open the opportunity and start an Action Project."}
-                      </p>
-                    </div>
-                  )}
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-subtle">
-                        Quick wins
-                      </p>
-                      <ul className="mt-1 list-inside list-disc text-fg-muted">
-                        {quickWins.length
-                          ? quickWins.map((o) => <li key={o.id}>{o.title}</li>)
-                          : <li>See opportunity cards for Quick Wins tiers.</li>}
-                      </ul>
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-subtle">
-                        Long-term strategy
-                      </p>
-                      <ul className="mt-1 list-inside list-disc text-fg-muted">
-                        {longTerm.length
-                          ? longTerm.map((o) => <li key={o.id}>{o.title}</li>)
-                          : <li>See Long-Term Strategy fixes in cards.</li>}
-                      </ul>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-4 text-xs text-fg-muted">
-                    <span>
-                      Confidence summary:{" "}
-                      <span className="font-semibold text-fg">{avgConf}%</span> avg
-                    </span>
-                    {avgOverall != null && (
-                      <span>
-                        Confidence Intelligence™ overall:{" "}
-                        <span className="font-semibold text-fg">{avgOverall}%</span>
-                      </span>
-                    )}
-                    {impact > 0 && (
-                      <span>
-                        Estimated business impact:{" "}
-                        <span className="font-semibold text-gap">
-                          {formatCurrency(impact)}
-                        </span>{" "}
-                        <EstimateBadge />
-                      </span>
-                    )}
-                  </div>
-                  {report.analysisMeta && (
-                    <p className="text-[11px] text-fg-subtle">
-                      Last analysis:{" "}
-                      {report.analysisMeta.completedAt
-                        ? new Date(report.analysisMeta.completedAt).toLocaleString()
-                        : "—"}
-                      {report.analysisMeta.durationMs != null &&
-                        ` · ${(report.analysisMeta.durationMs / 1000).toFixed(0)}s`}
-                      {report.analysisMeta.engineVersion &&
-                        ` · Engine ${report.analysisMeta.engineVersion}`}
-                      {report.analysisMeta.trustVersion &&
-                        ` · Trust ${report.analysisMeta.trustVersion}`}
-                    </p>
-                  )}
-                </>
-              );
-            })()}
-          </CardBody>
-        </Card>
-      )}
-
-      {report.crawlabilityReport && (
-        <Card>
-          <CardHeader>
-            <h2 className="font-display text-lg font-semibold">
-              Crawlability Score™
-            </h2>
-            <p className="mt-1 text-sm text-fg-muted">
-              Higher = healthier discovery for search engines and AI systems (distinct from
-              MoneyGap Score™ opportunity polarity).
-            </p>
-          </CardHeader>
-          <CardBody className="space-y-4">
-            <div className="flex flex-wrap items-end gap-4">
-              <p className="font-display text-4xl font-semibold tabular-nums">
-                {report.crawlabilityReport.score != null
-                  ? report.crawlabilityReport.score
-                  : "—"}
-                {report.crawlabilityReport.score != null ? (
-                  <span className="ml-1 text-base font-medium text-fg-subtle">/100</span>
-                ) : null}
-              </p>
-              {report.crawlabilityReport.status ? (
-                <Badge tone="accent">{report.crawlabilityReport.status}</Badge>
-              ) : null}
-              {report.crawlabilityReport.delta != null ? (
-                <p className="text-sm text-fg-muted">
-                  Trend: {report.crawlabilityReport.delta > 0 ? "+" : ""}
-                  {report.crawlabilityReport.delta} vs previous
-                  {report.crawlabilityReport.previousScore != null
-                    ? ` (${report.crawlabilityReport.previousScore})`
-                    : ""}
-                </p>
-              ) : null}
-            </div>
-            {report.crawlabilityReport.executiveSummary ? (
-              <p className="text-sm text-fg-muted">
-                {report.crawlabilityReport.executiveSummary}
-              </p>
-            ) : null}
-            {report.crawlabilityReport.contributors ? (
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(report.crawlabilityReport.contributors).map(
-                  ([key, value]) => (
-                    <span
-                      key={key}
-                      className="rounded-md border border-border px-2 py-1 text-[11px] text-fg-muted"
-                    >
-                      {key}: {value != null ? value : "—"}
-                    </span>
-                  ),
+      <div className="sticky top-14 z-20 -mx-4 border-b border-border bg-bg/95 px-4 backdrop-blur-xl sm:-mx-6 sm:px-6">
+        <div className="-mx-1 flex flex-nowrap gap-1 overflow-x-auto px-1 py-2">
+          {tabs.map((item) => {
+            const Icon = item.icon;
+            const active = tab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setTab(item.id)}
+                className={cn(
+                  "inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition",
+                  active
+                    ? "bg-accent-soft text-accent"
+                    : "text-fg-muted hover:bg-bg-muted hover:text-fg",
                 )}
-              </div>
-            ) : null}
-            <p className="text-xs text-fg-subtle">
-              Critical/high crawl issues appear under Opportunities as SEO · Crawlability.
-              {report.crawlabilityReport.estimatedImprovement
-                ? ` ${report.crawlabilityReport.estimatedImprovement}`
-                : ""}
-            </p>
-          </CardBody>
-        </Card>
-      )}
-
-      {report.privacyReport && (
-        <Card>
-          <CardHeader>
-            <h2 className="font-display text-lg font-semibold">Privacy Score™</h2>
-            <p className="mt-1 text-sm text-fg-muted">
-              Higher = healthier privacy posture (verified probes only — no invented cookies).
-            </p>
-          </CardHeader>
-          <CardBody className="space-y-4">
-            <div className="flex flex-wrap items-end gap-4">
-              <p className="font-display text-4xl font-semibold tabular-nums">
-                {report.privacyReport.score != null ? report.privacyReport.score : "—"}
-                {report.privacyReport.score != null ? (
-                  <span className="ml-1 text-base font-medium text-fg-subtle">/100</span>
-                ) : null}
-              </p>
-              {report.privacyReport.status ? (
-                <Badge tone="accent">{report.privacyReport.status}</Badge>
-              ) : null}
-              {report.privacyReport.delta != null ? (
-                <p className="text-sm text-fg-muted">
-                  Trend: {report.privacyReport.delta > 0 ? "+" : ""}
-                  {report.privacyReport.delta} vs previous
-                  {report.privacyReport.previousScore != null
-                    ? ` (${report.privacyReport.previousScore})`
-                    : ""}
-                </p>
-              ) : null}
-            </div>
-            {report.privacyReport.executiveSummary ? (
-              <p className="text-sm text-fg-muted">{report.privacyReport.executiveSummary}</p>
-            ) : null}
-            {report.privacyReport.contributors ? (
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(report.privacyReport.contributors).map(([key, value]) => (
-                  <span
-                    key={key}
-                    className="rounded-md border border-border px-2 py-1 text-[11px] text-fg-muted"
-                  >
-                    {key}: {value != null ? value : "—"}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-            {report.privacyReport.trackingDetected &&
-            report.privacyReport.trackingDetected.length > 0 ? (
-              <p className="text-xs text-fg-subtle">
-                Tracking / third-party hosts detected:{" "}
-                {report.privacyReport.trackingDetected.slice(0, 8).join(", ")}
-              </p>
-            ) : (
-              <p className="text-xs text-fg-subtle">
-                No analytics hosts detected on probed pages.
-              </p>
-            )}
-            <p className="text-xs text-fg-subtle">
-              Critical/high privacy issues appear under Opportunities as Trust · Privacy.
-              {report.privacyReport.estimatedImprovement
-                ? ` ${report.privacyReport.estimatedImprovement}`
-                : ""}
-            </p>
-          </CardBody>
-        </Card>
-      )}
-
-      {report.growthRoadmap && (
-        <div id="roadmap">
-          <Card>
-            <CardHeader>
-              <h2 className="font-display text-lg font-semibold">
-                Prioritized Fix Roadmap
-              </h2>
-              <p className="mt-1 text-sm text-fg-muted">
-                What to fix first — from Opportunity Index™ findings across
-                MoneyGap Categories™.
-              </p>
-            </CardHeader>
-            <CardBody>
-              <RoadmapTimeline roadmap={report.growthRoadmap} />
-            </CardBody>
-          </Card>
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {item.label}
+              </button>
+            );
+          })}
         </div>
-      )}
-
-      <div className="-mx-1 flex flex-nowrap gap-1 overflow-x-auto border-b border-border px-1 pb-1">
-        {tabs.map((item) => {
-          const Icon = item.icon;
-          const active = tab === item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setTab(item.id)}
-              className={cn(
-                "inline-flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-medium transition sm:gap-2 sm:px-3 sm:text-sm",
-                active
-                  ? "bg-accent-soft text-accent"
-                  : "text-fg-muted hover:bg-bg-muted hover:text-fg",
-              )}
-            >
-              <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              {item.label}
-            </button>
-          );
-        })}
       </div>
 
       <AnimatePresence mode="wait">
@@ -1472,8 +1014,462 @@ export function IntelligenceReport({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -6 }}
           transition={{ duration: 0.2 }}
-          className="space-y-6"
+          className="space-y-4"
         >
+          {tab === "summary" && (
+            <div className="space-y-4">
+              <Card>
+                <CardBody className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.08em] text-fg-subtle">
+                      Estimated Annual Revenue Opportunity
+                    </p>
+                    <p className="mt-1 font-display text-2xl font-semibold tabular-nums text-gap">
+                      {formatCurrency(report.revenueAtRisk)}
+                    </p>
+                    <p className="mt-1 text-xs text-fg-muted">
+                      Capture potential:{" "}
+                      <span className="font-semibold text-accent">
+                        {formatCurrency(report.capturePotential)}
+                      </span>
+                    </p>
+                  </div>
+                  <EstimateDisclaimer />
+                </CardBody>
+              </Card>
+
+                  {report.categoryScores && (
+                    <div id="categories">
+                      <Card>
+                        <CardHeader>
+                          <h2 className="font-display text-lg font-semibold">
+                            MoneyGap Score™ by category
+                          </h2>
+                          <p className="mt-1 text-sm text-fg-muted">
+                            Higher = more missing opportunity in that MoneyGap Category™.
+                          </p>
+                        </CardHeader>
+                        <CardBody>
+                          <ScoreBreakdown
+                            scores={report.categoryScores}
+                            opportunities={report.opportunities}
+                          />
+                        </CardBody>
+                      </Card>
+                    </div>
+                  )}
+
+                  {report.executiveBrief && (
+                    <Card>
+                      <CardHeader>
+                        <h2 className="font-display text-lg font-semibold">
+                          Executive Growth Brief
+                        </h2>
+                      </CardHeader>
+                      <CardBody>
+                        <div className="space-y-3 text-sm leading-relaxed text-fg-muted whitespace-pre-line">
+                          {report.executiveBrief}
+                        </div>
+                      </CardBody>
+                    </Card>
+                  )}
+
+                  {report.industryGapReport && (
+                    <IndustryComparedSection
+                      reportId={report.id}
+                      initial={report.industryGapReport}
+                    />
+                  )}
+
+                  {report.revenueArchitecture && report.revenueArchitecture.stages.length > 0 && (
+                    <RevenueArchitectureSection architecture={report.revenueArchitecture} />
+                  )}
+
+                  {report.businessModelGapReport && (
+                    <BusinessModelComparedSection
+                      key={`${report.id}-${report.businessModelGapReport.businessModelSlug}`}
+                      reportId={report.id}
+                      initial={report.businessModelGapReport}
+                    />
+                  )}
+
+                  {report.patternMatchReport &&
+                    report.patternMatchReport.recommendations.length > 0 && (
+                      <RecommendedPatternsSection
+                        snapshot={report.patternMatchReport}
+                        opportunities={report.opportunities}
+                      />
+                    )}
+
+                  {report.industryPlaybook && report.industryPlaybook.steps.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <div>
+                          <h2 className="font-display text-lg font-semibold">
+                            {report.industryPlaybook.name}
+                          </h2>
+                          <p className="mt-1 text-sm text-fg-muted">
+                            Industry Growth Playbook from Knowledge Graph™ — recommended sequence, not isolated tips.
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          <Badge tone="accent">
+                            {report.industryPlaybook.industrySlug.replace(/_/g, " ")}
+                          </Badge>
+                          {report.industryPlaybook.businessModelSlug && (
+                            <Badge tone="neutral">
+                              {report.industryPlaybook.businessModelSlug.replace(/_/g, " ")}
+                            </Badge>
+                          )}
+                        </div>
+                      </CardHeader>
+                      <CardBody>
+                        {report.industryPlaybook.patternSlugs &&
+                          report.industryPlaybook.patternSlugs.length > 0 && (
+                            <p className="mb-3 text-xs text-fg-subtle">
+                              Patterns:{" "}
+                              {report.industryPlaybook.patternSlugs
+                                .map((s) => s.replace(/_/g, " "))
+                                .join(" · ")}
+                            </p>
+                          )}
+                        <ol className="space-y-3">
+                          {[...report.industryPlaybook.steps]
+                            .sort((a, b) => a.order - b.order)
+                            .map((step) => {
+                              const related = report.opportunities.find((o) => {
+                                const hay = `${o.title} ${o.category} ${o.moduleId ?? ""}`.toLowerCase();
+                                const moduleHit =
+                                  step.moduleId &&
+                                  (o.moduleId === step.moduleId ||
+                                    o.category.toLowerCase().includes(step.moduleId));
+                                const titleHit = step.title
+                                  .toLowerCase()
+                                  .split(/\s+/)
+                                  .some((w) => w.length > 4 && hay.includes(w));
+                                return Boolean(moduleHit || titleHit);
+                              });
+                              return (
+                                <li
+                                  key={`${step.order}-${step.title}`}
+                                  className="rounded-xl border border-border px-3 py-3"
+                                >
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="text-[11px] uppercase tracking-[0.08em] text-fg-subtle">
+                                      Step {step.order}
+                                    </p>
+                                    {(step.patternName || step.patternSlug) && (
+                                      <Badge tone="neutral">
+                                        {step.patternName ??
+                                          step.patternSlug!.replace(/_/g, " ")}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="mt-1 font-medium text-fg">{step.title}</p>
+                                  <p className="mt-1 text-sm text-fg-muted">{step.action}</p>
+                                  {related && (
+                                    <p className="mt-2 text-xs text-accent">
+                                      Related opportunity: {related.title}
+                                    </p>
+                                  )}
+                                </li>
+                              );
+                            })}
+                        </ol>
+                      </CardBody>
+                    </Card>
+                  )}
+
+                  {report.opportunities.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <h2 className="font-display text-lg font-semibold">
+                          Decision summary
+                        </h2>
+                        <p className="mt-1 text-sm text-fg-muted">
+                          Trust Engine™ priorities and confidence at a glance.{" "}
+                          <a
+                            href="/dashboard/confidence"
+                            className="text-accent underline-offset-2 hover:underline"
+                          >
+                            Open Confidence Center™
+                          </a>
+                        </p>
+                      </CardHeader>
+                      <CardBody className="space-y-3 text-sm">
+                        {(() => {
+                          const sorted = [...report.opportunities].sort(
+                            (a, b) =>
+                              (b.opportunityIndex ?? b.priorityScore) -
+                              (a.opportunityIndex ?? a.priorityScore),
+                          );
+                          const top3 = sorted.slice(0, 3);
+                          const biggest = top3[0];
+                          const quickWins = sorted.filter((o) =>
+                            (o.fixes ?? []).some((f) => f.tier === "quick_win"),
+                          ).slice(0, 3);
+                          const longTerm = sorted.filter((o) =>
+                            (o.fixes ?? []).some((f) => f.tier === "long_term"),
+                          ).slice(0, 2);
+                          const avgConf = Math.round(
+                            sorted.reduce((s, o) => s + o.confidence, 0) / sorted.length,
+                          );
+                          const withIntel = sorted.filter((o) => o.confidenceIntel);
+                          const avgOverall =
+                            withIntel.length > 0
+                              ? Math.round(
+                                  withIntel.reduce(
+                                    (s, o) => s + (o.confidenceIntel?.overall ?? 0),
+                                    0,
+                                  ) / withIntel.length,
+                                )
+                              : null;
+                          const impact = sorted.reduce(
+                            (s, o) => s + (o.estimatedAnnualRevenue ?? 0),
+                            0,
+                          );
+                          return (
+                            <>
+                              <div>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-subtle">
+                                  Top 3 priorities
+                                </p>
+                                <ol className="mt-2 list-decimal space-y-1 pl-4 text-fg-muted">
+                                  {top3.map((o) => (
+                                    <li key={o.id}>
+                                      <span className="text-fg">{o.title}</span>
+                                    </li>
+                                  ))}
+                                </ol>
+                              </div>
+                              {biggest && (
+                                <div>
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-subtle">
+                                    Biggest opportunity
+                                  </p>
+                                  <p className="mt-1 text-fg">{biggest.title}</p>
+                                  <p className="mt-1 text-xs text-fg-muted">
+                                    Next best action:{" "}
+                                    {biggest.fixes?.find((f) => f.tier === "quick_win")?.action ??
+                                      biggest.fixes?.[0]?.action ??
+                                      "Open the opportunity and start an Action Project."}
+                                  </p>
+                                </div>
+                              )}
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <div>
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-subtle">
+                                    Quick wins
+                                  </p>
+                                  <ul className="mt-1 list-inside list-disc text-fg-muted">
+                                    {quickWins.length
+                                      ? quickWins.map((o) => <li key={o.id}>{o.title}</li>)
+                                      : <li>See opportunity cards for Quick Wins tiers.</li>}
+                                  </ul>
+                                </div>
+                                <div>
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-subtle">
+                                    Long-term strategy
+                                  </p>
+                                  <ul className="mt-1 list-inside list-disc text-fg-muted">
+                                    {longTerm.length
+                                      ? longTerm.map((o) => <li key={o.id}>{o.title}</li>)
+                                      : <li>See Long-Term Strategy fixes in cards.</li>}
+                                  </ul>
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap gap-4 text-xs text-fg-muted">
+                                <span>
+                                  Confidence summary:{" "}
+                                  <span className="font-semibold text-fg">{avgConf}%</span> avg
+                                </span>
+                                {avgOverall != null && (
+                                  <span>
+                                    Confidence Intelligence™ overall:{" "}
+                                    <span className="font-semibold text-fg">{avgOverall}%</span>
+                                  </span>
+                                )}
+                                {impact > 0 && (
+                                  <span>
+                                    Estimated business impact:{" "}
+                                    <span className="font-semibold text-gap">
+                                      {formatCurrency(impact)}
+                                    </span>{" "}
+                                    <EstimateBadge />
+                                  </span>
+                                )}
+                              </div>
+                              {report.analysisMeta && (
+                                <p className="text-[11px] text-fg-subtle">
+                                  Last analysis:{" "}
+                                  {report.analysisMeta.completedAt
+                                    ? new Date(report.analysisMeta.completedAt).toLocaleString()
+                                    : "—"}
+                                  {report.analysisMeta.durationMs != null &&
+                                    ` · ${(report.analysisMeta.durationMs / 1000).toFixed(0)}s`}
+                                  {report.analysisMeta.engineVersion &&
+                                    ` · Engine ${report.analysisMeta.engineVersion}`}
+                                  {report.analysisMeta.trustVersion &&
+                                    ` · Trust ${report.analysisMeta.trustVersion}`}
+                                </p>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </CardBody>
+                    </Card>
+                  )}
+
+                  {report.crawlabilityReport && (
+                    <Card>
+                      <CardHeader>
+                        <h2 className="font-display text-lg font-semibold">
+                          Crawlability Score™
+                        </h2>
+                        <p className="mt-1 text-sm text-fg-muted">
+                          Higher = healthier discovery for search engines and AI systems (distinct from
+                          MoneyGap Score™ opportunity polarity).
+                        </p>
+                      </CardHeader>
+                      <CardBody className="space-y-4">
+                        <div className="flex flex-wrap items-end gap-4">
+                          <p className="font-display text-2xl font-semibold tabular-nums">
+                            {report.crawlabilityReport.score != null
+                              ? report.crawlabilityReport.score
+                              : "—"}
+                            {report.crawlabilityReport.score != null ? (
+                              <span className="ml-1 text-base font-medium text-fg-subtle">/100</span>
+                            ) : null}
+                          </p>
+                          {report.crawlabilityReport.status ? (
+                            <Badge tone="accent">{report.crawlabilityReport.status}</Badge>
+                          ) : null}
+                          {report.crawlabilityReport.delta != null ? (
+                            <p className="text-sm text-fg-muted">
+                              Trend: {report.crawlabilityReport.delta > 0 ? "+" : ""}
+                              {report.crawlabilityReport.delta} vs previous
+                              {report.crawlabilityReport.previousScore != null
+                                ? ` (${report.crawlabilityReport.previousScore})`
+                                : ""}
+                            </p>
+                          ) : null}
+                        </div>
+                        {report.crawlabilityReport.executiveSummary ? (
+                          <p className="text-sm text-fg-muted">
+                            {report.crawlabilityReport.executiveSummary}
+                          </p>
+                        ) : null}
+                        {report.crawlabilityReport.contributors ? (
+                          <div className="flex flex-wrap gap-2">
+                            {Object.entries(report.crawlabilityReport.contributors).map(
+                              ([key, value]) => (
+                                <span
+                                  key={key}
+                                  className="rounded-md border border-border px-2 py-1 text-[11px] text-fg-muted"
+                                >
+                                  {key}: {value != null ? value : "—"}
+                                </span>
+                              ),
+                            )}
+                          </div>
+                        ) : null}
+                        <p className="text-xs text-fg-subtle">
+                          Critical/high crawl issues appear under Opportunities as SEO · Crawlability.
+                          {report.crawlabilityReport.estimatedImprovement
+                            ? ` ${report.crawlabilityReport.estimatedImprovement}`
+                            : ""}
+                        </p>
+                      </CardBody>
+                    </Card>
+                  )}
+
+                  {report.privacyReport && (
+                    <Card>
+                      <CardHeader>
+                        <h2 className="font-display text-lg font-semibold">Privacy Score™</h2>
+                        <p className="mt-1 text-sm text-fg-muted">
+                          Higher = healthier privacy posture (verified probes only — no invented cookies).
+                        </p>
+                      </CardHeader>
+                      <CardBody className="space-y-4">
+                        <div className="flex flex-wrap items-end gap-4">
+                          <p className="font-display text-2xl font-semibold tabular-nums">
+                            {report.privacyReport.score != null ? report.privacyReport.score : "—"}
+                            {report.privacyReport.score != null ? (
+                              <span className="ml-1 text-base font-medium text-fg-subtle">/100</span>
+                            ) : null}
+                          </p>
+                          {report.privacyReport.status ? (
+                            <Badge tone="accent">{report.privacyReport.status}</Badge>
+                          ) : null}
+                          {report.privacyReport.delta != null ? (
+                            <p className="text-sm text-fg-muted">
+                              Trend: {report.privacyReport.delta > 0 ? "+" : ""}
+                              {report.privacyReport.delta} vs previous
+                              {report.privacyReport.previousScore != null
+                                ? ` (${report.privacyReport.previousScore})`
+                                : ""}
+                            </p>
+                          ) : null}
+                        </div>
+                        {report.privacyReport.executiveSummary ? (
+                          <p className="text-sm text-fg-muted">{report.privacyReport.executiveSummary}</p>
+                        ) : null}
+                        {report.privacyReport.contributors ? (
+                          <div className="flex flex-wrap gap-2">
+                            {Object.entries(report.privacyReport.contributors).map(([key, value]) => (
+                              <span
+                                key={key}
+                                className="rounded-md border border-border px-2 py-1 text-[11px] text-fg-muted"
+                              >
+                                {key}: {value != null ? value : "—"}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                        {report.privacyReport.trackingDetected &&
+                        report.privacyReport.trackingDetected.length > 0 ? (
+                          <p className="text-xs text-fg-subtle">
+                            Tracking / third-party hosts detected:{" "}
+                            {report.privacyReport.trackingDetected.slice(0, 8).join(", ")}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-fg-subtle">
+                            No analytics hosts detected on probed pages.
+                          </p>
+                        )}
+                        <p className="text-xs text-fg-subtle">
+                          Critical/high privacy issues appear under Opportunities as Trust · Privacy.
+                          {report.privacyReport.estimatedImprovement
+                            ? ` ${report.privacyReport.estimatedImprovement}`
+                            : ""}
+                        </p>
+                      </CardBody>
+                    </Card>
+                  )}
+
+                  {report.growthRoadmap && (
+                    <div id="roadmap">
+                      <Card>
+                        <CardHeader>
+                          <h2 className="font-display text-lg font-semibold">
+                            Prioritized Fix Roadmap
+                          </h2>
+                          <p className="mt-1 text-sm text-fg-muted">
+                            What to fix first — from Opportunity Index™ findings across
+                            MoneyGap Categories™.
+                          </p>
+                        </CardHeader>
+                        <CardBody>
+                          <RoadmapTimeline roadmap={report.growthRoadmap} />
+                        </CardBody>
+                      </Card>
+                    </div>
+                  )}
+
+            </div>
+          )}
+
           {tab === "opportunities" && (
             <>
               {engineFailed && (
@@ -1568,7 +1564,7 @@ export function IntelligenceReport({
                     <h2 className="font-display text-lg font-semibold">Website Understanding</h2>
                   </CardHeader>
                   <CardBody className="space-y-4">
-                    <p className="font-display text-3xl font-semibold tabular-nums">
+                    <p className="font-display text-2xl font-semibold tabular-nums">
                       {report.intelligenceScore ?? 0}
                       <span className="text-base text-fg-subtle">/100</span>
                     </p>

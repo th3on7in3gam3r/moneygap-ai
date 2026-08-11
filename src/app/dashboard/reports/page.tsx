@@ -13,14 +13,14 @@ export default async function ReportsPage() {
   const intelligence = userId ? await listUserIntelligenceReports(userId) : [];
 
   return (
-    <div className="w-full space-y-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div className="w-full space-y-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight">
+          <h1 className="font-display text-2xl font-semibold tracking-tight">
             Reports
           </h1>
-          <p className="mt-1 text-sm text-fg-muted">
-            Growth intelligence reports from your completed analyses.
+          <p className="mt-0.5 text-sm text-fg-muted">
+            Growth intelligence from completed analyses.
           </p>
         </div>
         <Button href="/dashboard/analyze" size="sm">
@@ -29,46 +29,43 @@ export default async function ReportsPage() {
       </div>
 
       {intelligence.length > 0 ? (
-        <div className="grid gap-4">
-          {intelligence.map((item) => (
-            <Link key={item.report!.id} href={`/reports/${item.report!.id}`}>
-              <Card interactive className="transition hover:bg-bg-muted/30">
-                <CardBody className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0 space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge tone="gap">opportunities</Badge>
-                      <Badge tone="accent">intelligence</Badge>
-                      <span className="text-xs text-fg-subtle">
+        <div className="overflow-hidden rounded-xl border border-border">
+          <ul className="divide-y divide-border">
+            {intelligence.map((item) => (
+              <li key={item.report!.id}>
+                <Link
+                  href={`/reports/${item.report!.id}`}
+                  className="flex items-center gap-3 px-3 py-2.5 transition hover:bg-bg-muted/40 sm:gap-4 sm:px-4"
+                >
+                  <MoneyGapScore
+                    score={item.report!.moneyGapScore}
+                    size="sm"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="truncate text-sm font-medium text-fg">
                         {item.website.domain}
                       </span>
+                      <Badge tone="gap" className="text-[10px]">
+                        opportunities
+                      </Badge>
                     </div>
-                    <h3 className="font-display text-xl font-semibold tracking-tight">
+                    <p className="mt-0.5 truncate text-xs text-fg-muted">
                       {item.report!.title}
-                    </h3>
-                    <p className="line-clamp-2 max-w-2xl text-sm text-fg-muted">
-                      {item.report!.opportunitySummary ??
-                        item.report!.overview ??
-                        item.report!.summary}
                     </p>
                   </div>
-                  <div className="flex items-center gap-6">
-                    <div className="text-right">
-                      <p className="text-[11px] uppercase tracking-[0.08em] text-fg-subtle">
-                        Est. annual opportunity
-                      </p>
-                      <p className="font-display text-xl font-semibold tabular-nums text-gap">
-                        {formatCurrency(item.report!.revenueAtRisk)}
-                      </p>
-                    </div>
-                    <MoneyGapScore
-                      score={item.report!.moneyGapScore}
-                      size="sm"
-                    />
+                  <div className="hidden shrink-0 text-right sm:block">
+                    <p className="text-[10px] uppercase tracking-[0.06em] text-fg-subtle">
+                      Est. annual
+                    </p>
+                    <p className="font-display text-sm font-semibold tabular-nums text-gap">
+                      {formatCurrency(item.report!.revenueAtRisk)}
+                    </p>
                   </div>
-                </CardBody>
-              </Card>
-            </Link>
-          ))}
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : (
         <Card>
