@@ -66,14 +66,40 @@ export function formatEtaSeconds(seconds: number): string {
   return `~${Math.round(minutes)}+ minutes`;
 }
 
-export function estimateEtaSeconds(
+const PROFILE_ETA_ORDER: ScanProfile[] = [
+  "quick",
+  "standard",
+  "deep",
+  "enterprise",
+];
+
+function estimateEtaSecondsRaw(
   profile: ScanProfile,
   estimatedPages: number,
 ): number {
   const cfg = getScanProfile(profile);
   const pages = Math.min(Math.max(1, estimatedPages), cfg.maxPages);
-  const parallelFactor = Math.max(1, cfg.concurrency * 0.65);
+  // Modest parallelism — do not let high concurrency invert heavier profiles.
+  const parallelFactor = Math.min(2.5, Math.max(1, Math.sqrt(cfg.concurrency)));
   return Math.max(5, Math.round((pages * cfg.secondsPerPage) / parallelFactor));
+}
+
+/**
+ * Pre-scan ETA for a profile. Heavier profiles never estimate faster than
+ * lighter ones for the same discovered page count (Enterprise is not "quicker").
+ */
+export function estimateEtaSeconds(
+  profile: ScanProfile,
+  estimatedPages: number,
+): number {
+  const idx = PROFILE_ETA_ORDER.indexOf(profile);
+  let seconds = estimateEtaSecondsRaw(profile, estimatedPages);
+  for (let i = 0; i < idx; i++) {
+    const lighter = estimateEtaSecondsRaw(PROFILE_ETA_ORDER[i]!, estimatedPages);
+    // Keep a clear step up vs lighter tiers for the same site size.
+    seconds = Math.max(seconds, Math.round(lighter * 1.12) + 3);
+  }
+  return seconds;
 }
 
 export function recommendProfile(estimatedPages: number, complexity: "low" | "medium" | "high"): ScanProfile {

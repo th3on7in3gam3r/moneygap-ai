@@ -39,6 +39,17 @@ describe("scan profiles", () => {
     assert.ok(quickEta < deepEta);
     assert.ok(quickEta > 0);
   });
+
+  it("never estimates heavier profiles faster for the same site size", () => {
+    const pages = 85;
+    const quick = estimateEtaSeconds("quick", pages);
+    const standard = estimateEtaSeconds("standard", pages);
+    const deep = estimateEtaSeconds("deep", pages);
+    const enterprise = estimateEtaSeconds("enterprise", pages);
+    assert.ok(quick <= standard);
+    assert.ok(standard <= deep);
+    assert.ok(deep <= enterprise);
+  });
 });
 
 describe("batch claim helpers", () => {
