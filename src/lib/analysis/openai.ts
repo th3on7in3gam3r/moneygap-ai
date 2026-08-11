@@ -305,6 +305,53 @@ const intelligenceSchema = {
 
 const INTELLIGENCE_TIMEOUT_MS = 120_000;
 
+/** Strip chars that can break strict JSON request parsers (nulls, lone surrogates). */
+export function sanitizeLlmText(text: string): string {
+  let out = "";
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    if (code === 0) continue;
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = text.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        out += text[i]! + text[i + 1]!;
+        i++;
+      } else {
+        out += "\uFFFD";
+      }
+      continue;
+    }
+    if (code >= 0xdc00 && code <= 0xdfff) {
+      out += "\uFFFD";
+      continue;
+    }
+    // Keep tab/newline/cr; drop other C0 controls.
+    if (code < 32 && code !== 9 && code !== 10 && code !== 13) continue;
+    out += text[i]!;
+  }
+  return out;
+}
+
+function plainSchema(): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(intelligenceSchema)) as Record<
+    string,
+    unknown
+  >;
+}
+
+function isNonRetryableOpenAiRequestError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  const lower = msg.toLowerCase();
+  return (
+    lower.includes("invalid body") ||
+    lower.includes("invalid_json") ||
+    lower.includes("failed to parse json value") ||
+    lower.includes("could not parse the json body") ||
+    lower.includes("invalid_request_error") ||
+    /\b400\b/.test(msg)
+  );
+}
+
 function extractOutputText(response: OpenAI.Responses.Response): string {
   if (typeof response.output_text === "string" && response.output_text.trim()) {
     return response.output_text;
@@ -382,18 +429,23 @@ export async function generateWebsiteIntelligence(input: {
   pageCount?: number;
   stage?: string;
 }): Promise<IntelligenceResult> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
     throw new Error(MISSING_KEYS_ERROR);
   }
 
   const client = new OpenAI({ apiKey });
-  const model = process.env.OPENAI_MODEL || "gpt-4o";
+  const model = (process.env.OPENAI_MODEL || "gpt-4o").trim();
   const stage = input.stage ?? "website_intelligence";
-  const content =
+  const rawContent =
     input.siteModel && input.siteModel.length > 0
       ? `Compact site intelligence model (structured; prefer this over raw pages):\n${input.siteModel}\n\nSupporting excerpts:\n${input.corpus}`
       : `Crawled website content:\n${input.corpus}`;
+  const content = sanitizeLlmText(rawContent);
+  const userPrompt = sanitizeLlmText(
+    `Website URL: ${input.url}\nDomain: ${input.domain}\n\n${content}`,
+  );
+  const schema = plainSchema();
 
   log("info", "llm_request_budget", {
     stage,
@@ -403,42 +455,91 @@ export async function generateWebsiteIntelligence(input: {
     estimatedTokens: estimateTokenCount(content),
   });
 
-  try {
-    const runOnce = async (correction?: string) => {
-      const response = await withRetry(
-        () =>
-          client.responses.create(
-            {
-              model,
-              instructions: `You are a senior business intelligence analyst for MoneyGap AI.
+  const instructions = (correction?: string) =>
+    `You are a senior business intelligence analyst for MoneyGap AI.
 Analyze the crawled website content and produce a precise Website Intelligence Report.
 Be specific and evidence-based. Do not invent dollar amounts or money-gap calculations.
 Scores are integers 0-100 reflecting clarity/visibility of each dimension on the site itself.
 Overview should be 1-3 polished sentences describing what the business is.
-${correction ?? ""}`,
-              input: `Website URL: ${input.url}
-Domain: ${input.domain}
+${correction ?? ""}`;
 
-${content}`,
-              text: {
-                format: {
-                  type: "json_schema",
-                  name: "website_intelligence",
-                  strict: true,
-                  schema: intelligenceSchema,
-                },
-              },
-            },
-            {
-              timeout: INTELLIGENCE_TIMEOUT_MS,
-              signal: AbortSignal.timeout(INTELLIGENCE_TIMEOUT_MS),
-            },
-          ),
-        { attempts: 3, label: "openai_website_intelligence" },
-      );
-      return extractOutputText(response);
-    };
+  const viaResponses = async (correction?: string) => {
+    const response = await client.responses.create(
+      {
+        model,
+        instructions: instructions(correction),
+        input: userPrompt,
+        text: {
+          format: {
+            type: "json_schema",
+            name: "website_intelligence",
+            strict: true,
+            schema,
+          },
+        },
+      },
+      {
+        timeout: INTELLIGENCE_TIMEOUT_MS,
+        signal: AbortSignal.timeout(INTELLIGENCE_TIMEOUT_MS),
+      },
+    );
+    return extractOutputText(response);
+  };
 
+  const viaChatCompletions = async (correction?: string) => {
+    const completion = await client.chat.completions.create(
+      {
+        model,
+        messages: [
+          { role: "system", content: instructions(correction) },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "website_intelligence",
+            strict: true,
+            schema,
+          },
+        },
+      },
+      {
+        timeout: INTELLIGENCE_TIMEOUT_MS,
+        signal: AbortSignal.timeout(INTELLIGENCE_TIMEOUT_MS),
+      },
+    );
+    const text = completion.choices[0]?.message?.content;
+    if (!text?.trim()) {
+      throw new AnalysisPipelineError(AI_GENERATION_ERROR, {
+        errorClass: "AI_PROVIDER_ERROR",
+      });
+    }
+    return text;
+  };
+
+  const runOnce = async (correction?: string) => {
+    try {
+      return await withRetry(() => viaResponses(correction), {
+        attempts: 2,
+        label: "openai_website_intelligence_responses",
+        shouldRetry: (err) => !isNonRetryableOpenAiRequestError(err),
+      });
+    } catch (err) {
+      if (!isNonRetryableOpenAiRequestError(err)) throw err;
+      log("warn", "intelligence_responses_fallback_chat", {
+        stage,
+        model,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return await withRetry(() => viaChatCompletions(correction), {
+        attempts: 2,
+        label: "openai_website_intelligence_chat",
+        shouldRetry: (err2) => !isNonRetryableOpenAiRequestError(err2),
+      });
+    }
+  };
+
+  try {
     let text = await runOnce();
     try {
       return parseIntelligenceJson(text);

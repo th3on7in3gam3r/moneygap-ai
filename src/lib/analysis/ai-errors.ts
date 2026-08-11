@@ -60,6 +60,15 @@ export function classifyAiError(err: unknown): AiErrorClass {
     return "AI_CONTEXT_LIMIT";
   }
   if (
+    lower.includes("invalid body") ||
+    lower.includes("invalid_json") ||
+    lower.includes("failed to parse json value") ||
+    lower.includes("could not parse the json body")
+  ) {
+    // OpenAI rejected the *request* payload — not model output JSON.
+    return "AI_PROVIDER_ERROR";
+  }
+  if (
     lower.includes("json") ||
     lower.includes("unexpected token") ||
     lower.includes("parse")

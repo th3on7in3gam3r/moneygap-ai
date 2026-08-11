@@ -146,8 +146,27 @@ describe("AI error classification", () => {
     assert.equal(classifyAiError(new Error("Rate limit 429")), "AI_RATE_LIMIT");
     assert.equal(classifyAiError(new Error("Unexpected token < in JSON")), "AI_INVALID_JSON");
     assert.equal(
+      classifyAiError(
+        new Error(
+          "400 Invalid body: failed to parse JSON value. Please check the value to ensure it is valid JSON.",
+        ),
+      ),
+      "AI_PROVIDER_ERROR",
+    );
+    assert.equal(
       classifyAiError(new Error('duplicate key value violates unique constraint "business_profiles_analysis_id_unique"')),
       "DATABASE_WRITE_ERROR",
     );
+  });
+});
+
+describe("sanitizeLlmText", () => {
+  it("drops nulls and unpaired surrogates", async () => {
+    const { sanitizeLlmText } = await import("@/lib/analysis/openai");
+    const lone = String.fromCharCode(0xdc00);
+    const cleaned = sanitizeLlmText(`ok\u0000${lone}👍`);
+    assert.equal(cleaned.includes("\u0000"), false);
+    assert.equal(cleaned.includes(lone), false);
+    assert.equal(cleaned.includes("👍"), true);
   });
 });
