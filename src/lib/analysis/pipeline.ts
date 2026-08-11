@@ -26,6 +26,7 @@ import type { IntelligenceResult } from "@/lib/analysis/openai";
 import { generateWebsiteIntelligence } from "@/lib/analysis/openai";
 import { persistMoneyGapEngineResult } from "@/lib/analysis/persist-money-gaps";
 import { persistCompetitiveIntelligence } from "@/lib/analysis/competitive/persist";
+import { archiveSupersededReports } from "@/lib/analysis/reports";
 import {
   claimPostCrawlAnalysis,
   releasePostCrawlClaim,
@@ -1089,6 +1090,18 @@ async function finishPipelineWithPages(
         })
         .returning();
       report = inserted[0]!;
+      const archivedCount = await archiveSupersededReports(
+        analysis.websiteId,
+        report.id,
+      );
+      if (archivedCount > 0) {
+        log("info", "REPORTS_SUPERSEDED_ARCHIVED", {
+          analysisId,
+          reportId: report.id,
+          websiteId: analysis.websiteId,
+          archivedCount,
+        });
+      }
     } catch (err) {
       throw new AnalysisPipelineError(toUserSafeError(err), {
         errorClass: classifyDbError(err),

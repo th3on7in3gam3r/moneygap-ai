@@ -53,6 +53,8 @@ import { cn, formatCurrency } from "@/lib/utils";
 export type IntelligenceReportView = {
   id: string;
   title: string;
+  status?: string | null;
+  supersededByReportId?: string | null;
   overview: string | null;
   opportunitySummary: string | null;
   executiveBrief: string | null;
@@ -917,6 +919,26 @@ export function IntelligenceReport({
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4">
+      {report.status === "archived" && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-bg-muted/40 px-3 py-2 text-sm text-fg-muted">
+          <span>
+            This report was superseded by a newer scan for this website.
+          </span>
+          {report.supersededByReportId ? (
+            <Button
+              href={`/reports/${report.supersededByReportId}`}
+              size="sm"
+              variant="secondary"
+            >
+              Open live report
+            </Button>
+          ) : (
+            <Button href="/dashboard/reports" size="sm" variant="secondary">
+              Back to reports
+            </Button>
+          )}
+        </div>
+      )}
       <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-2">

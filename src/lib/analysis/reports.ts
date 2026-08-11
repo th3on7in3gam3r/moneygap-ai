@@ -9,6 +9,82 @@ import {
 } from "@/db/schema";
 import { assertWebsiteAccess } from "@/lib/monitor/access";
 
+/**
+ * Soft-archive prior live intelligence reports for a website so only
+ * `keepReportId` remains `ready`. Does not delete rows or related data.
+ */
+export async function archiveSupersededReports(
+  websiteId: string,
+  keepReportId: string,
+): Promise<number> {
+  const updated = await db
+    .update(reports)
+    .set({ status: "archived" })
+    .where(
+      and(
+        eq(reports.websiteId, websiteId),
+        eq(reports.type, "intelligence"),
+        eq(reports.status, "ready"),
+        ne(reports.id, keepReportId),
+      ),
+    )
+    .returning({ id: reports.id });
+  return updated.length;
+}
+
+/** Newest ready intelligence report for a website, if any. */
+export async function getLatestReadyReportForWebsite(websiteId: string) {
+  return db.query.reports.findFirst({
+    where: and(
+      eq(reports.websiteId, websiteId),
+      eq(reports.type, "intelligence"),
+      eq(reports.status, "ready"),
+    ),
+    orderBy: [desc(reports.createdAt)],
+    columns: { id: true, title: true, status: true },
+  });
+}
+
+/**
+ * One-time / ops: for each website keep the newest intelligence report as
+ * ready and archive the rest. Returns how many reports were archived.
+ */
+export async function backfillArchiveSupersededReports(): Promise<{
+  archived: number;
+  websitesTouched: number;
+}> {
+  const rows = await db
+    .select({
+      id: reports.id,
+      websiteId: reports.websiteId,
+      createdAt: reports.createdAt,
+      status: reports.status,
+    })
+    .from(reports)
+    .where(eq(reports.type, "intelligence"))
+    .orderBy(desc(reports.createdAt));
+
+  const keepByWebsite = new Map<string, string>();
+  for (const row of rows) {
+    if (!keepByWebsite.has(row.websiteId)) {
+      keepByWebsite.set(row.websiteId, row.id);
+    }
+  }
+
+  let archived = 0;
+  for (const [websiteId, keepId] of keepByWebsite) {
+    // Ensure the keeper is ready
+    await db
+      .update(reports)
+      .set({ status: "ready" })
+      .where(and(eq(reports.id, keepId), ne(reports.status, "ready")));
+
+    archived += await archiveSupersededReports(websiteId, keepId);
+  }
+
+  return { archived, websitesTouched: keepByWebsite.size };
+}
+
 export async function getIntelligenceReport(reportId: string, userId: string) {
   const report = await db.query.reports.findFirst({
     where: and(eq(reports.id, reportId), eq(reports.type, "intelligence")),
@@ -114,7 +190,11 @@ export async function getIntelligenceReport(reportId: string, userId: string) {
   };
 }
 
-export async function listUserIntelligenceReports(userId: string) {
+export async function listUserIntelligenceReports(
+  userId: string,
+  opts?: { includeArchived?: boolean },
+) {
+  const includeArchived = opts?.includeArchived === true;
   const analyses = await db.query.websiteAnalyses.findMany({
     where: and(
       eq(websiteAnalyses.userId, userId),
@@ -127,7 +207,13 @@ export async function listUserIntelligenceReports(userId: string) {
     orderBy: [desc(websiteAnalyses.completedAt)],
   });
 
-  return analyses.filter((a) => a.report);
+  return analyses.filter((a) => {
+    if (!a.report || a.report.type !== "intelligence") return false;
+    if (includeArchived) {
+      return a.report.status === "ready" || a.report.status === "archived";
+    }
+    return a.report.status === "ready";
+  });
 }
 
 export async function listUserOpenOpportunities(userId: string) {

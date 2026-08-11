@@ -3,7 +3,10 @@ import { notFound, redirect } from "next/navigation";
 import { IntelligenceReport } from "@/components/intelligence/report-view";
 import type { CompetitorProfileData, OpportunityFix } from "@/db/schema";
 import { getBrandSettings } from "@/lib/agency/brand";
-import { getIntelligenceReport } from "@/lib/analysis/reports";
+import {
+  getIntelligenceReport,
+  getLatestReadyReportForWebsite,
+} from "@/lib/analysis/reports";
 import { planHasFeature } from "@/lib/billing/entitlements";
 import { getWorkspacePlanId } from "@/lib/billing/gate";
 
@@ -29,6 +32,13 @@ export default async function IntelligenceReportPage({
   const canImplement = planHasFeature(planId, "action_center");
   const showSoftUpgrade = !canImplement;
 
+  const latestReady =
+    report.status === "archived"
+      ? await getLatestReadyReportForWebsite(report.websiteId)
+      : null;
+  const supersededByReportId =
+    latestReady && latestReady.id !== report.id ? latestReady.id : null;
+
   return (
     <IntelligenceReport
       initialFocusId={focus ?? null}
@@ -37,6 +47,8 @@ export default async function IntelligenceReportPage({
       report={{
         id: report.id,
         title: report.title,
+        status: report.status,
+        supersededByReportId,
         overview: report.overview,
         opportunitySummary: report.opportunitySummary,
         executiveBrief: report.executiveBrief ?? null,
