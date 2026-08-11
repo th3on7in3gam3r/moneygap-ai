@@ -105,6 +105,20 @@ export async function GET(
         .tickScheduleError === "string"
         ? (analysis.scanMeta as { tickScheduleError: string }).tickScheduleError
         : null,
+    tickScheduleSeverity:
+      analysis.scanMeta &&
+      typeof (analysis.scanMeta as { tickScheduleSeverity?: unknown })
+        .tickScheduleSeverity === "string"
+        ? (analysis.scanMeta as { tickScheduleSeverity: string })
+            .tickScheduleSeverity
+        : null,
+    tickScheduleErrorClass:
+      analysis.scanMeta &&
+      typeof (analysis.scanMeta as { tickScheduleErrorClass?: unknown })
+        .tickScheduleErrorClass === "string"
+        ? (analysis.scanMeta as { tickScheduleErrorClass: string })
+            .tickScheduleErrorClass
+        : null,
     scanStage:
       analysis.scanMeta &&
       typeof (analysis.scanMeta as { scanStage?: unknown }).scanStage === "string"
@@ -175,6 +189,13 @@ export async function GET(
         typeof (analysis.scanMeta as { tickScheduleError?: unknown })
           .tickScheduleError === "string"
           ? (analysis.scanMeta as { tickScheduleError: string }).tickScheduleError
+          : null,
+      tickScheduleErrorClass:
+        analysis.scanMeta &&
+        typeof (analysis.scanMeta as { tickScheduleErrorClass?: unknown })
+          .tickScheduleErrorClass === "string"
+          ? (analysis.scanMeta as { tickScheduleErrorClass: string })
+              .tickScheduleErrorClass
           : null,
     },
     stages: ANALYSIS_STAGES.map((s, index) => {

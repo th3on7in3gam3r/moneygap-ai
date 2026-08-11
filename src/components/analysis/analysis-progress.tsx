@@ -16,6 +16,10 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { ANALYSIS_STAGES } from "@/lib/analysis/stages";
+import {
+  shouldShowCustomerTickWarning,
+  shouldShowTickEnvAdminHint,
+} from "@/lib/scan/tick-errors";
 import { cn } from "@/lib/utils";
 
 const STAGE_TIPS: Record<string, string[]> = {
@@ -126,6 +130,8 @@ type StatusPayload = {
   estimatedRemainingMs?: number | null;
   currentUrl?: string | null;
   tickScheduleError?: string | null;
+  tickScheduleSeverity?: string | null;
+  tickScheduleErrorClass?: string | null;
   scanStage?: string | null;
   crawlProvider?: string | null;
   crawlStage?: string | null;
@@ -399,12 +405,16 @@ export function AnalysisProgress({
                 {data?.currentUrl ? (
                   <p className="truncate text-fg-subtle">{data.currentUrl}</p>
                 ) : null}
-                {data?.tickScheduleError ? (
+                {shouldShowCustomerTickWarning({
+                  tickScheduleError: data?.tickScheduleError,
+                  tickScheduleSeverity: data?.tickScheduleSeverity,
+                }) ? (
                   <p className="text-gap" role="alert">
-                    Crawl continuation issue: {data.tickScheduleError} We are
-                    retrying automatically. If this persists, ask your admin to
-                    set APP_URL and CRON_SECRET (or enable CRAWL_WORKER_ENABLED
-                    with the Render crawl worker), then retry the scan.
+                    Crawl continuation issue: {data?.tickScheduleError} We are
+                    retrying automatically.
+                    {shouldShowTickEnvAdminHint(data?.tickScheduleErrorClass)
+                      ? " If this persists, ask your admin to set APP_URL and CRON_SECRET (or enable CRAWL_WORKER_ENABLED with the Render crawl worker), then retry the scan."
+                      : ""}
                   </p>
                 ) : null}
               </div>
@@ -530,9 +540,12 @@ export function AnalysisProgress({
                 {data?.error ??
                   "We couldn't analyze this website. Please confirm the URL is publicly accessible."}
               </p>
-              {data?.tickScheduleError ? (
+              {shouldShowCustomerTickWarning({
+                tickScheduleError: data?.tickScheduleError,
+                tickScheduleSeverity: data?.tickScheduleSeverity,
+              }) ? (
                 <p className="text-xs text-fg-muted" role="status">
-                  Crawl worker note: {data.tickScheduleError}
+                  Crawl worker note: {data?.tickScheduleError}
                 </p>
               ) : null}
               <div className="flex flex-wrap gap-2">

@@ -20,6 +20,7 @@ import {
 } from "./providers/defaults";
 import { STALE_PROCESSING_MS } from "./reclaim";
 import { scanLog, scanWarn } from "./scan-log";
+import { releaseTickClaim, touchTickProgress } from "./tick-claim";
 import type { ScanProfile } from "./types";
 import { startWatchdog, withTimeout } from "./watchdog";
 
@@ -207,8 +208,21 @@ export async function runIncrementalDiscover(analysisId: string): Promise<void> 
 
   let finished = false;
   try {
+    const { claimScanTick } = await import("./tick-claim");
     const deadline = Date.now() + 50_000;
     while (Date.now() < deadline) {
+      const claim = await claimScanTick(analysisId);
+      if (!claim.claimed) {
+        if (
+          claim.reason === "already_claimed" ||
+          claim.reason === "lost_race"
+        ) {
+          // Another tick owns processing — do not duplicate.
+          finished = true;
+          return;
+        }
+        break;
+      }
       const { done } = await processScanTick(analysisId);
       if (done) {
         finished = true;
@@ -291,40 +305,78 @@ export async function processScanTick(analysisId: string): Promise<{
   processed: number;
 }> {
   const tickStarted = Date.now();
-  const analysis = await db.query.websiteAnalyses.findFirst({
-    where: eq(websiteAnalyses.id, analysisId),
-  });
-  if (!analysis?.crawlJobId) return { done: true, processed: 0 };
+  let keepClaimForRecurse = false;
 
-  if (
-    analysis.scanPhase === "paused" ||
-    analysis.scanPhase === "cancelled" ||
-    analysis.status === "failed" ||
-    analysis.status === "completed"
-  ) {
-    return { done: true, processed: 0 };
-  }
+  try {
+    await touchTickProgress(analysisId, {});
 
-  // Async Apify whole-site run — poll provider instead of page queue extract.
-  const { isApifyExecution, processApifyPoll } = await import("./crawlers");
-  if (isApifyExecution(analysis.scanMeta)) {
-    return processApifyPoll(analysisId);
-  }
+    const analysis = await db.query.websiteAnalyses.findFirst({
+      where: eq(websiteAnalyses.id, analysisId),
+    });
+    if (!analysis?.crawlJobId) return { done: true, processed: 0 };
 
-  const profile = (analysis.scanProfile as ScanProfile) || "standard";
-  const cfg = getScanProfile(profile);
-  const jobId = analysis.crawlJobId;
-  const siteUrl = analysis.url;
-  const concurrency = Math.min(READ_CONCURRENCY, cfg.concurrency || READ_CONCURRENCY);
-  const metaEarly = (analysis.scanMeta as Record<string, unknown>) ?? {};
-  const deadlineAtMs = resolveActiveCrawlDeadlineAt({
-    scanMeta: metaEarly,
-    profile,
-    startedAt: analysis.startedAt,
-    createdAt: analysis.createdAt,
-  });
+    if (
+      analysis.scanPhase === "paused" ||
+      analysis.scanPhase === "cancelled" ||
+      analysis.status === "failed" ||
+      analysis.status === "completed"
+    ) {
+      return { done: true, processed: 0 };
+    }
 
-  if (isActiveCrawlDeadlinePassed(deadlineAtMs)) {
+    // Async Apify whole-site run — poll provider instead of page queue extract.
+    const { isApifyExecution, processApifyPoll } = await import("./crawlers");
+    if (isApifyExecution(analysis.scanMeta)) {
+      return processApifyPoll(analysisId);
+    }
+
+    const profile = (analysis.scanProfile as ScanProfile) || "standard";
+    const cfg = getScanProfile(profile);
+    const jobId = analysis.crawlJobId;
+    const siteUrl = analysis.url;
+    const concurrency = Math.min(
+      READ_CONCURRENCY,
+      cfg.concurrency || READ_CONCURRENCY,
+    );
+    const metaEarly = (analysis.scanMeta as Record<string, unknown>) ?? {};
+    const deadlineAtMs = resolveActiveCrawlDeadlineAt({
+      scanMeta: metaEarly,
+      profile,
+      startedAt: analysis.startedAt,
+      createdAt: analysis.createdAt,
+    });
+
+    // Render worker owns page drain — serverless ticks must not claim pages.
+    if (metaEarly.execution === "worker") {
+      if (!isActiveCrawlDeadlinePassed(deadlineAtMs)) {
+        const counts = await defaultQueueProvider.countByState(jobId);
+        const completed = counts.completed ?? analysis.pagesCompleted ?? 0;
+        if (isQueueDrained(counts) && completed > 0) {
+          await defaultProgressProvider.update(analysisId, {
+            scanPhase: "analyzing",
+            stage: "Understanding business",
+            progress: 32,
+            estimatedRemainingMs: null,
+            scanMeta: {
+              scanStage: "extract_content",
+              execution: "worker",
+            },
+          });
+          const { runPostCrawlAnalysis } = await import(
+            "@/lib/analysis/pipeline"
+          );
+          await runPostCrawlAnalysis(analysisId);
+          return { done: true, processed: 0 };
+        }
+        scanLog("SCAN", "Worker owns page drain — tick no-op", {
+          analysisId,
+          counts,
+        });
+        return { done: true, processed: 0 };
+      }
+    }
+
+    if (isActiveCrawlDeadlinePassed(deadlineAtMs)) {
     const counts = await defaultQueueProvider.countByState(jobId);
     const completed = counts.completed ?? analysis.pagesCompleted ?? 0;
     scanWarn("CRAWLER", "Active crawl deadline exceeded (native/worker)", {
@@ -679,10 +731,16 @@ export async function processScanTick(analysisId: string): Promise<{
   const counts = await defaultQueueProvider.countByState(jobId);
   if (isQueueDrained(counts)) {
     // Let next path finish post-crawl via empty claim branch (or recurse once)
+    keepClaimForRecurse = true;
     const again = await processScanTick(analysisId);
     return again;
   }
 
   scheduleScanTickAsync(analysisId);
   return { done: false, processed };
+  } finally {
+    if (!keepClaimForRecurse) {
+      await releaseTickClaim(analysisId).catch(() => undefined);
+    }
+  }
 }

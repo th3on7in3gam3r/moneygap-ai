@@ -12,7 +12,7 @@
     "db:push": "drizzle-kit push",
     "db:seed": "tsx --env-file=.env.local src/db/seed.ts",
     "db:studio": "drizzle-kit studio",
-    "test:scan": "tsx --test src/lib/billing/scan-profiles.test.ts src/lib/scan/execution.test.ts src/lib/scan/profiles.test.ts src/lib/scan/reclaim.test.ts src/lib/scan/normalize.test.ts src/lib/scan/connectivity/classify-error.test.ts src/lib/scan/connectivity/pipeline.test.ts src/lib/scan/crawlers/crawlers.test.ts src/lib/scan/crawlers/orchestrator.test.ts scripts/smoke-crawl-orchestrator.ts src/lib/analysis/report-pipeline.test.ts src/lib/analysis/roadmap-stage.test.ts",
+    "test:scan": "tsx --test src/lib/billing/scan-profiles.test.ts src/lib/scan/execution.test.ts src/lib/scan/profiles.test.ts src/lib/scan/reclaim.test.ts src/lib/scan/normalize.test.ts src/lib/scan/connectivity/classify-error.test.ts src/lib/scan/connectivity/pipeline.test.ts src/lib/scan/crawlers/crawlers.test.ts src/lib/scan/crawlers/orchestrator.test.ts scripts/smoke-crawl-orchestrator.ts src/lib/analysis/report-pipeline.test.ts src/lib/analysis/roadmap-stage.test.ts src/lib/scan/tick-schedule.test.ts",
     "test:report": "tsx --test src/lib/analysis/report-pipeline.test.ts src/lib/analysis/roadmap-stage.test.ts",
     "smoke:worker-crawl": "tsx scripts/smoke-worker-crawl.ts",
     "smoke:crawl-orchestrator": "tsx --test scripts/smoke-crawl-orchestrator.ts",

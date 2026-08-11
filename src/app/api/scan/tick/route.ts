@@ -2,6 +2,9 @@ import { after } from "next/server";
 import { z } from "zod";
 import { authorizeCron } from "@/lib/cron/auth";
 import { processScanTick } from "@/lib/scan/batch";
+import { isWorkerScanExecution } from "@/lib/scan/execution";
+import { claimScanTick, releaseTickClaim } from "@/lib/scan/tick-claim";
+import { log } from "@/lib/observability/logger";
 
 export const maxDuration = 60;
 
@@ -9,7 +12,13 @@ const bodySchema = z.object({
   analysisId: z.string().uuid(),
 });
 
+/**
+ * Crawl continuation ACK endpoint.
+ * Authenticates, claims ownership, returns 202 immediately.
+ * Heavy work (Apify poll / page extract / post-crawl) runs in after().
+ */
 export async function POST(req: Request) {
+  const ackStarted = Date.now();
   if (!authorizeCron(req)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -27,19 +36,74 @@ export async function POST(req: Request) {
   }
 
   const { analysisId } = parsed.data;
+  const workerEnabled = isWorkerScanExecution();
 
-  // Process this batch in the current invocation; further ticks self-schedule.
-  try {
-    const result = await processScanTick(analysisId);
-    return Response.json({ ok: true, ...result });
-  } catch (err) {
-    console.error("scan tick error", err);
-    // Retry once via after() for transient failures
-    after(() => {
-      void processScanTick(analysisId).catch((e) =>
-        console.error("scan tick retry failed", e),
-      );
+  const claim = await claimScanTick(analysisId);
+  if (!claim.claimed) {
+    log("info", "TICK_SCHEDULE_ACK", {
+      analysisId,
+      accepted: false,
+      reason: claim.reason,
+      ackDurationMs: Date.now() - ackStarted,
+      workerEnabled,
+      executionMode: workerEnabled ? "worker" : "ticks",
     });
-    return Response.json({ ok: false, error: "tick_failed" }, { status: 500 });
+    return Response.json(
+      {
+        ok: true,
+        accepted: false,
+        reason: claim.reason,
+        analysisId,
+      },
+      { status: 202 },
+    );
   }
+
+  after(() => {
+    const processStarted = Date.now();
+    log("info", "TICK_PROCESS_START", {
+      analysisId,
+      claimResult: claim.reason,
+      workerEnabled,
+      executionMode: workerEnabled ? "worker" : "ticks",
+    });
+    void processScanTick(analysisId)
+      .then((result) => {
+        log("info", "TICK_PROCESS_COMPLETE", {
+          analysisId,
+          processingDurationMs: Date.now() - processStarted,
+          done: result.done,
+          processed: result.processed,
+          claimResult: claim.reason,
+          workerEnabled,
+          executionMode: workerEnabled ? "worker" : "ticks",
+        });
+      })
+      .catch(async (err) => {
+        console.error("scan tick process error", analysisId, err);
+        await releaseTickClaim(analysisId, {
+          tickProcessError:
+            err instanceof Error ? err.message : String(err),
+        });
+      });
+  });
+
+  log("info", "TICK_SCHEDULE_ACK", {
+    analysisId,
+    accepted: true,
+    reason: "claimed",
+    ackDurationMs: Date.now() - ackStarted,
+    workerEnabled,
+    executionMode: workerEnabled ? "worker" : "ticks",
+  });
+
+  return Response.json(
+    {
+      ok: true,
+      accepted: true,
+      started: true,
+      analysisId,
+    },
+    { status: 202 },
+  );
 }

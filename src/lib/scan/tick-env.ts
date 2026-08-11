@@ -1,3 +1,5 @@
+import type { TickScheduleErrorClass } from "@/lib/scan/tick-errors";
+
 /**
  * Origin used for crawl tick / complete self-scheduling.
  * Prefer explicit APP_URL so misconfigured localhost NEXT_PUBLIC does not
@@ -41,6 +43,7 @@ function isLocalHost(url: string): boolean {
 export function diagnoseTickEnv(): {
   ok: boolean;
   message: string | null;
+  errorClass: TickScheduleErrorClass | null;
   hasSecret: boolean;
   hasOrigin: boolean;
   origin: string | null;
@@ -52,6 +55,7 @@ export function diagnoseTickEnv(): {
       ok: false,
       message:
         "Missing CRON_SECRET and APP_URL (or NEXT_PUBLIC_APP_URL) — crawl ticks cannot self-schedule over HTTP.",
+      errorClass: "ENV_INCOMPLETE",
       hasSecret: false,
       hasOrigin: false,
       origin: null,
@@ -62,6 +66,7 @@ export function diagnoseTickEnv(): {
       ok: false,
       message:
         "Missing CRON_SECRET — crawl ticks cannot authenticate to /api/scan/tick.",
+      errorClass: "MISSING_CRON_SECRET",
       hasSecret: false,
       hasOrigin: Boolean(origin),
       origin,
@@ -72,6 +77,7 @@ export function diagnoseTickEnv(): {
       ok: false,
       message:
         "Missing APP_URL (or NEXT_PUBLIC_APP_URL) — crawl ticks cannot resolve the web origin.",
+      errorClass: "MISSING_APP_URL",
       hasSecret: true,
       hasOrigin: false,
       origin: null,
@@ -80,6 +86,7 @@ export function diagnoseTickEnv(): {
   return {
     ok: true,
     message: null,
+    errorClass: null,
     hasSecret: true,
     hasOrigin: true,
     origin,

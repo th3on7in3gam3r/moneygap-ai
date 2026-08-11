@@ -2,14 +2,27 @@ import { after } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { websiteAnalyses } from "@/db/schema";
+import { log } from "@/lib/observability/logger";
 import {
   isActiveCrawlDeadlinePassed,
   resolveActiveCrawlDeadlineAt,
 } from "./deadline";
+import { isWorkerScanExecution } from "./execution";
 import { scanLog, scanWarn } from "./scan-log";
+import {
+  claimScanTick,
+  releaseTickClaim,
+  tickClaimFromMeta,
+} from "./tick-claim";
+import {
+  classifyTickScheduleError,
+  type TickScheduleErrorClass,
+  type TickScheduleSeverity,
+} from "./tick-errors";
 import { diagnoseTickEnv } from "./tick-env";
 import type { ScanProfile } from "./types";
 
+/** Short timeout for ACK-only scheduling (not processing). */
 const TICK_FETCH_TIMEOUT_MS = 5_000;
 /** Re-kick crawl ticks if no progress heartbeat for this long. */
 const STALL_KICK_MS = 90_000;
@@ -20,27 +33,51 @@ const WORKER_STALL_MS = 3 * 60_000;
 /** Don't spam scheduleScanTick from status polls. */
 const KICK_COOLDOWN_MS = 45_000;
 
-async function persistTickScheduleError(
+async function persistTickScheduleMeta(
   analysisId: string,
-  message: string | null,
+  patch: {
+    tickScheduleError?: string | null;
+    tickScheduleErrorClass?: TickScheduleErrorClass | null;
+    tickScheduleSeverity?: TickScheduleSeverity | null;
+    tickScheduleNote?: string | null;
+  },
 ): Promise<void> {
   try {
     const existing = await db.query.websiteAnalyses.findFirst({
       where: eq(websiteAnalyses.id, analysisId),
       columns: { scanMeta: true },
     });
+    const meta = {
+      ...((existing?.scanMeta as Record<string, unknown>) ?? {}),
+    };
+    if ("tickScheduleError" in patch) {
+      meta.tickScheduleError = patch.tickScheduleError;
+    }
+    if ("tickScheduleErrorClass" in patch) {
+      meta.tickScheduleErrorClass = patch.tickScheduleErrorClass;
+    }
+    if ("tickScheduleSeverity" in patch) {
+      meta.tickScheduleSeverity = patch.tickScheduleSeverity;
+    }
+    if ("tickScheduleNote" in patch) {
+      meta.tickScheduleNote = patch.tickScheduleNote;
+    }
     await db
       .update(websiteAnalyses)
-      .set({
-        scanMeta: {
-          ...((existing?.scanMeta as Record<string, unknown>) ?? {}),
-          tickScheduleError: message,
-        },
-      })
+      .set({ scanMeta: meta })
       .where(eq(websiteAnalyses.id, analysisId));
   } catch {
     /* ignore */
   }
+}
+
+async function clearTickScheduleWarning(analysisId: string): Promise<void> {
+  await persistTickScheduleMeta(analysisId, {
+    tickScheduleError: null,
+    tickScheduleErrorClass: null,
+    tickScheduleSeverity: "RECOVERED",
+    tickScheduleNote: "Tick schedule ACK succeeded.",
+  });
 }
 
 async function persistTickKickMeta(analysisId: string): Promise<void> {
@@ -63,10 +100,56 @@ async function persistTickKickMeta(analysisId: string): Promise<void> {
   }
 }
 
-/** Best-effort same-process tick when HTTP self-schedule is unavailable. */
+async function shouldSkipInProcessFallback(analysisId: string): Promise<{
+  skip: boolean;
+  reason: string;
+}> {
+  const analysis = await db.query.websiteAnalyses.findFirst({
+    where: eq(websiteAnalyses.id, analysisId),
+    columns: { scanMeta: true, status: true, reportId: true },
+  });
+  if (!analysis) return { skip: true, reason: "missing" };
+  if (analysis.reportId || analysis.status === "completed") {
+    return { skip: true, reason: "already_complete" };
+  }
+  const meta = (analysis.scanMeta as Record<string, unknown>) ?? {};
+  const claim = tickClaimFromMeta(meta);
+  if (claim.fresh) {
+    return { skip: true, reason: "already_claimed" };
+  }
+  const isApify = meta.execution === "apify" || meta.crawlProvider === "apify";
+  if (meta.execution === "worker" && !isApify) {
+    return { skip: true, reason: "worker_owns" };
+  }
+  if (isApify && claim.claimedAt != null && claim.fresh) {
+    return { skip: true, reason: "apify_in_flight" };
+  }
+  return { skip: false, reason: "ok" };
+}
+
+/**
+ * Best-effort same-process tick when HTTP self-schedule is unavailable.
+ * Must acquire the tick claim — never duplicates an in-flight owner.
+ */
 function fallbackInProcessTick(analysisId: string): void {
   const run = async () => {
     try {
+      const skip = await shouldSkipInProcessFallback(analysisId);
+      if (skip.skip) {
+        scanLog("SCAN", "In-process tick fallback skipped", {
+          analysisId,
+          reason: skip.reason,
+        });
+        return;
+      }
+      const claim = await claimScanTick(analysisId);
+      if (!claim.claimed) {
+        scanLog("SCAN", "In-process tick fallback not claimed", {
+          analysisId,
+          reason: claim.reason,
+        });
+        return;
+      }
       const { processScanTick } = await import("./batch");
       const result = await processScanTick(analysisId);
       if (!result.done) scheduleScanTickAsync(analysisId);
@@ -75,6 +158,7 @@ function fallbackInProcessTick(analysisId: string): void {
         analysisId,
         error: err instanceof Error ? err.message : String(err),
       });
+      await releaseTickClaim(analysisId).catch(() => undefined);
     }
   };
   try {
@@ -86,10 +170,20 @@ function fallbackInProcessTick(analysisId: string): void {
   }
 }
 
-/** Schedule the next serverless crawl tick (fire-and-forget, timed). */
+/** Schedule the next crawl tick (ACK-only HTTP; processing is detached). */
 export async function scheduleScanTick(analysisId: string): Promise<void> {
+  const scheduleStarted = Date.now();
   const diag = diagnoseTickEnv();
   const secret = process.env.CRON_SECRET?.trim();
+  const workerEnabled = isWorkerScanExecution();
+
+  log("info", "TICK_SCHEDULE_START", {
+    analysisId,
+    workerEnabled,
+    executionMode: workerEnabled ? "worker" : "ticks",
+    hasOrigin: diag.hasOrigin,
+    hasSecret: diag.hasSecret,
+  });
 
   if (!diag.ok || !diag.origin || !secret) {
     const msg =
@@ -99,9 +193,14 @@ export async function scheduleScanTick(analysisId: string): Promise<void> {
       analysisId,
       hasSecret: diag.hasSecret,
       hasOrigin: diag.hasOrigin,
+      errorClass: diag.errorClass,
     });
-    await persistTickScheduleError(analysisId, msg);
-    // Still advance the queue in-process so local/misconfigured deploys don't freeze.
+    await persistTickScheduleMeta(analysisId, {
+      tickScheduleError: msg,
+      tickScheduleErrorClass: diag.errorClass,
+      tickScheduleSeverity: "WARNING",
+    });
+    // Local / misconfigured deploys: advance in-process if nobody owns the tick.
     fallbackInProcessTick(analysisId);
     return;
   }
@@ -121,31 +220,90 @@ export async function scheduleScanTick(analysisId: string): Promise<void> {
         body: JSON.stringify({ analysisId }),
         signal: AbortSignal.timeout(TICK_FETCH_TIMEOUT_MS),
       });
-      if (!res.ok) {
-        const detail = `Tick HTTP ${res.status} from ${url}`;
-        scanWarn("SCAN", "scheduleScanTick non-OK response", {
+
+      let body: {
+        ok?: boolean;
+        accepted?: boolean;
+        reason?: string;
+        started?: boolean;
+      } = {};
+      try {
+        body = (await res.json()) as typeof body;
+      } catch {
+        /* non-JSON */
+      }
+
+      const ackDurationMs = Date.now() - scheduleStarted;
+      // 200/202 = scheduling accepted (including already_claimed).
+      if (res.ok || res.status === 202) {
+        log("info", "TICK_SCHEDULE_ACK", {
+          analysisId,
+          ackDurationMs,
+          status: res.status,
+          accepted: body.accepted ?? true,
+          reason: body.reason ?? "ok",
+          workerEnabled,
+        });
+        await clearTickScheduleWarning(analysisId);
+        scanLog("SCAN", "Scheduled next tick", {
           analysisId,
           status: res.status,
+          accepted: body.accepted,
+          reason: body.reason,
         });
-        await persistTickScheduleError(analysisId, detail);
-        fallbackInProcessTick(analysisId);
         return;
       }
-      await persistTickScheduleError(analysisId, null);
-      scanLog("SCAN", "Scheduled next tick", {
+
+      const detail = `Tick HTTP ${res.status} from ${url}`;
+      const errorClass = classifyTickScheduleError(new Error(detail));
+      scanWarn("SCAN", "scheduleScanTick non-OK response", {
         analysisId,
         status: res.status,
+        errorClass,
       });
+      await persistTickScheduleMeta(analysisId, {
+        tickScheduleError: detail,
+        tickScheduleErrorClass: errorClass,
+        tickScheduleSeverity: "WARNING",
+      });
+      const skip = await shouldSkipInProcessFallback(analysisId);
+      if (!skip.skip) fallbackInProcessTick(analysisId);
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
+      const errorClass = classifyTickScheduleError(err);
       scanWarn("SCAN", "scheduleScanTick failed", {
         analysisId,
         error: detail,
+        errorClass,
       });
-      await persistTickScheduleError(
+      log("info", "TICK_SCHEDULE_ACK", {
         analysisId,
-        `Tick schedule failed: ${detail}`,
-      );
+        ackDurationMs: Date.now() - scheduleStarted,
+        status: 0,
+        accepted: false,
+        reason: errorClass,
+        workerEnabled,
+      });
+
+      // Timeout after ACK-first redesign is infrastructure failure if env is OK.
+      // Do not scare customers when another owner / worker is already progressing.
+      const skip = await shouldSkipInProcessFallback(analysisId);
+      if (skip.skip) {
+        await persistTickScheduleMeta(analysisId, {
+          tickScheduleError: `Tick schedule failed: ${detail}`,
+          tickScheduleErrorClass: errorClass,
+          tickScheduleSeverity: "INFO",
+          tickScheduleNote: `Scheduling noise while ${skip.reason}; crawl continues.`,
+        });
+        return;
+      }
+
+      await persistTickScheduleMeta(analysisId, {
+        tickScheduleError: `Tick schedule failed: ${detail}`,
+        tickScheduleErrorClass: errorClass,
+        tickScheduleSeverity:
+          errorClass === "TICK_CONNECTION_TIMEOUT" ? "INFO" : "WARNING",
+      });
       fallbackInProcessTick(analysisId);
     }
   };
@@ -214,6 +372,15 @@ export async function kickStalledScanIfNeeded(analysisId: string): Promise<{
     typeof meta.lastTickKickAt === "number" ? meta.lastTickKickAt : 0;
   const tickScheduleError =
     typeof meta.tickScheduleError === "string" ? meta.tickScheduleError : null;
+  const tickSeverity =
+    typeof meta.tickScheduleSeverity === "string"
+      ? meta.tickScheduleSeverity
+      : null;
+
+  const claim = tickClaimFromMeta(meta);
+  if (claim.fresh) {
+    return { kicked: false, reason: "tick_in_flight" };
+  }
 
   const clock =
     (Number.isFinite(lastProgressAt) ? lastProgressAt : null) ??
@@ -222,12 +389,9 @@ export async function kickStalledScanIfNeeded(analysisId: string): Promise<{
   const ageMs = Date.now() - clock;
   const sinceKick = Date.now() - lastTickKickAt;
 
-  // Apify polls via the same tick scheduler — always eligible to re-kick.
   const isApify = meta.execution === "apify" || meta.crawlProvider === "apify";
   const isWorker = meta.execution === "worker" && !isApify;
 
-  // Active profile deadline (not the 3h orphan stale ceiling) — force tick so
-  // processScanTick can fail or complete-partial instead of waiting for stale unlock.
   const profile = (analysis.scanProfile as ScanProfile) || "standard";
   const deadlineAtMs = resolveActiveCrawlDeadlineAt({
     scanMeta: meta,
@@ -242,18 +406,11 @@ export async function kickStalledScanIfNeeded(analysisId: string): Promise<{
       execution: meta.execution,
     });
     await persistTickKickMeta(analysisId);
+    // Single path only — HTTP ACK claims ownership; no parallel in-process tick.
     scheduleScanTickAsync(analysisId);
-    try {
-      const { processScanTick } = await import("./batch");
-      await processScanTick(analysisId);
-    } catch {
-      /* ignore */
-    }
     return { kicked: true, reason: "active_deadline" };
   }
 
-  // Worker with stale heartbeat: kick /api/scan/complete attempt via tick path
-  // (tick no-ops if queue empty; complete route is separate — schedule tick + warn).
   if (isWorker) {
     if (ageMs < WORKER_STALL_MS) {
       return { kicked: false, reason: "worker_fresh" };
@@ -266,14 +423,9 @@ export async function kickStalledScanIfNeeded(analysisId: string): Promise<{
       ageMs,
     });
     await persistTickKickMeta(analysisId);
+    // Prefer scheduling ACK only; worker owns page drain. Tick may only
+    // handle deadline helpers when claim succeeds.
     scheduleScanTickAsync(analysisId);
-    // Also try complete if pages already mirrored
-    try {
-      const { processScanTick } = await import("./batch");
-      await processScanTick(analysisId);
-    } catch {
-      /* ignore */
-    }
     return { kicked: true, reason: "worker_stale" };
   }
 
@@ -288,7 +440,6 @@ export async function kickStalledScanIfNeeded(analysisId: string): Promise<{
     scanStage === "discovery" ||
     scanStage === "queue";
 
-  // Allow kick after discover stall threshold so mid-discover kill cannot freeze forever.
   if (stillDiscovering && !isApify) {
     if (ageMs < DISCOVER_STALL_MS) {
       return { kicked: false, reason: "still_discovering" };
@@ -306,8 +457,12 @@ export async function kickStalledScanIfNeeded(analysisId: string): Promise<{
     return { kicked: true, reason: "discover_stalled" };
   }
 
-  const shouldKick =
-    Boolean(tickScheduleError) || ageMs >= STALL_KICK_MS;
+  // INFO/RECOVERED schedule notes should not force endless re-kicks.
+  const warningKick =
+    Boolean(tickScheduleError) &&
+    (tickSeverity === "WARNING" || !tickSeverity);
+
+  const shouldKick = warningKick || ageMs >= STALL_KICK_MS;
 
   if (!shouldKick) return { kicked: false, reason: "fresh" };
   if (sinceKick < KICK_COOLDOWN_MS) {
