@@ -397,6 +397,11 @@ export function MoneyGapsBoard({
                             : websiteId !== "all" && index === 0
                         }
                         reportId={o.reportId}
+                        onAskAdvisor={(opportunityId) => {
+                          router.push(
+                            `/reports/${o.reportId}?tab=advisor&opportunity=${encodeURIComponent(opportunityId)}`,
+                          );
+                        }}
                         opportunity={{
                           id: o.id,
                           title: o.title,

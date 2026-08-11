@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { AssetSection } from "@/db/schema";
 import {
@@ -49,6 +50,7 @@ export function OpportunityActionCenter({
   openFixPathRequest?: FixPathId | null;
   onOpenFixPathRequestHandled?: () => void;
 }) {
+  const router = useRouter();
   const playbook = useMemo(
     () =>
       resolvePlaybook({
@@ -295,8 +297,14 @@ export function OpportunityActionCenter({
       return;
     }
     if (id === "ask_advisor") {
-      onAskAdvisor?.(opportunity.id);
-      setToast("Switch to the Advisor tab to continue this conversation.");
+      if (onAskAdvisor) {
+        onAskAdvisor(opportunity.id);
+        return;
+      }
+      // Money Gaps board (and other surfaces) have no in-page Advisor tab.
+      router.push(
+        `/reports/${reportId}?tab=advisor&opportunity=${encodeURIComponent(opportunity.id)}`,
+      );
       return;
     }
     if (id === "build" || id === "campaign" || id === "outreach" || id === "testimonial_request") {

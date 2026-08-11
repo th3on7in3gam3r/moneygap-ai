@@ -291,6 +291,10 @@ const tabs = [
 
 type TabId = (typeof tabs)[number]["id"];
 
+function isTabId(value: string | null | undefined): value is TabId {
+  return !!value && tabs.some((t) => t.id === value);
+}
+
 function ScoreBar({ label, value }: { label: string; value: number }) {
   return (
     <div className="space-y-1.5">
@@ -873,18 +877,24 @@ function RetryMoneyGapButton({ analysisId }: { analysisId: string }) {
 export function IntelligenceReport({
   report,
   initialFocusId = null,
+  initialTab = null,
+  initialAdvisorOpportunityId = null,
   canImplement = false,
   showSoftUpgrade = false,
 }: {
   report: IntelligenceReportView;
   initialFocusId?: string | null;
+  initialTab?: string | null;
+  initialAdvisorOpportunityId?: string | null;
   canImplement?: boolean;
   showSoftUpgrade?: boolean;
 }) {
   const [tab, setTab] = useState<TabId>(
-    initialFocusId ? "opportunities" : "opportunities",
+    isTabId(initialTab) ? initialTab : "opportunities",
   );
-  const [advisorFocusId, setAdvisorFocusId] = useState<string | null>(null);
+  const [advisorFocusId, setAdvisorFocusId] = useState<string | null>(
+    initialAdvisorOpportunityId,
+  );
   const [executionFocusId, setExecutionFocusId] = useState<string | null>(
     initialFocusId,
   );
@@ -1857,8 +1867,16 @@ export function IntelligenceReport({
             }
           }}
           onAskAdvisor={(id) => {
+            setExecutionFocusId(null);
             setAdvisorFocusId(id);
             setTab("advisor");
+            if (typeof window !== "undefined") {
+              const url = new URL(window.location.href);
+              url.searchParams.delete("focus");
+              url.searchParams.set("tab", "advisor");
+              url.searchParams.set("opportunity", id);
+              window.history.replaceState({}, "", url.pathname + url.search);
+            }
           }}
         />
       )}

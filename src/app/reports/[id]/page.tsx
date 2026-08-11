@@ -15,7 +15,7 @@ export default async function IntelligenceReportPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ focus?: string }>;
+  searchParams: Promise<{ focus?: string; tab?: string; opportunity?: string }>;
 }) {
   const { userId, isAuthenticated } = await auth();
   if (!isAuthenticated || !userId) {
@@ -23,7 +23,7 @@ export default async function IntelligenceReportPage({
   }
 
   const { id } = await params;
-  const { focus } = await searchParams;
+  const { focus, tab, opportunity } = await searchParams;
   const report = await getIntelligenceReport(id, userId);
   if (!report) notFound();
 
@@ -42,6 +42,8 @@ export default async function IntelligenceReportPage({
   return (
     <IntelligenceReport
       initialFocusId={focus ?? null}
+      initialTab={tab ?? null}
+      initialAdvisorOpportunityId={opportunity ?? null}
       canImplement={canImplement}
       showSoftUpgrade={showSoftUpgrade}
       report={{
