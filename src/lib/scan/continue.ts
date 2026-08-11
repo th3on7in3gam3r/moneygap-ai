@@ -323,6 +323,221 @@ export function scheduleScanTickAsync(analysisId: string): void {
   void scheduleScanTick(analysisId);
 }
 
+const COMPLETE_FETCH_TIMEOUT_MS = 5_000;
+/** Re-kick post-crawl if analyzing without report this long without progress. */
+export const ANALYZING_KICK_MS = 90_000;
+
+/**
+ * Schedule POST /api/scan/complete (ACK-only). OpenAI runs detached on the
+ * complete route — never await post-crawl from ticks.
+ */
+export async function scheduleScanComplete(analysisId: string): Promise<void> {
+  const scheduleStarted = Date.now();
+  const diag = diagnoseTickEnv();
+  const secret = process.env.CRON_SECRET?.trim();
+
+  log("info", "POST_CRAWL_SCHEDULE_START", {
+    analysisId,
+    hasOrigin: diag.hasOrigin,
+    hasSecret: diag.hasSecret,
+  });
+
+  if (!diag.ok || !diag.origin || !secret) {
+    scanWarn("SCAN", "scheduleScanComplete: env incomplete", {
+      analysisId,
+      errorClass: diag.errorClass,
+    });
+    // Local/misconfigured: run post-crawl in-process via after().
+    try {
+      after(() => {
+        void import("@/lib/analysis/pipeline").then(({ runPostCrawlAnalysis }) =>
+          runPostCrawlAnalysis(analysisId).catch((err) =>
+            console.error("in-process post-crawl failed", analysisId, err),
+          ),
+        );
+      });
+    } catch {
+      void import("@/lib/analysis/pipeline").then(({ runPostCrawlAnalysis }) =>
+        runPostCrawlAnalysis(analysisId).catch((err) =>
+          console.error("in-process post-crawl failed", analysisId, err),
+        ),
+      );
+    }
+    return;
+  }
+
+  const url = `${diag.origin}/api/scan/complete`;
+  const run = async () => {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "x-cron-secret": secret,
+          Authorization: `Bearer ${secret}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ analysisId }),
+        signal: AbortSignal.timeout(COMPLETE_FETCH_TIMEOUT_MS),
+      });
+      log("info", "POST_CRAWL_SCHEDULE_ACK", {
+        analysisId,
+        ackDurationMs: Date.now() - scheduleStarted,
+        status: res.status,
+        ok: res.ok || res.status === 202,
+      });
+      if (!res.ok && res.status !== 202) {
+        scanWarn("SCAN", "scheduleScanComplete non-OK", {
+          analysisId,
+          status: res.status,
+        });
+      }
+    } catch (err) {
+      scanWarn("SCAN", "scheduleScanComplete failed", {
+        analysisId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      // Fallback: still try in-process so Basics scans do not orphan.
+      try {
+        const { runPostCrawlAnalysis } = await import(
+          "@/lib/analysis/pipeline"
+        );
+        await runPostCrawlAnalysis(analysisId);
+      } catch (e) {
+        console.error("post-crawl fallback failed", analysisId, e);
+      }
+    }
+  };
+
+  try {
+    after(() => {
+      void run();
+    });
+  } catch {
+    void run();
+  }
+}
+
+export function scheduleScanCompleteAsync(analysisId: string): void {
+  void scheduleScanComplete(analysisId);
+}
+
+/**
+ * Heal analyzing / preparing without a report — schedule /api/scan/complete.
+ * Also releases a dead post-crawl lease past the watchdog window.
+ */
+export async function kickAnalyzingWithoutReport(analysisId: string): Promise<{
+  kicked: boolean;
+  reason?: string;
+}> {
+  const {
+    postCrawlClaimFromMeta,
+    releasePostCrawlClaim,
+    POST_CRAWL_WATCHDOG_MS,
+  } = await import("@/lib/analysis/post-crawl-guard");
+
+  const analysis = await db.query.websiteAnalyses.findFirst({
+    where: eq(websiteAnalyses.id, analysisId),
+    columns: {
+      id: true,
+      status: true,
+      reportId: true,
+      scanPhase: true,
+      stage: true,
+      startedAt: true,
+      createdAt: true,
+      scanMeta: true,
+    },
+  });
+
+  if (!analysis) return { kicked: false, reason: "missing" };
+  if (analysis.reportId) return { kicked: false, reason: "has_report" };
+  if (analysis.status !== "running" && analysis.status !== "queued") {
+    return { kicked: false, reason: "not_running" };
+  }
+
+  const meta = (analysis.scanMeta as Record<string, unknown>) ?? {};
+  const stageLower = (analysis.stage ?? "").toLowerCase();
+  const isAnalyzingPhase =
+    analysis.scanPhase === "analyzing" ||
+    Boolean(meta.completeNotifyFailed) ||
+    stageLower.includes("preparing") ||
+    stageLower.includes("understanding") ||
+    stageLower.includes("extracting") ||
+    stageLower.includes("audience") ||
+    stageLower.includes("reviewing content");
+
+  if (!isAnalyzingPhase && analysis.scanPhase !== "analyzing") {
+    return { kicked: false, reason: "not_analyzing" };
+  }
+
+  const lease = postCrawlClaimFromMeta(meta);
+  const progressAt =
+    lease.lastProgressAt ??
+    lease.claimedAt ??
+    analysis.startedAt?.getTime() ??
+    analysis.createdAt.getTime();
+  const ageMs = Date.now() - progressAt;
+  const lastCompleteKickAt =
+    typeof meta.lastCompleteKickAt === "number" ? meta.lastCompleteKickAt : 0;
+  const sinceKick = Date.now() - lastCompleteKickAt;
+
+  if (lease.fresh && ageMs < ANALYZING_KICK_MS) {
+    return { kicked: false, reason: "post_crawl_in_flight" };
+  }
+
+  // Watchdog: lease held too long with no progress — release so complete can reclaim.
+  if (
+    lease.claimedAt != null &&
+    !lease.fresh &&
+    ageMs >= POST_CRAWL_WATCHDOG_MS
+  ) {
+    scanWarn("SCAN", "Post-crawl watchdog releasing stale lease", {
+      analysisId,
+      ageMs,
+    });
+    await releasePostCrawlClaim(analysisId, {
+      postCrawlWatchdogReleased: true,
+      severity: "INFO",
+    });
+  }
+
+  if (ageMs < ANALYZING_KICK_MS && !meta.completeNotifyFailed) {
+    return { kicked: false, reason: "analyzing_fresh" };
+  }
+  if (sinceKick < KICK_COOLDOWN_MS) {
+    return { kicked: false, reason: "cooldown" };
+  }
+
+  scanWarn("SCAN", "Re-kicking post-crawl complete for analyzing-without-report", {
+    analysisId,
+    ageMs,
+    scanPhase: analysis.scanPhase,
+    stage: analysis.stage,
+  });
+
+  try {
+    const existing = await db.query.websiteAnalyses.findFirst({
+      where: eq(websiteAnalyses.id, analysisId),
+      columns: { scanMeta: true },
+    });
+    await db
+      .update(websiteAnalyses)
+      .set({
+        scanMeta: {
+          ...((existing?.scanMeta as Record<string, unknown>) ?? {}),
+          lastCompleteKickAt: Date.now(),
+        },
+      })
+      .where(eq(websiteAnalyses.id, analysisId));
+  } catch {
+    /* soft */
+  }
+
+  scheduleScanCompleteAsync(analysisId);
+  return { kicked: true, reason: "analyzing_stuck" };
+}
+
 /**
  * If a crawl looks stalled (no page progress heartbeat), re-schedule a tick.
  * Called from status polling so hung "Reading pages" jobs self-heal.
@@ -331,6 +546,16 @@ export async function kickStalledScanIfNeeded(analysisId: string): Promise<{
   kicked: boolean;
   reason?: string;
 }> {
+  // Post-crawl orphan heal first (preparing / analyzing without report).
+  const analyzingKick = await kickAnalyzingWithoutReport(analysisId);
+  if (analyzingKick.kicked) return analyzingKick;
+  if (
+    analyzingKick.reason === "post_crawl_in_flight" ||
+    analyzingKick.reason === "analyzing_fresh"
+  ) {
+    return analyzingKick;
+  }
+
   const analysis = await db.query.websiteAnalyses.findFirst({
     where: eq(websiteAnalyses.id, analysisId),
     columns: {

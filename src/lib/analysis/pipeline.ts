@@ -26,7 +26,11 @@ import type { IntelligenceResult } from "@/lib/analysis/openai";
 import { generateWebsiteIntelligence } from "@/lib/analysis/openai";
 import { persistMoneyGapEngineResult } from "@/lib/analysis/persist-money-gaps";
 import { persistCompetitiveIntelligence } from "@/lib/analysis/competitive/persist";
-import { claimPostCrawlAnalysis } from "@/lib/analysis/post-crawl-guard";
+import {
+  claimPostCrawlAnalysis,
+  releasePostCrawlClaim,
+  touchPostCrawlProgress,
+} from "@/lib/analysis/post-crawl-guard";
 import { isMoneyGapClaimFresh } from "@/lib/analysis/roadmap-errors";
 import {
   ANALYSIS_STAGES,
@@ -43,7 +47,7 @@ import { MONEYGAP_ENGINE_VERSION, TRUST_ENGINE_VERSION } from "@/lib/trust";
 async function setStage(analysisId: string, stageId: AnalysisStageId | "complete") {
   const current = await db.query.websiteAnalyses.findFirst({
     where: eq(websiteAnalyses.id, analysisId),
-    columns: { status: true },
+    columns: { status: true, scanMeta: true },
   });
   // Do not revive a user-stopped or failed analysis.
   if (current?.status === "failed" || current?.status === "completed") {
@@ -55,12 +59,20 @@ async function setStage(analysisId: string, stageId: AnalysisStageId | "complete
       ? { id: "complete", label: "Complete", progress: 100 }
       : ANALYSIS_STAGES.find((s) => s.id === stageId)!;
 
+  const now = Date.now();
+  const meta = {
+    ...((current?.scanMeta as Record<string, unknown>) ?? {}),
+    lastProgressAt: now,
+    postCrawlLastProgressAt: now,
+  };
+
   await db
     .update(websiteAnalyses)
     .set({
       status: stageId === "complete" ? "completed" : "running",
       stage: stage.label,
       progress: stage.progress,
+      scanMeta: meta,
       ...(stageId === "complete" ? { completedAt: new Date(), error: null } : {}),
     })
     .where(eq(websiteAnalyses.id, analysisId));
@@ -816,6 +828,7 @@ export async function runPostCrawlAnalysis(analysisId: string) {
         });
       }
     }
+    // already_claimed / lost_race: fresh lease owns work; stale leases are stolen above.
     return;
   }
 
@@ -823,8 +836,14 @@ export async function runPostCrawlAnalysis(analysisId: string) {
     where: eq(websiteAnalyses.id, analysisId),
     with: { website: true },
   });
-  if (!analysis) return;
+  if (!analysis) {
+    await releasePostCrawlClaim(analysisId, { postCrawlSkip: "missing" });
+    return;
+  }
   if (!process.env.OPENAI_API_KEY) {
+    await releasePostCrawlClaim(analysisId, {
+      errorClass: "AI_PROVIDER_ERROR",
+    });
     await failAnalysis(analysisId, analysis.websiteId, MISSING_KEYS_ERROR, {
       failedStage: "preparing",
       errorClass: "AI_PROVIDER_ERROR",
@@ -846,6 +865,9 @@ export async function runPostCrawlAnalysis(analysisId: string) {
   const pages = dedupePagesByUrl(rawPages);
 
   if (pages.length === 0) {
+    await releasePostCrawlClaim(analysisId, {
+      errorClass: "NO_PAGES",
+    });
     await failAnalysis(analysisId, analysis.websiteId, PUBLIC_CRAWL_ERROR, {
       failedStage: "extract_content",
       errorClass: "UNKNOWN",
@@ -861,7 +883,17 @@ export async function runPostCrawlAnalysis(analysisId: string) {
     durationMs: Date.now() - startedAtMs,
   });
 
+  // Heartbeat while intelligence LLM runs so the lease stays fresh.
+  const heartbeat = setInterval(() => {
+    void touchPostCrawlProgress(analysisId, {
+      postCrawlStage: "intelligence_llm",
+    });
+  }, 20_000);
+
   try {
+    await touchPostCrawlProgress(analysisId, {
+      postCrawlStage: "start",
+    });
     await finishPipelineWithPages(analysisId, analysis, pages, startedAtMs, {
       rawPageRows: rawPages.length,
     });
@@ -914,6 +946,13 @@ export async function runPostCrawlAnalysis(analysisId: string) {
         /* fall through to fail */
       }
     }
+    // Release lease so status-poll can reclaim / reschedule complete.
+    await releasePostCrawlClaim(analysisId, {
+      errorClass,
+      severity: "FATAL",
+      errorMessage: err instanceof Error ? err.message : String(err),
+      failedStage: "preparing",
+    });
     await failAnalysis(
       analysisId,
       analysis.websiteId,
@@ -923,6 +962,8 @@ export async function runPostCrawlAnalysis(analysisId: string) {
         durationMs: Date.now() - startedAtMs,
       }),
     );
+  } finally {
+    clearInterval(heartbeat);
   }
 }
 

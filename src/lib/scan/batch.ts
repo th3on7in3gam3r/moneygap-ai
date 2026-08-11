@@ -9,7 +9,7 @@ import {
   resolveActiveCrawlDeadlineAt,
 } from "./deadline";
 import { isWorkerScanExecution } from "./execution";
-import { scheduleScanTickAsync } from "./continue";
+import { scheduleScanTickAsync, scheduleScanCompleteAsync } from "./continue";
 import { isQueueDrained, remainingQueueCount } from "./claim";
 import { getScanProfile } from "./profiles";
 import {
@@ -362,10 +362,7 @@ export async function processScanTick(analysisId: string): Promise<{
               execution: "worker",
             },
           });
-          const { runPostCrawlAnalysis } = await import(
-            "@/lib/analysis/pipeline"
-          );
-          await runPostCrawlAnalysis(analysisId);
+          scheduleScanCompleteAsync(analysisId);
           return { done: true, processed: 0 };
         }
         scanLog("SCAN", "Worker owns page drain — tick no-op", {
@@ -416,8 +413,7 @@ export async function processScanTick(analysisId: string): Promise<{
           updatedAt: new Date(),
         })
         .where(eq(crawlJobs.id, jobId));
-      const { runPostCrawlAnalysis } = await import("@/lib/analysis/pipeline");
-      await runPostCrawlAnalysis(analysisId);
+      scheduleScanCompleteAsync(analysisId);
       return { done: true, processed: 0 };
     }
 
@@ -578,8 +574,7 @@ export async function processScanTick(analysisId: string): Promise<{
       })
       .where(eq(crawlJobs.id, jobId));
 
-    const { runPostCrawlAnalysis } = await import("@/lib/analysis/pipeline");
-    await runPostCrawlAnalysis(analysisId);
+    scheduleScanCompleteAsync(analysisId);
     return { done: true, processed: 0 };
   }
 

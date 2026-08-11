@@ -22,7 +22,7 @@ import {
   recoverAndFinalizeCorpus,
   weightedCrawlProgress,
 } from "./orchestrator";
-import { scheduleScanTickAsync } from "../continue";
+import { scheduleScanTickAsync, scheduleScanCompleteAsync } from "../continue";
 import { isWorkerScanExecution } from "../execution";
 import { getScanProfile } from "../profiles";
 import {
@@ -160,8 +160,7 @@ async function finishWithPages(
     })
     .where(eq(crawlJobs.id, jobId));
 
-  const { runPostCrawlAnalysis } = await import("@/lib/analysis/pipeline");
-  await runPostCrawlAnalysis(analysisId);
+  scheduleScanCompleteAsync(analysisId);
 }
 
 async function failCrawl(

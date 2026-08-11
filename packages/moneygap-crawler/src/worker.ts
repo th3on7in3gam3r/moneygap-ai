@@ -353,6 +353,29 @@ async function resolveWorkerWebOrigin(): Promise<{
   return { origin, hasSecret: secret };
 }
 
+async function markCompleteNotifyFailed(
+  analysisId: string,
+  detail: string,
+): Promise<void> {
+  try {
+    await withPg(async (client) => {
+      await client.query(
+        `UPDATE website_analyses
+         SET scan_meta = COALESCE(scan_meta, '{}'::jsonb)
+           || jsonb_build_object(
+             'completeNotifyFailed', true,
+             'completeNotifyError', to_jsonb($2::text),
+             'lastProgressAt', to_jsonb((EXTRACT(EPOCH FROM NOW()) * 1000)::bigint)
+           )
+         WHERE id = $1::uuid`,
+        [analysisId, detail.slice(0, 500)],
+      );
+    });
+  } catch (err) {
+    console.error("crawl-worker: failed to mark completeNotifyFailed", err);
+  }
+}
+
 async function notifyScanComplete(analysisId: string): Promise<void> {
   const secret = process.env.CRON_SECRET?.trim();
   const { origin, hasSecret } = await resolveWorkerWebOrigin();
@@ -362,30 +385,55 @@ async function notifyScanComplete(analysisId: string): Promise<void> {
       "crawl-worker: cannot notify scan complete — set APP_URL (or NEXT_PUBLIC_APP_URL) and CRON_SECRET",
       { analysisId, hasSecret, hasOrigin: Boolean(origin) },
     );
+    await markCompleteNotifyFailed(
+      analysisId,
+      "Missing APP_URL or CRON_SECRET on crawl worker",
+    );
     return;
   }
 
   const url = `${origin}/api/scan/complete`;
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "x-cron-secret": secret,
-        Authorization: `Bearer ${secret}`,
-      },
-      body: JSON.stringify({ analysisId }),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!res.ok) {
-      console.error("crawl-worker: scan complete HTTP", res.status, await res.text());
-    } else {
-      console.log("crawl-worker: post-crawl started", analysisId);
+  const maxAttempts = 3;
+  let lastError = "";
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "x-cron-secret": secret,
+          Authorization: `Bearer ${secret}`,
+        },
+        body: JSON.stringify({ analysisId }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (res.ok || res.status === 202) {
+        console.log("crawl-worker: post-crawl started", analysisId, {
+          attempt,
+          status: res.status,
+        });
+        return;
+      }
+      lastError = `HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`;
+      console.error("crawl-worker: scan complete HTTP", res.status, lastError, {
+        attempt,
+      });
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
+      console.error("crawl-worker: scan complete notify failed", {
+        analysisId,
+        attempt,
+        error: lastError,
+      });
     }
-  } catch (err) {
-    console.error("crawl-worker: scan complete notify failed", err);
+    if (attempt < maxAttempts) {
+      await new Promise((r) => setTimeout(r, 500 * Math.pow(2, attempt - 1)));
+    }
   }
+
+  await markCompleteNotifyFailed(analysisId, lastError || "notify failed");
 }
 
 /** Drain pre-enqueued crawl_pages for a product Engine analysis. */
