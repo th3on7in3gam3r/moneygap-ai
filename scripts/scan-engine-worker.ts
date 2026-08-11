@@ -26,13 +26,25 @@ async function main() {
     process.exit(1);
   }
 
-  const { default: pg } = require("pg") as {
-    default: { Client: new (opts: { connectionString: string }) => {
-      connect: () => Promise<void>;
-      query: (sql: string, params?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>;
-      end: () => Promise<void>;
-    } };
+  // `pg` is CJS: require("pg").Client — there is no `.default` export.
+  type PgClient = {
+    connect: () => Promise<void>;
+    query: (
+      sql: string,
+      params?: unknown[],
+    ) => Promise<{ rows: Record<string, unknown>[] }>;
+    end: () => Promise<void>;
   };
+  type PgModule = {
+    Client: new (opts: { connectionString: string }) => PgClient;
+    default?: { Client: new (opts: { connectionString: string }) => PgClient };
+  };
+  const pgMod = require("pg") as PgModule;
+  const PgClientCtor = pgMod.Client ?? pgMod.default?.Client;
+  if (!PgClientCtor) {
+    console.error("scan-engine-worker: pg.Client missing from require('pg')");
+    process.exit(1);
+  }
 
   const workerId =
     process.env.RENDER_INSTANCE_ID ||
@@ -49,7 +61,7 @@ async function main() {
       continue;
     }
 
-    const client = new pg.Client({ connectionString: url });
+    const client = new PgClientCtor({ connectionString: url });
     try {
       await client.connect();
       let processed = true;

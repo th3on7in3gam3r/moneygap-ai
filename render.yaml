@@ -95,7 +95,7 @@ services:
     name: moneygap-scan-worker
     runtime: node
     plan: starter
-    buildCommand: npm install && npm run build --prefix packages/moneygap-scan-engine
+    buildCommand: npm install && npm run build --prefix packages/moneygap-scan-engine && npm run build --prefix packages/moneygap-crawler
     startCommand: npx tsx scripts/scan-engine-worker.ts
     envVars:
       - key: NODE_VERSION
